@@ -13,3 +13,7 @@ diff f x0 = (\(Dual _ d) -> d) $ f $ Dual x0 1
 
 g :: (Num a) => a -> a
 g x = x*x 
+
+main :: IO ()
+main = do
+  print $ map (diff g) [0,1..3::Double]
