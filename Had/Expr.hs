@@ -2,14 +2,14 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Expr( Expr(..)
-           , Op2Type(..)
-           , SourceType(..)
-           , ElemwiseType(..)
-           , exprToGr
-           , sym
-           , exprExample
-           ) where
+module Had.Expr( Expr(..)
+               , Op2Type(..)
+               , SourceType(..)
+               , ElemwiseType(..)
+               , exprToGr
+               , sym
+               , exprExample
+               ) where
 
 import Data.GraphViz
 import Data.Graph.Inductive hiding (pre)

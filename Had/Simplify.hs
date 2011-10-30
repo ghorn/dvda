@@ -2,11 +2,11 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Simplify( pruneZeros
-               , pruneExample
-               ) where
+module Had.Simplify( pruneZeros
+                   , pruneExample
+                   ) where
 
-import Expr
+import Had.Expr
 
 import Data.GraphViz
 

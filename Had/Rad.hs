@@ -2,12 +2,12 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Rad( diff
-          , radExample
-          ) where
+module Had.Rad( diff
+              , radExample
+              ) where
 
-import Expr
-import Simplify(pruneZeros)
+import Had.Expr
+import Had.Simplify(pruneZeros)
 
 import Data.GraphViz
 
