@@ -26,12 +26,12 @@ instance Show Op2Type where
 
 data ElemwiseType = Abs
                   | Signum
-                  | Sqr deriving (Show, Eq)
+                  | Negate deriving (Show, Eq)
 elemwisePrePost :: ElemwiseType -> (String, String)
 --elemwisePrePost Abs = ("|", "|")
 elemwisePrePost Abs = ("abs", "")
 elemwisePrePost Signum = ("signum", "")
-elemwisePrePost Sqr = ("( ", "^2 )")
+elemwisePrePost Negate = ("negate", "")
 
 data (Show a, Eq a) => SourceType a = Number a
                                     | I Integer
@@ -62,6 +62,7 @@ instance (Show a, Eq a, Num a) => Num (Expr a) where
   (*) = Op2 Mul
   abs = Elemwise Abs
   signum = Elemwise Signum
+  fromInteger 0 = Source Zero
   fromInteger x = Source (I x)
 
 edgeName :: String
