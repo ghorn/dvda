@@ -3,38 +3,45 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Expr( Expr(..)
+           , Op2Type(..)
+           , SourceType(..)
+           , ElemwiseType(..)
            , exprToGr
            , sym
+           , exprExample
            ) where
-
 
 import Data.GraphViz
 import Data.Graph.Inductive hiding (pre)
 
-
 data Op2Type = Mul
-             | Div
+--             | Div
              | Add
              | Sub deriving Eq
 instance Show Op2Type where
   show Mul = "*"
-  show Div = "/"
+--  show Div = "/"
   show Add = "+"
   show Sub = "-"
 
 data ElemwiseType = Abs
+                  | Signum
                   | Sqr deriving (Show, Eq)
 elemwisePrePost :: ElemwiseType -> (String, String)
-elemwisePrePost Abs = ("|", "|")
+--elemwisePrePost Abs = ("|", "|")
+elemwisePrePost Abs = ("abs", "")
+elemwisePrePost Signum = ("signum", "")
 elemwisePrePost Sqr = ("( ", "^2 )")
 
 data (Show a, Eq a) => SourceType a = Number a
                                     | I Integer
-                                    | Sym String deriving Eq
+                                    | Sym String
+                                    | Zero deriving Eq
 instance (Show a, Eq a) => Show (SourceType a) where
   show (Number a) = show a
   show (I i) = show i
   show (Sym s) = s
+  show Zero = "0"
 
 data (Show a, Eq a) => Expr a = Source (SourceType a)
                               | Elemwise ElemwiseType (Expr a)
@@ -54,9 +61,8 @@ instance (Show a, Eq a, Num a) => Num (Expr a) where
   (-) = Op2 Sub
   (*) = Op2 Mul
   abs = Elemwise Abs
---  signum = error "suck it"
+  signum = Elemwise Signum
   fromInteger x = Source (I x)
-
 
 edgeName :: String
 edgeName = ""
@@ -96,13 +102,12 @@ exprToNe expr = (topNode:nodes', edges')
         nn = newNode idx (show a)
         ne = newEdge parentIdx idx edgeName
 
-
-exampleExpr :: Expr Integer
-exampleExpr = abs(x*34) + 5
-  where
-    x = sym "x"
-
-main :: IO ()
-main = do
+exprExample :: IO ()
+exprExample = do
+  let exampleExpr :: Expr Integer
+      exampleExpr = abs(x*34) + 5 + x
+        where
+          x = sym "x"
+  
   print exampleExpr
   preview $ exprToGr exampleExpr
