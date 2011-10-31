@@ -5,8 +5,6 @@
 module Had.Fad( fadExample
               ) where
 
-import Data.GraphViz
-
 import Had.Expr
 import Had.Simplify(pruneZeros)
 
@@ -33,5 +31,5 @@ fadExample = do
   print exampleExpr
   print $ f
   print $ g
-  preview $ exprToGraph f
-  preview $ exprToGraph g
+  previewGraph $ exprToGraph f
+  previewGraph $ exprToGraph g
