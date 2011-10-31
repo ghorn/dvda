@@ -4,6 +4,7 @@
 
 module Had.Expr.Expr( Expr(..)
                     , sym
+                    , showExprOp
                     ) where
 
 import Had.Expr.Op2Type
@@ -32,3 +33,10 @@ instance (Show a, Eq a, Num a) => Num (Expr a) where
 
 sym :: (Show a, Eq a) => String -> Expr a
 sym name = Source (Sym name)
+
+showExprOp :: (Show a, Eq a) => Expr a -> String
+showExprOp (Source s) = show s
+showExprOp (Elemwise elemwiseType _) = (pre ++ "  " ++ post)
+  where
+    (pre, post) = elemwisePrePost elemwiseType
+showExprOp (Op2 op2type _ _) = (show op2type)

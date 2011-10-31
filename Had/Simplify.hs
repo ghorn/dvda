@@ -54,5 +54,5 @@ pruneExample = do
         where
           y = sym "y"
   print exampleExpr
-  preview $ exprToGr exampleExpr
-  preview $ exprToGr $ pruneZeros exampleExpr
+  preview $ exprToGraph exampleExpr
+  preview $ exprToGraph $ pruneZeros exampleExpr

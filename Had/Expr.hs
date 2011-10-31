@@ -8,7 +8,7 @@ module Had.Expr( Expr(..)
                , SourceType(..)
                , elemwisePrePost
                , sym
-               , exprToGr
+               , exprToGraph
                , exprExample
                ) where
 
@@ -16,5 +16,5 @@ import Had.Expr.Expr(Expr(..), sym)
 import Had.Expr.Op2Type(Op2Type(..))
 import Had.Expr.ElemwiseType(ElemwiseType(..), elemwisePrePost)
 import Had.Expr.SourceType(SourceType(..))
-import Had.Expr.ExprToGraph(exprToGr)
+import Had.Expr.ExprToGraph(exprToGraph)
 import Had.Expr.ExprExample(exprExample)

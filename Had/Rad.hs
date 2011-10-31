@@ -22,10 +22,11 @@ diffR (Elemwise elemwiseType x) = pruneZeros $ elemwiseDiffRule elemwiseType (x,
 radExample :: IO ()
 radExample = do
   let exampleExpr :: Expr Integer
-      exampleExpr = abs(y*34) + 5 + y
+      exampleExpr = abs(y*34) + 5 + x*y
         where
+          x = sym "x"
           y = sym "y"
   print exampleExpr
   print $ diffR exampleExpr
-  preview $ exprToGr exampleExpr
-  preview $ exprToGr $ diffR exampleExpr
+  preview $ exprToGraph exampleExpr
+  preview $ exprToGraph $ diffR exampleExpr

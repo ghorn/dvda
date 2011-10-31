@@ -18,4 +18,4 @@ exprExample = do
           x = sym "x"
   
   print exampleExpr
-  preview $ exprToGr exampleExpr
+  preview $ exprToGraph exampleExpr
