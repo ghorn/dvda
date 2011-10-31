@@ -15,4 +15,3 @@ instance (Show a, Eq a) => Show (SourceType a) where
   show (I i) = show i
   show (Sym s) = s
   show Zero = "0"
-

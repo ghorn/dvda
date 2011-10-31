@@ -2,39 +2,22 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Rad( diff
+module Had.Rad( diffR
               , radExample
               ) where
 
 import Had.Expr
+import Had.Expr.Op2Type(op2DiffRule)
+import Had.Expr.ElemwiseType(elemwiseDiffRule)
 import Had.Simplify(pruneZeros)
 
 import Data.GraphViz
 
-diff :: (Show a, Eq a, Num a) => Expr a -> Expr a
-diff (Op2 op2Type x y) = pruneZeros $ op2DiffRule op2Type x y
-diff (Elemwise elemwiseType x) = pruneZeros $ elemwiseDiffRule elemwiseType x
-diff (Source x) = Source $ sourceDiffRule x
-
--- op2 differentiation rules
-op2DiffRule :: Num a => Op2Type -> Expr a -> Expr a -> Expr a
-op2DiffRule Mul x y = x*(diff y) + (diff x)*y
-op2DiffRule Add x y = (diff x) + (diff y)
-op2DiffRule Sub x y = (diff x) - (diff y)
-
--- source differentiation rules
-sourceDiffRule :: (Show a, Eq a) => SourceType a -> SourceType a
-sourceDiffRule (Sym name) = Sym ("d("++name++")")
-sourceDiffRule (Number _) = Zero
-sourceDiffRule (I _) = Zero
-sourceDiffRule Zero = Zero
-
--- elementwise differentiation rules
-elemwiseDiffRule :: Num a => ElemwiseType -> Expr a -> Expr a
-elemwiseDiffRule Abs x = signum x
-elemwiseDiffRule Negate x = Elemwise Negate (diff x)
-elemwiseDiffRule Signum _ = Source Zero
-  
+diffR :: (Show a, Eq a, Num a) => Expr a -> Expr a
+diffR (Source (Sym name)) = Source $ Sym ("d(" ++ name ++ ")")
+diffR (Source _) = Source Zero
+diffR (Op2 op2Type x y) = pruneZeros $ op2DiffRule op2Type (x, diffR x) (y, diffR y)
+diffR (Elemwise elemwiseType x) = pruneZeros $ elemwiseDiffRule elemwiseType (x, diffR x)
 
 radExample :: IO ()
 radExample = do
@@ -43,6 +26,6 @@ radExample = do
         where
           y = sym "y"
   print exampleExpr
-  print $ diff exampleExpr
+  print $ diffR exampleExpr
   preview $ exprToGr exampleExpr
-  preview $ exprToGr $ diff exampleExpr
+  preview $ exprToGr $ diffR exampleExpr
