@@ -10,11 +10,12 @@ module Had.Expr( Expr(..)
                , sym
                , exprToGraph
                , exprExample
+               , previewGraph
                ) where
 
 import Had.Expr.Expr(Expr(..), sym)
 import Had.Expr.Op2Type(Op2Type(..))
 import Had.Expr.ElemwiseType(ElemwiseType(..), elemwisePrePost)
 import Had.Expr.SourceType(SourceType(..))
-import Had.Expr.ExprToGraph(exprToGraph)
+import Had.Expr.ExprToGraph(exprToGraph, previewGraph)
 import Had.Expr.ExprExample(exprExample)

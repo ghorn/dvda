@@ -11,8 +11,6 @@ import Had.Expr.Op2Type(op2DiffRule)
 import Had.Expr.ElemwiseType(elemwiseDiffRule)
 import Had.Simplify(pruneZeros)
 
-import Data.GraphViz
-
 diffR :: (Show a, Eq a, Num a) => Expr a -> Expr a
 diffR (Source (Sym name)) = Source $ Sym ("d(" ++ name ++ ")")
 diffR (Source _) = Source Zero
@@ -28,5 +26,5 @@ radExample = do
           y = sym "y"
   print exampleExpr
   print $ diffR exampleExpr
-  preview $ exprToGraph exampleExpr
-  preview $ exprToGraph $ diffR exampleExpr
+  previewGraph $ exprToGraph exampleExpr
+  previewGraph $ exprToGraph $ diffR exampleExpr

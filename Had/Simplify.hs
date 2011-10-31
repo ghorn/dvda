@@ -8,8 +8,6 @@ module Had.Simplify( pruneZeros
 
 import Had.Expr
 
-import Data.GraphViz
-
 pruneZeros :: (Show a, Eq a, Num a) => Expr a -> Expr a
 pruneZeros x 
   | x == xPruned = x
@@ -54,5 +52,5 @@ pruneExample = do
         where
           y = sym "y"
   print exampleExpr
-  preview $ exprToGraph exampleExpr
-  preview $ exprToGraph $ pruneZeros exampleExpr
+  previewGraph $ exprToGraph exampleExpr
+  previewGraph $ exprToGraph $ pruneZeros exampleExpr

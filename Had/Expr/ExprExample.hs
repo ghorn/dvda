@@ -5,8 +5,6 @@
 module Had.Expr.ExprExample( exprExample 
                            ) where
 
-import Data.GraphViz
-
 import Had.Expr.Expr
 import Had.Expr.ExprToGraph
 
@@ -18,4 +16,4 @@ exprExample = do
           x = sym "x"
   
   print exampleExpr
-  preview $ exprToGraph exampleExpr
+  previewGraph $ exprToGraph exampleExpr

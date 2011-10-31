@@ -10,6 +10,8 @@ module Had.Expr.Expr( Expr(..)
 import Had.Expr.Op2Type
 import Had.Expr.ElemwiseType
 import Had.Expr.SourceType
+import Data.GraphViz(Labellable(..))
+import Data.Text.Lazy(pack)
 
 data (Show a, Eq a) => Expr a = Source (SourceType a)
                               | Elemwise ElemwiseType (Expr a)
@@ -30,6 +32,9 @@ instance (Show a, Eq a, Num a) => Num (Expr a) where
   signum = Elemwise Signum
   fromInteger 0 = Source Zero
   fromInteger x = Source (I x)
+
+instance (Show a, Num a) => Labellable (Expr a) where
+  toLabelValue go = toLabelValue $ pack $ show go
 
 sym :: (Show a, Eq a) => String -> Expr a
 sym name = Source (Sym name)

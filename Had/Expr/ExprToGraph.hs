@@ -4,27 +4,55 @@
 
 module Had.Expr.ExprToGraph( exprToGraph
                            , exprToGraphTest
+                           , previewGraph
                            ) where
 
 import Data.Graph.Inductive hiding (pre, nodes, edges)
 import Control.Monad.State
 import Data.GraphViz
+import Data.Text.Lazy(pack)
 
 import Had.Expr.Expr
+import Had.Expr.SourceType
+import Had.Expr.ElemwiseType
+import Had.Expr.Op2Type
 
-exprToGraph :: (Show a, Num a) => Expr a -> (Gr String String)
+previewGraph :: (Show a, Eq a) => Gr (GraphOp a) (Expr a) -> IO ()
+previewGraph g = preview $ emap show g
+                
+data GraphOp a = GSource (SourceType a)
+               | GElemwise ElemwiseType
+               | GOp2 Op2Type
+               | GOutput String
+instance (Eq a, Show a) => Show (GraphOp a) where
+  show (GSource sourceType) = show sourceType
+  show (GElemwise elemwiseType) = show elemwiseType
+  show (GOp2 op2Type) = show op2Type
+  show (GOutput name) = name
+
+
+instance (Show a, Eq a) => Labellable (GraphOp a) where
+  toLabelValue go = toLabelValue $ pack $ show go
+
+exprToGraph :: (Show a, Num a) => Expr a -> Gr (GraphOp a) (Expr a)
 exprToGraph expr = evalState (graphGobbler 0 expr) emptyGP
   where
-    emptyGP :: Gr String String
-    emptyGP = mkGraph [(0, "output")] []
+    emptyGP = mkGraph [(0, GOutput "out")] []
+
+getGraphOp :: (Show a, Eq a) => Expr a -> GraphOp a
+getGraphOp (Source s) = GSource s
+getGraphOp (Elemwise ewt _) = GElemwise ewt
+getGraphOp (Op2 op2 _ _) = GOp2 op2
 
 
-graphGobbler :: (Show a, Num a) => Int -> Expr a -> State (Gr String String) (Gr String String)
+graphGobbler :: (Show a, Num a) => Int -> Expr a -> State (Gr (GraphOp a) (Expr a)) (Gr (GraphOp a) (Expr a))
 graphGobbler parentIdx expr = do
   graph <- get
   let newIdx = noNodes graph
-      newState = ([], newIdx, showExprOp expr, [(show expr, parentIdx)]) & graph
+      newState = ([], newIdx, getGraphOp expr, [(expr, parentIdx)]) & graph
+  
   put newState
+  
   case expr of (Source _) -> do
                  return newState
                (Elemwise _ x) -> do
@@ -46,4 +74,4 @@ test = do
       g = exprToGraph exampleExpr
   print exampleExpr
   print g
-  preview $ g
+  previewGraph g
