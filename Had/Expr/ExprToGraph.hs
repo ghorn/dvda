@@ -11,6 +11,7 @@ import Data.Graph.Inductive hiding (pre, nodes, edges)
 import Control.Monad.State
 import Data.GraphViz
 import Data.Text.Lazy(pack)
+import Data.Maybe
 
 import Had.Expr.Expr
 import Had.Expr.SourceType
@@ -45,11 +46,21 @@ getGraphOp (Elemwise ewt _) = GElemwise ewt
 getGraphOp (Op2 op2 _ _) = GOp2 op2
 
 
+lookupBy :: (Eq a) => (b -> a) -> a -> [b] -> Maybe b
+lookupBy f a bs = lookup a $ map (\x -> (f x, x)) bs
+
+
 graphGobbler :: (Show a, Num a) => Int -> Expr a -> State (Gr (GraphOp a) (Expr a)) (Gr (GraphOp a) (Expr a))
 graphGobbler parentIdx expr = do
   graph <- get
-  let newIdx = noNodes graph
-      newState = ([], newIdx, getGraphOp expr, [(expr, parentIdx)]) & graph
+
+  let existingNode = lookupBy (\(_,_,a) -> a) expr (labEdges graph)
+      newIdx = noNodes graph
+      newState
+        | isNothing existingNode = ([], newIdx, getGraphOp expr, [(expr, parentIdx)]) & graph
+        | otherwise = insEdge (idx, parentIdx, expr) graph
+        where
+          (idx,_,_) = (fromJust existingNode)
   
   put newState
   
