@@ -47,7 +47,7 @@ Library
   Exposed-modules:     Had.Rad, Had.Expr, Had.Simplify
   
   -- Packages needed in order to build this package.
-  Build-depends:       base, graphviz, fgl, mtl, text
+  Build-depends:       base, graphviz, fgl, text
 
   Ghc-options:         -O2
   
