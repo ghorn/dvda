@@ -51,19 +51,17 @@ addOutput (name, expr) graph = graphGobbler newIdx expr newState
     newState = insNode (newIdx, GOutput name) graph
 
 graphGobbler :: (Show a, Num a) => Int -> Expr a -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
-graphGobbler parentIdx expr oldGraph = ret
-  where
-    existingNode = lookupBy (\(_,_,a) -> a) expr (labEdges oldGraph)
-    newIdx = noNodes oldGraph
-    newGraph
-      | isNothing existingNode = ([], newIdx, getGraphOp expr, [(expr, parentIdx)]) & oldGraph
-      | otherwise = insEdge (idx, parentIdx, expr) oldGraph
+graphGobbler parentIdx expr oldGraph    
+  | isJust existingNode = insEdge (existingIdx, parentIdx, expr) oldGraph
+  | otherwise           = case expr of (Source _)     -> newGraph
+                                       (Elemwise _ x) -> graphGobbler newIdx x newGraph
+                                       (Op2 _ x y)    -> graphGobbler newIdx y $
+                                                         graphGobbler newIdx x newGraph
       where
-        (idx,_,_) = (fromJust existingNode)
-  
-    ret = case expr of (Source _)     -> newGraph
-                       (Elemwise _ x) -> graphGobbler newIdx x newGraph
-                       (Op2 _ x y)    -> graphGobbler newIdx y $ graphGobbler newIdx x newGraph
+        existingNode = lookupBy (\(_,_,a) -> a) expr (labEdges oldGraph)
+        (existingIdx,_,_) = fromJust existingNode
+        newIdx = noNodes oldGraph
+        newGraph = ([], newIdx, getGraphOp expr, [(expr, parentIdx)]) & oldGraph
 
 lookupBy :: (Eq a) => (b -> a) -> a -> [b] -> Maybe b
 lookupBy f a bs = lookup a $ map (\x -> (f x, x)) bs
@@ -79,7 +77,7 @@ exprToGraphTest = test
 test :: IO ()
 test = do
   let exampleExprs :: [Expr Integer]
-      exampleExprs = [x*34 + 5 + x, 3*x + 3]
+      exampleExprs = [x*34 + 5 + x, x*34 + 3]
         where
           x = sym "x"
       g = exprsToGraph exampleExprs
