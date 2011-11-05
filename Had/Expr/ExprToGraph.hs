@@ -39,15 +39,14 @@ exprToGraph :: (Show a, Num a) => Expr a -> Gr (GraphOp a) (Expr a)
 exprToGraph expr = exprsToGraph [expr]
 
 exprsToGraph :: (Show a, Num a) => [Expr a] -> Gr (GraphOp a) (Expr a)
-exprsToGraph exprs = foldr addOutput emptyGP labeledExprs
+exprsToGraph exprs = foldr addOutput empty labeledExprs
   where
     labeledExprs = reverse $ zipWith (\k e -> ("out"++show k, e)) [(0::Integer)..] exprs
-    emptyGP = mkGraph [] []
 
 addOutput :: (Show a, Num a) => (String, Expr a) -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
 addOutput (name, expr) graph = graphGobbler newIdx expr newState
   where
-    newIdx = noNodes graph
+    newIdx = head $ newNodes 1 graph
     newState = insNode (newIdx, GOutput name) graph
 
 graphGobbler :: (Show a, Num a) => Int -> Expr a -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
@@ -60,7 +59,7 @@ graphGobbler parentIdx expr oldGraph
       where
         existingNode = lookupBy (\(_,_,a) -> a) expr (labEdges oldGraph)
         (existingIdx,_,_) = fromJust existingNode
-        newIdx = noNodes oldGraph
+        newIdx = head $ newNodes 1 oldGraph
         newGraph = ([], newIdx, getGraphOp expr, [(expr, parentIdx)]) & oldGraph
 
 lookupBy :: (Eq a) => (b -> a) -> a -> [b] -> Maybe b
