@@ -3,11 +3,14 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Had.Expr.ExprToGraph( exprToGraph
+                           , exprsToGraph
                            , exprToGraphTest
                            , previewGraph
+                           , GraphOp(..)
+                           , nodeToExpr
                            ) where
 
-import Data.Graph.Inductive hiding (pre, nodes, edges)
+import Data.Graph.Inductive hiding (nodes, edges)
 import Data.GraphViz
 import Data.Text.Lazy(pack)
 import Data.Maybe
@@ -49,6 +52,15 @@ addOutput (name, expr) graph = graphGobbler newIdx expr newState
     newIdx = head $ newNodes 1 graph
     newState = insNode (newIdx, GOutput name) graph
 
+nodeToExpr :: (Show a, Eq a) => Node -> Gr (GraphOp a) (Expr a) -> Expr a
+nodeToExpr idx graph = f $ fromJust $ lab graph idx
+  where
+    children = pre graph idx
+    f (GOutput _) = nodeToExpr (head children) graph
+    f (GSource sourcetype) = Source sourcetype
+    f (GElemwise elemwiseType) = Elemwise elemwiseType (nodeToExpr (head children) graph)
+    f (GOp2 op2Type) = Op2 op2Type (nodeToExpr (children !! 0) graph) (nodeToExpr (children !! 1) graph)
+        
 graphGobbler :: (Show a, Num a) => Int -> Expr a -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
 graphGobbler parentIdx expr oldGraph    
   | isJust existingNode = insEdge (existingIdx, parentIdx, expr) oldGraph
