@@ -20,7 +20,8 @@ import Had.Expr.SourceType
 import Had.Expr.ElemwiseType
 import Had.Expr.Op2Type
 
-previewGraph :: (Show a, Eq a) => Gr (GraphOp a) (Expr a) -> IO ()
+--previewGraph :: (Show a, Eq a) => Gr (GraphOp a) (Expr a) -> IO ()
+previewGraph :: (DynGraph gr, Labellable nl, Show b) => gr nl b -> IO ()
 previewGraph g = preview $ emap show g
 
 data GraphOp a = GSource (SourceType a)
@@ -38,21 +39,21 @@ instance (Eq a, Show a) => Show (GraphOp a) where
 instance (Show a, Eq a) => Labellable (GraphOp a) where
   toLabelValue go = toLabelValue $ pack $ show go
 
-exprToGraph :: (Show a, Num a) => Expr a -> Gr (GraphOp a) (Expr a)
+exprToGraph :: Eq a => Expr a -> Gr (GraphOp a) (Expr a)
 exprToGraph expr = exprsToGraph [expr]
 
-exprsToGraph :: (Show a, Num a) => [Expr a] -> Gr (GraphOp a) (Expr a)
+exprsToGraph :: Eq a => [Expr a] -> Gr (GraphOp a) (Expr a)
 exprsToGraph exprs = foldr addOutput empty labeledExprs
   where
     labeledExprs = reverse $ zipWith (\k e -> ("out"++show k, e)) [(0::Integer)..] exprs
 
-addOutput :: (Show a, Num a) => (String, Expr a) -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
+addOutput :: Eq a => (String, Expr a) -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
 addOutput (name, expr) graph = graphGobbler newIdx expr newState
   where
     newIdx = head $ newNodes 1 graph
     newState = insNode (newIdx, GOutput name) graph
 
-nodeToExpr :: (Show a, Eq a) => Node -> Gr (GraphOp a) (Expr a) -> Expr a
+nodeToExpr :: Node -> Gr (GraphOp a) (Expr a) -> Expr a
 nodeToExpr idx graph = f $ fromJust $ lab graph idx
   where
     children = pre graph idx
@@ -61,7 +62,7 @@ nodeToExpr idx graph = f $ fromJust $ lab graph idx
     f (GElemwise elemwiseType) = Elemwise elemwiseType (nodeToExpr (head children) graph)
     f (GOp2 op2Type) = Op2 op2Type (nodeToExpr (children !! 0) graph) (nodeToExpr (children !! 1) graph)
         
-graphGobbler :: (Show a, Num a) => Int -> Expr a -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
+graphGobbler :: Eq a => Int -> Expr a -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
 graphGobbler parentIdx expr oldGraph    
   | isJust existingNode = insEdge (existingIdx, parentIdx, expr) oldGraph
   | otherwise           = case expr of (Source _)     -> newGraph
@@ -74,10 +75,10 @@ graphGobbler parentIdx expr oldGraph
         newIdx = head $ newNodes 1 oldGraph
         newGraph = ([], newIdx, getGraphOp expr, [(expr, parentIdx)]) & oldGraph
 
-lookupBy :: (Eq a) => (b -> a) -> a -> [b] -> Maybe b
+lookupBy :: Eq a => (b -> a) -> a -> [b] -> Maybe b
 lookupBy f a bs = lookup a $ map (\x -> (f x, x)) bs
 
-getGraphOp :: (Show a, Eq a) => Expr a -> GraphOp a
+getGraphOp :: Expr a -> GraphOp a
 getGraphOp (Source s) = GSource s
 getGraphOp (Elemwise ewt _) = GElemwise ewt
 getGraphOp (Op2 op2 _ _) = GOp2 op2

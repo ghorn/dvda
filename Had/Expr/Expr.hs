@@ -13,9 +13,9 @@ import Had.Expr.SourceType
 import Data.GraphViz(Labellable(..))
 import Data.Text.Lazy(pack)
 
-data (Show a, Eq a) => Expr a = Source (SourceType a)
-                              | Elemwise ElemwiseType (Expr a)
-                              | Op2 Op2Type (Expr a) (Expr a) deriving Eq
+data Expr a = Source (SourceType a)
+            | Elemwise ElemwiseType (Expr a)
+            | Op2 Op2Type (Expr a) (Expr a) deriving Eq
 
 instance (Show a, Eq a) => Show (Expr a) where
   show (Op2 op2Type x y) = "( " ++ show x ++" "++ show op2Type ++" "++ show y ++ " )"
@@ -36,7 +36,7 @@ instance (Show a, Eq a, Num a) => Num (Expr a) where
 instance (Show a, Num a) => Labellable (Expr a) where
   toLabelValue go = toLabelValue $ pack $ show go
 
-sym :: (Show a, Eq a) => String -> Expr a
+sym :: String -> Expr a
 sym name = Source (Sym name)
 
 showExprOp :: (Show a, Eq a) => Expr a -> String
