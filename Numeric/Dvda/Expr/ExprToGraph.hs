@@ -22,9 +22,11 @@ import Numeric.Dvda.Expr.SourceType
 import Numeric.Dvda.Expr.ElemwiseType
 import Numeric.Dvda.Expr.Op2Type
 
---previewGraph :: (Show a, Eq a) => Gr (GraphOp a) (Expr a) -> IO ()
 previewGraph :: (DynGraph gr, Labellable nl, Show b) => gr nl b -> IO ()
 previewGraph g = preview $ emap show g
+
+previewGraph_ :: (DynGraph gr, Labellable nl) => gr nl b -> IO ()
+previewGraph_ g = preview $ emap (\_ -> "") g
 
 data GraphOp a = GSource (SourceType a)
                | GElemwise ElemwiseType
@@ -44,16 +46,22 @@ instance (Show a, Eq a) => Labellable (GraphOp a) where
 exprToGraph :: Eq a => Expr a -> Gr (GraphOp a) (Expr a)
 exprToGraph expr = exprsToGraph [expr]
 
+lexprToGraph :: Eq a => (String, Expr a) -> Gr (GraphOp a) (Expr a)
+lexprToGraph labeledExpr = lexprsToGraph [labeledExpr]
+
 exprsToGraph :: Eq a => [Expr a] -> Gr (GraphOp a) (Expr a)
 exprsToGraph exprs = foldr addOutput empty labeledExprs
   where
     labeledExprs = reverse $ zipWith (\k e -> ("out"++show k, e)) [(0::Integer)..] exprs
 
+lexprsToGraph :: Eq a => [(String, Expr a)] -> Gr (GraphOp a) (Expr a)
+lexprsToGraph labeledExprs = foldr addOutput empty labeledExprs
+
 addOutput :: Eq a => (String, Expr a) -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
-addOutput (name, expr) graph = graphGobbler newIdx expr newState
+addOutput (name, expr) graph = graphGobbler newIdx expr newGraph
   where
     newIdx = head $ newNodes 1 graph
-    newState = insNode (newIdx, GOutput name) graph
+    newGraph = insNode (newIdx, GOutput name) graph
 
 nodeToExpr :: Node -> Gr (GraphOp a) (Expr a) -> Expr a
 nodeToExpr idx graph = f $ fromJust $ lab graph idx
