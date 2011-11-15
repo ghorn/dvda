@@ -21,4 +21,4 @@ instance Show Op2Type where
   show Mul = "*"
   show Add = "+"
   show Pow = "**"
-  show LogBase = "_logBase"
+  show LogBase = "`logBase`"
