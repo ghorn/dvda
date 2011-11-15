@@ -6,6 +6,7 @@ module Numeric.Dvda.Examples( fadExample
                             , radExample
                             , exprExample
                             , pruneExample
+                            , exprToGraphTest
                             ) where
 
 import Numeric.Dvda.AD.Fad(fad)
@@ -69,3 +70,15 @@ pruneExample = do
   print exampleExpr
   previewGraph $ exprToGraph exampleExpr
   previewGraph $ exprToGraph $ pruneZerosOnce exampleExpr
+
+
+exprToGraphTest :: IO ()
+exprToGraphTest = do
+  let exampleExprs :: [Expr Integer]
+      exampleExprs = [x*34 + 5 + x, x*34 + 3]
+        where
+          x = sym "x"
+      g = exprsToGraph exampleExprs
+  print exampleExprs
+  print g
+  previewGraph g

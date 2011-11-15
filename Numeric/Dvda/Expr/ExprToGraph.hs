@@ -4,8 +4,10 @@
 
 module Numeric.Dvda.Expr.ExprToGraph( exprToGraph
                                     , exprsToGraph
-                                    , exprToGraphTest
+                                    , lexprToGraph
+                                    , lexprsToGraph
                                     , previewGraph
+                                    , previewGraph_
                                     , GraphOp(..)
                                     , nodeToExpr
                                     ) where
@@ -82,17 +84,3 @@ getGraphOp :: Expr a -> GraphOp a
 getGraphOp (Source s) = GSource s
 getGraphOp (Elemwise ewt _) = GElemwise ewt
 getGraphOp (Op2 op2 _ _) = GOp2 op2
-
-exprToGraphTest :: IO ()
-exprToGraphTest = test
-
-test :: IO ()
-test = do
-  let exampleExprs :: [Expr Integer]
-      exampleExprs = [x*34 + 5 + x, x*34 + 3]
-        where
-          x = sym "x"
-      g = exprsToGraph exampleExprs
-  print exampleExprs
-  print g
-  previewGraph g
