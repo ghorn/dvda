@@ -36,7 +36,7 @@ instance Floating a => Floating (Dual a) where
   sqrt (Dual x x') = Dual (sqrt x) (x'/(2*(sqrt x)))
   log (Dual x x')  = Dual (log x) (x'/x)
   
-  (Dual x x')**(Dual y y') = Dual (x**y) $ ( y*x' + x*(log x) ) * y' * x**(y-1)
+  (Dual x x')**(Dual y y') = Dual (x**y) $ ( x'*y + x*y'*(log x) ) * x**(y-1)
   logBase (Dual b b') (Dual e e') = Dual (logBase b e) $
                                     (b*e'*(log b) - b'*e*log(e)) / (b*e*(log b)*(log b))
   
