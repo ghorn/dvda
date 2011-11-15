@@ -10,7 +10,6 @@ import Numeric.Dvda.Expr.Expr
 import Numeric.Dvda.Expr.Op2Type
 import Numeric.Dvda.Expr.ElemwiseType
 import Numeric.Dvda.Expr.SourceType
-import Numeric.Dvda.Expr.ExprToGraph
 import Numeric.Dvda.Simplify
 import Numeric.Dvda.AD.Fad
 
@@ -38,21 +37,3 @@ getSensitivities (Elemwise ewt x) sens = getSensitivities x (sens*dfdx)
   where
     f = applyElemwise ewt
     dfdx = pert $ f (Dual x 1)
-
-  
-radExample :: IO ()
-radExample = do
-  let exampleExpr :: Expr Double
-      --      exampleExpr = abs(y*34) + 5 + x*y
-      exampleExpr = z + x*y
-        where
-          x = sym "x"
-          y = sym "y"
-          z = sym "z"
-  let args = map sym ["x", "y", "z"]
-
-  print exampleExpr
-  print $ rad exampleExpr args
-  
-  previewGraph $ exprToGraph exampleExpr
-  previewGraph $ exprsToGraph (exampleExpr:(rad exampleExpr args))

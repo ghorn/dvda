@@ -12,6 +12,6 @@ Description:         Automatic differentiation on symbolic expression trees.
 Cabal-version:       >=1.2
 
 Library
-  Exposed-modules:     Numeric.Dvda.AD.Rad, Numeric.Dvda.AD.Fad, Numeric.Dvda.Expr, Numeric.Dvda.Simplify
+  Exposed-modules:     Numeric.Dvda.AD.Rad, Numeric.Dvda.AD.Fad, Numeric.Dvda.Expr.Expr, Numeric.Dvda.Simplify, Numeric.Dvda.Examples
   Build-depends:       base, graphviz, fgl, text
   Ghc-options:         -O2

@@ -3,13 +3,10 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.AD.Fad( fad
---                          , fadExample
+                          , Dual(..)
                           ) where
 
 import Data.Ratio(numerator, denominator)
-
---import Numeric.Dvda.Expr
---import Numeric.Dvda.Simplify(pruneZeros)
 
 data Dual a = Dual a a deriving (Show, Eq)
 
@@ -55,22 +52,8 @@ instance Floating a => Floating (Dual a) where
   asinh (Dual x x') = Dual (asinh x) $ x'/(sqrt (1 + x*x))
   acosh (Dual x x') = Dual (acosh x) $ x'/((sqrt (x - 1))*(sqrt (x + 1)))
   atanh (Dual x x') = Dual (atanh x) $ x'/(1 - x*x)
-  
-fad :: Num a => (Dual a -> Dual b) -> a -> b
-fad f x = pert $ f (Dual x 1)
+
+fad :: Num a => (Dual a -> [Dual b]) -> a -> [b]
+fad f x = map pert $ f (Dual x 1)
   where
     pert (Dual _ p) = p
-
---fadExample :: IO ()
---fadExample = do
---  let -- exampleExpr :: Dual (Expr Integer)
---      f y = y*34 + 5 + y/(sin y)
---
---      expr = f (sym "y")
---      g = pruneZeros $ fad expr (sym "y")
---
---  print expr
---  print $ expr
---  print $ g
---  previewGraph $ exprToGraph expr
---  previewGraph $ exprToGraph g
