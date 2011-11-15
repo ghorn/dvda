@@ -6,7 +6,10 @@ module Numeric.Dvda.AD.Rad( getSensitivities
                           , radExample
                           ) where
 
-import Numeric.Dvda.Expr
+import Numeric.Dvda.Expr.Expr
+import Numeric.Dvda.Expr.Op2Type
+--import Numeric.Dvda.Expr.ElemwiseType
+import Numeric.Dvda.Expr.SourceType
 import Numeric.Dvda.Expr.ExprToGraph
 import Numeric.Dvda.Simplify
 
@@ -15,7 +18,6 @@ getSensitivities primal@(Source (Sym _)) sens = [(primal, sens)]
 getSensitivities (Source _) _ = []
 getSensitivities (Op2 Mul x y) sens = (getSensitivities x (sens*y))++(getSensitivities y (sens*x))
 getSensitivities (Op2 Add x y) sens = (getSensitivities x sens)++(getSensitivities y sens)
-getSensitivities (Op2 Sub x y) sens = (getSensitivities x sens)++(getSensitivities y sens)
 
 
 rad :: Num a => Expr a -> [Expr a] -> [Expr a]

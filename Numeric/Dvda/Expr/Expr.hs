@@ -24,8 +24,9 @@ instance (Show a, Eq a) => Show (Expr a) where
 
 instance (Show a, Eq a, Num a) => Num (Expr a) where
   (+) = Op2 Add
-  (-) = Op2 Sub
   (*) = Op2 Mul
+  (-) x y = Op2 Add x (-y)
+  negate = Elemwise Neg
   abs = Elemwise Abs
   signum = Elemwise Signum
   fromInteger 0 = Source Zero
@@ -36,10 +37,3 @@ instance (Show a, Num a) => Labellable (Expr a) where
 
 sym :: String -> Expr a
 sym name = Source (Sym name)
-
-showExprOp :: (Show a, Eq a) => Expr a -> String
-showExprOp (Source s) = show s
-showExprOp (Elemwise elemwiseType _) = (pre ++ "  " ++ post)
-  where
-    (pre, post) = elemwisePrePost elemwiseType
-showExprOp (Op2 op2type _ _) = (show op2type)
