@@ -13,7 +13,7 @@ import Numeric.Dvda.AD.Fad(fad)
 import Numeric.Dvda.AD.Rad(rad)
 import Numeric.Dvda.Expr.Expr(sym, Expr)
 import Numeric.Dvda.Simplify(fastSimplify, pruneZerosOnce)
-import Numeric.Dvda.Expr.ExprToGraph(previewGraph, exprToGraph, exprsToGraph)
+import Numeric.Dvda.Expr.ExprToGraph
 
 
 fadExample :: IO ()
@@ -34,8 +34,7 @@ fadExample = do
 radExample :: IO ()
 radExample = do
   let exampleExpr :: Expr Double
-      --      exampleExpr = abs(y*34) + 5 + x*y
-      exampleExpr = z + x*y
+      exampleExpr = (z + x*y)*log(cos(x)/(tanh(y)))**(z/exp(y))
         where
           x = sym "x"
           y = sym "y"
@@ -45,8 +44,8 @@ radExample = do
   print exampleExpr
   print $ rad exampleExpr args
   
-  previewGraph $ exprToGraph exampleExpr
-  previewGraph $ exprsToGraph (exampleExpr:(rad exampleExpr args))
+  previewGraph_ $ lexprToGraph ("f", exampleExpr)
+  previewGraph_ $ lexprsToGraph $ zip ["f", "df/dx", "df/dy", "df/dz"] (exampleExpr:(rad exampleExpr args))
 
 
 exprExample :: IO ()
