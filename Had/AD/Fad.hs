@@ -2,8 +2,8 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Fad( fadExample
-              ) where
+module Had.AD.Fad( fadExample
+                 ) where
 
 import Had.Expr
 import Had.Simplify(pruneZeros)
@@ -21,10 +21,9 @@ instance (Num a) => Num (Dual a) where
 fadExample :: IO ()
 fadExample = do
   let exampleExpr :: Dual (Expr Integer)
-      exampleExpr = abs(y*34) + 5 + x*y
+      exampleExpr = y*34 + 5 + y*y
         where
-          x = Dual (sym "x") (sym "dx")
-          y = Dual (sym "y") (sym "dy")
+          y = Dual (sym "y") 1
       f = (\(Dual x _) -> x) exampleExpr
       g = pruneZeros $ (\(Dual _ x) -> x) exampleExpr
 

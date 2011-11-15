@@ -2,9 +2,9 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Rad( getSensitivities
-              , radExample
-              ) where
+module Had.AD.Rad( getSensitivities
+                 , radExample
+                 ) where
 
 import Had.Expr
 import Had.Expr.ExprToGraph
@@ -12,7 +12,7 @@ import Had.Simplify
 
 getSensitivities :: Num a => Expr a -> Expr a -> [(Expr a, Expr a)]
 getSensitivities primal@(Source (Sym _)) sens = [(primal, sens)]
-getSensitivities primal@(Source _) _ = []
+getSensitivities (Source _) _ = []
 getSensitivities (Op2 Mul x y) sens = (getSensitivities x (sens*y))++(getSensitivities y (sens*x))
 getSensitivities (Op2 Add x y) sens = (getSensitivities x sens)++(getSensitivities y sens)
 getSensitivities (Op2 Sub x y) sens = (getSensitivities x sens)++(getSensitivities y sens)
