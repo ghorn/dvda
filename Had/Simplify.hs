@@ -3,22 +3,38 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Had.Simplify( pruneZeros
-                   , pruneExample
+                   , pruneZerosOnce
+                   , fastSimplify
+                   , removeTimesOne
                    ) where
 
-import Had.Expr
+import Had.Expr.Expr
+import Had.Expr.Op2Type
+import Had.Expr.ElemwiseType
+import Had.Expr.SourceType
+
+fastSimplify :: Num a => Expr a -> Expr a
+fastSimplify = removeTimesOne . pruneZeros
+
+-- only need to be called once
+removeTimesOne :: Expr a -> Expr a
+removeTimesOne (Op2 Mul (Source (I 1)) x) = removeTimesOne x
+removeTimesOne (Op2 Mul x (Source (I 1))) = removeTimesOne x
+removeTimesOne (Op2 asm x y) = Op2 asm (removeTimesOne x) (removeTimesOne y)
+removeTimesOne (Elemwise ewo x) = Elemwise ewo (removeTimesOne x)
+removeTimesOne src@(Source _) = src
 
 pruneZeros :: (Show a, Eq a, Num a) => Expr a -> Expr a
 pruneZeros x 
   | x == xPruned = x
   | otherwise    = pruneZeros xPruned
   where
-    xPruned = pruneZeros' x
+    xPruned = pruneZerosOnce x
 
-pruneZeros' :: (Show a, Eq a, Num a) => Expr a -> Expr a
-pruneZeros' (Op2 op2Type x y) = op2PruneZeros op2Type x y
-pruneZeros' (Elemwise elemwiseType x) = elemwisePruneZeros elemwiseType x
-pruneZeros' (Source x) = (Source x)
+pruneZerosOnce :: (Show a, Eq a, Num a) => Expr a -> Expr a
+pruneZerosOnce (Op2 op2Type x y) = op2PruneZeros op2Type x y
+pruneZerosOnce (Elemwise elemwiseType x) = elemwisePruneZeros elemwiseType x
+pruneZerosOnce (Source x) = (Source x)
 
 -- elemwise prune zeros
 elemwisePruneZeros :: Num a => ElemwiseType -> Expr a -> Expr a
@@ -44,13 +60,3 @@ op2PruneZeros Sub (Source Zero) (Source Zero) = Source Zero
 op2PruneZeros Sub (Source Zero) y = pruneZeros $ Elemwise Negate y
 op2PruneZeros Sub x (Source Zero) = pruneZeros $ x
 op2PruneZeros Sub x y = Op2 Sub (pruneZeros x) (pruneZeros y)
-
-pruneExample :: IO ()
-pruneExample = do
-  let exampleExpr :: Expr Integer
-      exampleExpr = y*(3*0*0+0*6 + 3) + 0*3
-        where
-          y = sym "y"
-  print exampleExpr
-  previewGraph $ exprToGraph exampleExpr
-  previewGraph $ exprToGraph $ pruneZeros exampleExpr
