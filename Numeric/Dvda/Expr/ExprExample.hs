@@ -2,13 +2,13 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Expr.ExprExample( exprExample
-                           , pruneExample
-                           ) where
+module Numeric.Dvda.Expr.ExprExample( exprExample
+                                    , pruneExample
+                                    ) where
 
-import Had.Expr.Expr
-import Had.Expr.ExprToGraph
-import Had.Simplify
+import Numeric.Dvda.Expr.Expr
+import Numeric.Dvda.Expr.ExprToGraph
+import Numeric.Dvda.Simplify
 
 exprExample :: IO ()
 exprExample = do
@@ -19,6 +19,7 @@ exprExample = do
   
   print exampleExpr
   previewGraph $ exprToGraph exampleExpr
+  previewGraph $ exprToGraph $ pruneZerosOnce exampleExpr
 
 
 pruneExample :: IO ()

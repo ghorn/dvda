@@ -2,16 +2,17 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Expr.Expr( Expr(..)
-                    , sym
-                    , showExprOp
-                    ) where
+module Numeric.Dvda.Expr.Expr( Expr(..)
+                             , sym
+                             , showExprOp
+                             ) where
 
-import Had.Expr.Op2Type
-import Had.Expr.ElemwiseType
-import Had.Expr.SourceType
 import Data.GraphViz(Labellable(..))
 import Data.Text.Lazy(pack)
+
+import Numeric.Dvda.Expr.Op2Type
+import Numeric.Dvda.Expr.ElemwiseType
+import Numeric.Dvda.Expr.SourceType
 
 data Expr a = Source (SourceType a)
             | Elemwise ElemwiseType (Expr a)

@@ -2,10 +2,10 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Expr.ElemwiseType( ElemwiseType(..)
-                            , elemwisePrePost
-                            , elemwiseDiffRule
-                            ) where
+module Numeric.Dvda.Expr.ElemwiseType( ElemwiseType(..)
+                                     , elemwisePrePost
+                                     , elemwiseDiffRule
+                                     ) where
 
 import Debug.Trace
 

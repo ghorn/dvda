@@ -2,11 +2,11 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.AD.Fad( fadExample
-                 ) where
+module Numeric.Dvda.AD.Fad( fadExample
+                          ) where
 
-import Had.Expr
-import Had.Simplify(pruneZeros)
+import Numeric.Dvda.Expr
+import Numeric.Dvda.Simplify(pruneZeros)
 
 data Dual a = Dual a a deriving (Show, Eq)
 

@@ -2,13 +2,13 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.AD.Rad( getSensitivities
-                 , radExample
-                 ) where
+module Numeric.Dvda.AD.Rad( getSensitivities
+                          , radExample
+                          ) where
 
-import Had.Expr
-import Had.Expr.ExprToGraph
-import Had.Simplify
+import Numeric.Dvda.Expr
+import Numeric.Dvda.Expr.ExprToGraph
+import Numeric.Dvda.Simplify
 
 getSensitivities :: Num a => Expr a -> Expr a -> [(Expr a, Expr a)]
 getSensitivities primal@(Source (Sym _)) sens = [(primal, sens)]

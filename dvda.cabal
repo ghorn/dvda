@@ -1,0 +1,17 @@
+Name:                dvda
+Version:             0.1
+License:             BSD3
+License-file:        LICENSE
+Author:              Greg Horn
+Maintainer:          ghorn@stanford.edu
+Stability:           Experimental
+Category:            Math
+Build-type:          Simple
+Synopsis:            DVDA Verifiably Differentiates Automatically
+Description:         Automatic differentiation on symbolic expression trees.
+Cabal-version:       >=1.2
+
+Library
+  Exposed-modules:     Numeric.Dvda.AD.Rad, Numeric.Dvda.AD.Fad, Numeric.Dvda.Expr, Numeric.Dvda.Simplify
+  Build-depends:       base, graphviz, fgl, text
+  Ghc-options:         -O2

@@ -2,16 +2,16 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Simplify( pruneZeros
-                   , pruneZerosOnce
-                   , fastSimplify
-                   , removeTimesOne
-                   ) where
+module Numeric.Dvda.Simplify( pruneZeros
+                            , pruneZerosOnce
+                            , fastSimplify
+                            , removeTimesOne
+                            ) where
 
-import Had.Expr.Expr
-import Had.Expr.Op2Type
-import Had.Expr.ElemwiseType
-import Had.Expr.SourceType
+import Numeric.Dvda.Expr.Expr
+import Numeric.Dvda.Expr.Op2Type
+import Numeric.Dvda.Expr.ElemwiseType
+import Numeric.Dvda.Expr.SourceType
 
 fastSimplify :: Num a => Expr a -> Expr a
 fastSimplify = removeTimesOne . pruneZeros

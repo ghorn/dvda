@@ -2,8 +2,8 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Expr.SourceType( SourceType(..)
-                          ) where
+module Numeric.Dvda.Expr.SourceType( SourceType(..)
+                                   ) where
 
 data SourceType a = Number a
                   | I Integer

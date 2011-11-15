@@ -2,23 +2,23 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Expr.ExprToGraph( exprToGraph
-                           , exprsToGraph
-                           , exprToGraphTest
-                           , previewGraph
-                           , GraphOp(..)
-                           , nodeToExpr
-                           ) where
+module Numeric.Dvda.Expr.ExprToGraph( exprToGraph
+                                    , exprsToGraph
+                                    , exprToGraphTest
+                                    , previewGraph
+                                    , GraphOp(..)
+                                    , nodeToExpr
+                                    ) where
 
 import Data.Graph.Inductive hiding (nodes, edges)
 import Data.GraphViz
 import Data.Text.Lazy(pack)
 import Data.Maybe
 
-import Had.Expr.Expr
-import Had.Expr.SourceType
-import Had.Expr.ElemwiseType
-import Had.Expr.Op2Type
+import Numeric.Dvda.Expr.Expr
+import Numeric.Dvda.Expr.SourceType
+import Numeric.Dvda.Expr.ElemwiseType
+import Numeric.Dvda.Expr.Op2Type
 
 --previewGraph :: (Show a, Eq a) => Gr (GraphOp a) (Expr a) -> IO ()
 previewGraph :: (DynGraph gr, Labellable nl, Show b) => gr nl b -> IO ()

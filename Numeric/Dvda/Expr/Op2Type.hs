@@ -2,9 +2,9 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Expr.Op2Type( Op2Type(..)
-                       , op2DiffRule
-                       ) where
+module Numeric.Dvda.Expr.Op2Type( Op2Type(..)
+                                , op2DiffRule
+                                ) where
 
 data Op2Type = Mul
 --             | Div
