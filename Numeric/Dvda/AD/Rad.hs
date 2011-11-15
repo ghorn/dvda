@@ -2,34 +2,47 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.AD.Rad( getSensitivities
-                          , radExample
+module Numeric.Dvda.AD.Rad( rad
+                          , getSensitivities
                           ) where
 
 import Numeric.Dvda.Expr.Expr
 import Numeric.Dvda.Expr.Op2Type
---import Numeric.Dvda.Expr.ElemwiseType
+import Numeric.Dvda.Expr.ElemwiseType
 import Numeric.Dvda.Expr.SourceType
 import Numeric.Dvda.Expr.ExprToGraph
 import Numeric.Dvda.Simplify
+import Numeric.Dvda.AD.Fad
 
-getSensitivities :: Num a => Expr a -> Expr a -> [(Expr a, Expr a)]
-getSensitivities primal@(Source (Sym _)) sens = [(primal, sens)]
-getSensitivities (Source _) _ = []
-getSensitivities (Op2 Mul x y) sens = (getSensitivities x (sens*y))++(getSensitivities y (sens*x))
-getSensitivities (Op2 Add x y) sens = (getSensitivities x sens)++(getSensitivities y sens)
-
-
-rad :: Num a => Expr a -> [Expr a] -> [Expr a]
+rad :: Floating a => Expr a -> [Expr a] -> [Expr a]
 rad expr args = map getXSens args
   where
     senss = getSensitivities expr 1
     getXSens x = fastSimplify $ sum $ map snd $ filter (\y -> x == fst y) senss
 
+
+pert :: Dual a -> a
+pert (Dual _ b) = b
+
+
+getSensitivities :: Floating a => Expr a -> Expr a -> [(Expr a, Expr a)]
+getSensitivities primal@(Source (Sym _)) sens = [(primal, fastSimplify sens)]
+getSensitivities (Source _) _ = []
+getSensitivities (Op2 op2t x y) sens = (getSensitivities x (sens*dfdx))++
+                                       (getSensitivities y (sens*dfdy))
+  where
+    f = applyOp2 op2t
+    dfdx = pert $ f (Dual x 1) (Dual y 0)
+    dfdy = pert $ f (Dual x 0) (Dual y 1)
+getSensitivities (Elemwise ewt x) sens = getSensitivities x (sens*dfdx)
+  where
+    f = applyElemwise ewt
+    dfdx = pert $ f (Dual x 1)
+
   
 radExample :: IO ()
 radExample = do
-  let exampleExpr :: Expr Integer
+  let exampleExpr :: Expr Double
       --      exampleExpr = abs(y*34) + 5 + x*y
       exampleExpr = z + x*y
         where

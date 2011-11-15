@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.Expr.ElemwiseType( ElemwiseType(..)
+                                     , applyElemwise
                                      ) where
 
 data ElemwiseType = Abs
@@ -30,6 +31,26 @@ data ElemwiseType = Abs
                   | ACosh
                   | ATanh deriving Eq
 
+applyElemwise :: Floating a => ElemwiseType -> (a -> a)
+applyElemwise Abs    = abs   
+applyElemwise Signum = signum
+applyElemwise Neg    = \x -> -x
+applyElemwise Inv    = \x -> 1/x
+applyElemwise Exp    = exp
+applyElemwise Sqrt   = sqrt
+applyElemwise Log    = log
+applyElemwise Sin    = sin
+applyElemwise Cos    = cos
+applyElemwise Tan    = tan
+applyElemwise ASin   = asin
+applyElemwise ACos   = acos
+applyElemwise ATan   = atan
+applyElemwise Sinh   = sinh
+applyElemwise Cosh   = cosh
+applyElemwise Tanh   = tanh
+applyElemwise ASinh  = asinh
+applyElemwise ACosh  = acosh
+applyElemwise ATanh  = atanh
 
 instance Show ElemwiseType where
   show Abs = "abs"
