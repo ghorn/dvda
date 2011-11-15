@@ -4,7 +4,6 @@
 
 module Numeric.Dvda.Expr.Expr( Expr(..)
                              , sym
-                             , showExprOp
                              ) where
 
 import Data.GraphViz(Labellable(..))
@@ -21,9 +20,7 @@ data Expr a = Source (SourceType a)
 instance (Show a, Eq a) => Show (Expr a) where
   show (Op2 op2Type x y) = "( " ++ show x ++" "++ show op2Type ++" "++ show y ++ " )"
   show (Source sourcetype) = show sourcetype
-  show (Elemwise elemwiseType x) = pre ++ show x ++ post
-    where
-      (pre, post) = elemwisePrePost elemwiseType
+  show (Elemwise elemwiseType x) = show elemwiseType ++ show x
 
 instance (Show a, Eq a, Num a) => Num (Expr a) where
   (+) = Op2 Add
