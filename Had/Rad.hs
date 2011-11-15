@@ -2,29 +2,42 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Had.Rad( diffR
+module Had.Rad( getSensitivities
               , radExample
               ) where
 
 import Had.Expr
-import Had.Expr.Op2Type(op2DiffRule)
-import Had.Expr.ElemwiseType(elemwiseDiffRule)
-import Had.Simplify(pruneZeros)
+import Had.Expr.ExprToGraph
+import Had.Simplify
 
-diffR :: (Show a, Eq a, Num a) => Expr a -> Expr a
-diffR (Source (Sym name)) = Source $ Sym ("d(" ++ name ++ ")")
-diffR (Source _) = Source Zero
-diffR (Op2 op2Type x y) = pruneZeros $ op2DiffRule op2Type (x, diffR x) (y, diffR y)
-diffR (Elemwise elemwiseType x) = pruneZeros $ elemwiseDiffRule elemwiseType (x, diffR x)
+getSensitivities :: Num a => Expr a -> Expr a -> [(Expr a, Expr a)]
+getSensitivities primal@(Source (Sym _)) sens = [(primal, sens)]
+getSensitivities primal@(Source _) _ = []
+getSensitivities (Op2 Mul x y) sens = (getSensitivities x (sens*y))++(getSensitivities y (sens*x))
+getSensitivities (Op2 Add x y) sens = (getSensitivities x sens)++(getSensitivities y sens)
+getSensitivities (Op2 Sub x y) sens = (getSensitivities x sens)++(getSensitivities y sens)
 
+
+rad :: Num a => Expr a -> [Expr a] -> [Expr a]
+rad expr args = map getXSens args
+  where
+    senss = getSensitivities expr 1
+    getXSens x = fastSimplify $ sum $ map snd $ filter (\y -> x == fst y) senss
+
+  
 radExample :: IO ()
 radExample = do
   let exampleExpr :: Expr Integer
-      exampleExpr = abs(y*34) + 5 + x*y
+      --      exampleExpr = abs(y*34) + 5 + x*y
+      exampleExpr = z + x*y
         where
           x = sym "x"
           y = sym "y"
+          z = sym "z"
+  let args = map sym ["x", "y", "z"]
+
   print exampleExpr
-  print $ diffR exampleExpr
+  print $ rad exampleExpr args
+  
   previewGraph $ exprToGraph exampleExpr
-  previewGraph $ exprToGraph $ diffR exampleExpr
+  previewGraph $ exprsToGraph (exampleExpr:(rad exampleExpr args))
