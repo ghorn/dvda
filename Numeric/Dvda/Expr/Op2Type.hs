@@ -7,8 +7,11 @@ module Numeric.Dvda.Expr.Op2Type( Op2Type(..)
 
 data Op2Type = Mul
              | Add
-             | Sub deriving Eq
+             | Pow
+             | LogBase deriving Eq
+
 instance Show Op2Type where
   show Mul = "*"
   show Add = "+"
-  show Sub = "-"
+  show Pow = "**"
+  show LogBase = "_logBase"
