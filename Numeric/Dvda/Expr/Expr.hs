@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.Expr.Expr( Expr(..)
-                             , sym
+                             , symbolic
                              ) where
 
 import Data.Ratio(numerator, denominator)
@@ -70,5 +70,5 @@ instance Floating a => Floating (Expr a) where
 instance (Show a, Num a) => Labellable (Expr a) where
   toLabelValue go = toLabelValue $ pack $ show go
 
-sym :: String -> Expr a
-sym name = Source (Sym name)
+symbolic :: String -> Expr a
+symbolic name = Source (Sym name)

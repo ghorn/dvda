@@ -11,7 +11,7 @@ module Numeric.Dvda.Examples( fadExample
 
 import Numeric.Dvda.AD.Fad(fad)
 import Numeric.Dvda.AD.Rad(rad)
-import Numeric.Dvda.Expr.Expr(sym, Expr)
+import Numeric.Dvda.Expr.Expr(symbolic, Expr)
 import Numeric.Dvda.Simplify(fastSimplify, pruneZerosOnce)
 import Numeric.Dvda.Expr.ExprToGraph
 
@@ -19,7 +19,7 @@ import Numeric.Dvda.Expr.ExprToGraph
 fadExample :: IO ()
 fadExample = do
   let f x = [x*34 + 5, x*34 + 4/x, sin x]
-      y = sym "y" :: Expr Double
+      y = symbolic "y" :: Expr Double
       expr = f y
       g = map fastSimplify $ fad f y
 
@@ -34,11 +34,10 @@ radExample :: IO ()
 radExample = do
   let exampleExpr :: Expr Double
       exampleExpr = (z + x*y)*log(cos(x)/(tanh(y)))**(z/exp(y))
-        where
-          x = sym "x"
-          y = sym "y"
-          z = sym "z"
-  let args = map sym ["x", "y", "z"]
+      x = symbolic "x"
+      y = symbolic "y"
+      z = symbolic "z"
+      args = [x,y,z]
 
   print exampleExpr
   print $ rad exampleExpr args
@@ -52,7 +51,7 @@ exprExample = do
   let exampleExpr :: Expr Integer
       exampleExpr = abs(x*34) + 5 + x
         where
-          x = sym "x"
+          x = symbolic "x"
   
   print exampleExpr
   previewGraph $ exprToGraph exampleExpr
@@ -64,7 +63,7 @@ pruneExample = do
   let exampleExpr :: Expr Integer
       exampleExpr = y*(3*0*0+0*6 + 3) + 0*3
         where
-          y = sym "y"
+          y = symbolic "y"
   print exampleExpr
   previewGraph $ exprToGraph exampleExpr
   previewGraph $ exprToGraph $ pruneZerosOnce exampleExpr
@@ -75,7 +74,7 @@ exprToGraphTest = do
   let exampleExprs :: [Expr Integer]
       exampleExprs = [x*34 + 5 + x, x*34 + 3]
         where
-          x = sym "x"
+          x = symbolic "x"
       g = exprsToGraph exampleExprs
   print exampleExprs
   print g
