@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.Expr.SourceType( SourceType(..)
+                                   , getSource
                                    ) where
 
 data SourceType a = Number a
@@ -10,6 +11,11 @@ data SourceType a = Number a
                   | Sym String
                   | Zero deriving Eq
                                   
+getSource :: Num a => SourceType a -> a
+getSource (Number x) = x
+getSource (I x) = fromInteger x
+getSource Zero = 0
+getSource (Sym _) = error "can't getSource on a symbolic"
 
 instance (Show a, Eq a) => Show (SourceType a) where
   show (Number a) = show a

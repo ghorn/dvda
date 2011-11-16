@@ -7,11 +7,13 @@ module Numeric.Dvda.Examples( fadExample
                             , exprExample
                             , pruneExample
                             , exprToGraphTest
+                            , substituteExample
                             ) where
 
 import Numeric.Dvda.AD.Fad(fad)
 import Numeric.Dvda.AD.Rad(rad)
 import Numeric.Dvda.Expr.Expr(symbolic, Expr)
+import Numeric.Dvda.Expr.Apply
 import Numeric.Dvda.Simplify(fastSimplify, pruneZerosOnce)
 import Numeric.Dvda.Expr.ExprToGraph
 
@@ -79,3 +81,22 @@ exprToGraphTest = do
   print exampleExprs
   print g
   previewGraph g
+
+
+substituteExample :: IO ()
+substituteExample = do
+  let e0 :: Expr Double
+      e0 = (z + x*y)*cos(x) + log(y)/z
+      x = symbolic "x"
+      y = symbolic "y"
+      z = symbolic "z"
+      e1 = substitutes e0 [(x,4), (y,2), (z,-3)]
+      e2 = fastSimplify e1
+
+  print e0
+  print e1
+  print $ evaluate e1
+  print $ evaluate e2
+  previewGraph_ $ lexprToGraph ("f", e0)
+  previewGraph_ $ lexprToGraph ("f", e1)
+  previewGraph_ $ lexprToGraph ("f", e2)
