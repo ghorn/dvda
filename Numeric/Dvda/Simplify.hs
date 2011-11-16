@@ -24,14 +24,14 @@ removeTimesOne (Op2 asm x y) = Op2 asm (removeTimesOne x) (removeTimesOne y)
 removeTimesOne (Elemwise ewo x) = Elemwise ewo (removeTimesOne x)
 removeTimesOne src@(Source _) = src
 
-pruneZeros :: (Show a, Eq a, Num a) => Expr a -> Expr a
+pruneZeros :: Num a => Expr a -> Expr a
 pruneZeros x 
   | x == xPruned = x
   | otherwise    = pruneZeros xPruned
   where
     xPruned = pruneZerosOnce x
 
-pruneZerosOnce :: (Show a, Eq a, Num a) => Expr a -> Expr a
+pruneZerosOnce :: Num a => Expr a -> Expr a
 pruneZerosOnce (Op2 op2Type x y) = op2PruneZeros op2Type x y
 pruneZerosOnce (Elemwise elemwiseType x) = elemwisePruneZeros elemwiseType x
 pruneZerosOnce (Source x) = (Source x)
