@@ -41,7 +41,7 @@ instance Num a => Fractional (Expr a) where
       den = fromIntegral $ denominator x
 
 instance Floating a => Floating (Expr a) where
-  pi = Source (Constant Pi)
+  pi = Source (Number pi)
   
   exp  = Elemwise Exp
   sqrt = Elemwise Sqrt
