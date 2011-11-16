@@ -16,6 +16,7 @@ import Data.Graph.Inductive hiding (nodes, edges)
 import Data.GraphViz
 import Data.Text.Lazy(pack)
 import Data.Maybe
+import Control.Concurrent(threadDelay)
 
 import Numeric.Dvda.Expr.Expr
 import Numeric.Dvda.Expr.SourceType
@@ -23,10 +24,14 @@ import Numeric.Dvda.Expr.ElemwiseType
 import Numeric.Dvda.Expr.Op2Type
 
 previewGraph :: (DynGraph gr, Labellable nl, Show b) => gr nl b -> IO ()
-previewGraph g = preview $ emap show g
+previewGraph g = do
+  preview $ emap show g
+  threadDelay 10000
 
 previewGraph_ :: (DynGraph gr, Labellable nl) => gr nl b -> IO ()
-previewGraph_ g = preview $ emap (\_ -> "") g
+previewGraph_ g = do
+  preview $ emap (\_ -> "") g
+  threadDelay 10000
 
 data GraphOp a = GSource (SourceType a)
                | GElemwise ElemwiseType
