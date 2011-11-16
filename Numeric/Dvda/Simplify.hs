@@ -38,23 +38,20 @@ pruneZerosOnce (Source x) = (Source x)
 
 -- elemwise prune zeros
 elemwisePruneZeros :: Num a => ElemwiseType -> Expr a -> Expr a
-elemwisePruneZeros Abs (Source Zero) = Source Zero
-elemwisePruneZeros Signum (Source Zero) = Source Zero
-elemwisePruneZeros Neg (Source Zero) = Source Zero
-elemwisePruneZeros Inv (Source Zero) = error "divide by zero in elemwisePruneZeros Inv"
+elemwisePruneZeros Abs (Source (I 0)) = Source (I 0)
+elemwisePruneZeros Signum (Source (I 0)) = Source (I 0)
+elemwisePruneZeros Neg (Source (I 0)) = Source (I 0)
+elemwisePruneZeros Inv (Source (I 0)) = error "divide by zero in elemwisePruneZeros Inv"
 elemwisePruneZeros ewt x = Elemwise ewt $ pruneZeros x
 
 -- op2 prune zeros
 op2PruneZeros :: Num a => Op2Type -> Expr a -> Expr a -> Expr a
-op2PruneZeros Mul (Source Zero) _ = Source Zero
-op2PruneZeros Mul _ (Source Zero) = Source Zero
+op2PruneZeros Mul (Source (I 0)) _ = Source (I 0)
+op2PruneZeros Mul _ (Source (I 0)) = Source (I 0)
 op2PruneZeros Mul x y = Op2 Mul (pruneZeros x) (pruneZeros y)
-
-op2PruneZeros Add (Source Zero) (Source Zero) = Source Zero
-op2PruneZeros Add (Source Zero) y = pruneZeros y
-op2PruneZeros Add x (Source Zero) = pruneZeros x
+op2PruneZeros Add (Source (I 0)) (Source (I 0)) = Source (I 0)
+op2PruneZeros Add (Source (I 0)) y = pruneZeros y
+op2PruneZeros Add x (Source (I 0)) = pruneZeros x
 op2PruneZeros Add x y = Op2 Add (pruneZeros x) (pruneZeros y)
-
 op2PruneZeros Pow x y = Op2 Pow x y
-
 op2PruneZeros LogBase x y = Op2 LogBase x y

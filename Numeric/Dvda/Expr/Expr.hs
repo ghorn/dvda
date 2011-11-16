@@ -30,7 +30,6 @@ instance (Show a, Eq a, Num a) => Num (Expr a) where
   negate = Elemwise Neg
   abs = Elemwise Abs
   signum = Elemwise Signum
-  fromInteger 0 = Source Zero
   fromInteger x = Source (I x)
 
 instance Num a => Fractional (Expr a) where
