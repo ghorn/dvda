@@ -9,6 +9,8 @@ module Numeric.Dvda.Examples( fadExample
                             , exprToGraphTest
                             ) where
 
+import Control.Concurrent(threadDelay)
+
 import Numeric.Dvda.AD.Fad(fad)
 import Numeric.Dvda.AD.Rad(rad)
 import Numeric.Dvda.Expr.Expr(sym, Expr)
@@ -28,9 +30,9 @@ fadExample = do
   print $ g
   previewGraph $ exprsToGraph expr
   previewGraph $ exprsToGraph g
-
-
+  threadDelay 100000
   
+
 radExample :: IO ()
 radExample = do
   let exampleExpr :: Expr Double
@@ -46,6 +48,7 @@ radExample = do
   
   previewGraph_ $ lexprToGraph ("f", exampleExpr)
   previewGraph_ $ lexprsToGraph $ zip ["f", "df/dx", "df/dy", "df/dz"] (exampleExpr:(rad exampleExpr args))
+  threadDelay 100000
 
 
 exprExample :: IO ()
@@ -58,6 +61,7 @@ exprExample = do
   print exampleExpr
   previewGraph $ exprToGraph exampleExpr
   previewGraph $ exprToGraph $ pruneZerosOnce exampleExpr
+  threadDelay 100000
 
 
 pruneExample :: IO ()
@@ -69,6 +73,7 @@ pruneExample = do
   print exampleExpr
   previewGraph $ exprToGraph exampleExpr
   previewGraph $ exprToGraph $ pruneZerosOnce exampleExpr
+  threadDelay 100000
 
 
 exprToGraphTest :: IO ()
@@ -81,3 +86,4 @@ exprToGraphTest = do
   print exampleExprs
   print g
   previewGraph g
+  threadDelay 100000
