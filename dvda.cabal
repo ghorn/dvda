@@ -7,8 +7,8 @@ Maintainer:          ghorn@stanford.edu
 Stability:           Experimental
 Category:            Math
 Build-type:          Simple
-Synopsis:            DVDA Verifiably Differentiates Algorithmically
-Description:         Automatic differentiation on symbolic expression trees.
+Synopsis:            Automatic differentiation on symbolic expression trees.
+Description:         DVDA Verifiably Differentiates Algorithmically
 Cabal-version:       >=1.2
 
 Library
