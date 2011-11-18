@@ -22,6 +22,7 @@ import Numeric.Dvda.Expr.Expr
 import Numeric.Dvda.Expr.SourceType
 import Numeric.Dvda.Expr.ElemwiseType
 import Numeric.Dvda.Expr.Op2Type
+import Numeric.Dvda.Expr.Misc(outputNames)
 
 previewGraph :: (DynGraph gr, Labellable nl, Show b) => gr nl b -> IO ()
 previewGraph g = do
@@ -57,7 +58,7 @@ lexprToGraph labeledExpr = lexprsToGraph [labeledExpr]
 exprsToGraph :: Eq a => [Expr a] -> Gr (GraphOp a) (Expr a)
 exprsToGraph exprs = foldr addOutput empty labeledExprs
   where
-    labeledExprs = reverse $ zipWith (\k e -> ("out"++show k, e)) [(0::Integer)..] exprs
+    labeledExprs = reverse $ zip outputNames exprs
 
 lexprsToGraph :: Eq a => [(String, Expr a)] -> Gr (GraphOp a) (Expr a)
 lexprsToGraph labeledExprs = foldr addOutput empty labeledExprs
