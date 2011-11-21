@@ -1,39 +1,42 @@
--- CFunction.hs
+-- GenerateC.hs
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Codegen.CFunction( exprsToCFunction
+module Numeric.Dvda.Codegen.GenerateC( functionToCSource
                                      ) where
 
 import Data.Graph.Inductive hiding(out)
-import Data.List(intercalate, nub)
 import Data.Maybe(fromJust)
 
+import Numeric.Dvda.Function
 import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.Apply(getSyms)
 import Numeric.Dvda.Expr.ExprToGraph
 import Numeric.Dvda.Expr.ElemwiseType
 import Numeric.Dvda.Expr.SourceType
-import Numeric.Dvda.Expr.Misc(outputNames)
+--import Numeric.Dvda.Expr.Misc(outputNames)
 
 cType :: String
 cType = "double"
 
-exprsToCFunction :: (Eq a, Show a) => [Expr a] -> String
-exprsToCFunction exprs = intercalate "\n" $ (functionHeader inputs outputs):body++["}"]
+functionToCSource :: (Eq a, Show a) => Function a -> (String, String)
+functionToCSource fun = (src, include)
   where
-    body = exprsToC exprs
-    inputs = nub $ concatMap getSyms exprs
-    outputs = take (length exprs) outputNames
+    prototype = unlines [ "void call(const double * const in,"
+                        , "          double * const out)"
+                        ]
+    include = prototype ++ ";"
+    src = "#include \"math.h\"\n\n" ++ 
+          prototype ++
+          "\n{\n" ++
+          inputDeclarations ++
+          "\n" ++
+          body ++
+          "}"
+      where
+        inputDeclarations = unlines $ zipWith (\x k -> "    double " ++ show x ++" = in["++show k++"];")
+                            (funInputs fun) [(0::Integer)..]
+        body = unlines $ exprsToC (funOutputs fun)
     
-functionHeader :: (Eq a, Show a) => [Expr a] -> [String] -> String
-functionHeader inputs outputs = funBeginning++vars++")\n{"
-  where
-    funBeginning = "void blah("
-    whitespace = replicate (length funBeginning) ' '
-    vars = intercalate (",\n"++whitespace) (inputProtos++outputProtos)
-    inputProtos  = map (\x -> "const double "++show x) inputs
-    outputProtos = map (\x -> "const double * const "++ x) outputs
 
 exprsToC :: (Eq a, Show a) => [Expr a] -> [String]
 exprsToC exprs = map (\x -> "    "++x)  body
@@ -45,8 +48,12 @@ grToC gr = map f (topsort gr)
   where
     f idx = toC idx (pre gr idx) (fromJust $ lab gr idx)
 
+outputArrayHack :: String -> String
+outputArrayHack ('o':'u':'t':num) = "out["++num++"]"
+outputArrayHack _ = error "outputArrayHack fail"
+
 toC :: (Eq a, Show a) => Node -> [Node] -> GraphOp a -> String
-toC _ (x:[]) (GOutput out) = out ++ " = " ++ nodeName x ++ ";"
+toC _ (x:[]) (GOutput out) = (outputArrayHack out) ++ " = " ++ nodeName x ++ ";"
 toC idx _ (GSource sym@(Sym _)) = assign idx ++ show sym ++ ";"
 toC idx _ src@(GSource _) = assign idx ++ show src ++ ";"
 toC idx (x:y:[]) (GOp2 op2t) = assign idx ++ nodeName x ++" "++ show op2t ++" "++ nodeName y ++ ";"

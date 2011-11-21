@@ -44,12 +44,12 @@ substitute oldExpr (oldValue, newValue) = mapSources f oldExpr
     f src = src
 
 
--- substitute one symbolic variable for another
+-- substitute list of symbolic variable
 substitutes :: Eq a => Expr a -> [(Expr a,Expr a)] -> Expr a
 substitutes oldExpr subPairs = foldl' substitute oldExpr subPairs
 
 
--- evaluate all operations that are not on symbolic types
+-- evaluate all operations
 evaluate :: Floating a => Expr a -> a
 evaluate (Op2 op2t x y) = applyOp2 op2t (evaluate x) (evaluate y)
 evaluate (Elemwise ewt x) = applyElemwise ewt (evaluate x)
