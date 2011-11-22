@@ -18,32 +18,38 @@ import Numeric.Dvda.Expr.SourceType
 generateCSource :: (Eq a, Show a) => [Expr a] -> [Expr a] -> (String, String, String)
 generateCSource inputs outputs = (src, include, hash)
   where
-    hash = md5s (Str src)
+    hash = md5s (Str body)
     
-    prototype = unlines [ "void call(const double in[],"
-                        , "          double out[])"
-                        ]
+    prototype = "void " ++ Config.nameCFunction hash ++ "(const double in[], double out[])"
     
-    include = unlines ["#ifndef __" ++ hash ++ "__"
+    include = unlines [ "// " ++ Config.nameCInclude hash
+                      , ""
+                      , "#ifndef __" ++ hash ++ "__"
+                      , "#define __" ++ hash ++ "__"
                       , ""
                       , prototype ++ ";"
                       , ""
                       , "#endif //__" ++ hash ++ "__"
                       ]
 
-    src = unlines ["#include \"math.h\""
-                   , ""
-                   , prototype
-                   , "{" 
-                   , inputDeclarations
-                   , ""
-                   , body
-                   , "}"
-                   ]
+    src = unlines [ "// " ++ Config.nameCSource hash
+                  , ""
+                  , "#include \"math.h\""
+                  , "#include \"" ++ Config.nameCInclude hash ++ "\""
+                  , ""
+                  , prototype 
+                  , "{"
+                  , body ++ "}"
+                  ]
+
+    body = "    // input declarations:\n" ++ 
+           (unlines inputDeclarations) ++
+           "\n" ++
+           "    // body:\n" ++
+           (unlines $ exprsToC outputs)
+
       where
-        inputDeclarations = unlines $ zipWith (\x k -> "    double " ++ show x ++" = in["++show k++"];")
-                            inputs [(0::Integer)..]
-        body = unlines $ exprsToC outputs
+        inputDeclarations = zipWith (\x k -> "    double " ++ show x ++" = in["++show k++"];") inputs [(0::Integer)..]
     
 
 exprsToC :: (Eq a, Show a) => [Expr a] -> [String]

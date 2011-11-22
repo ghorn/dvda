@@ -41,13 +41,13 @@ functionDir hash = do
 
 
 nameCSource :: String -> String
-nameCSource hash = "call_" ++ hash ++ ".c"
+nameCSource hash = nameCFunction hash ++ ".c"
 
 nameCInclude :: String -> String
-nameCInclude hash = "call_" ++ hash ++ ".h"
+nameCInclude hash = nameCFunction hash ++ ".h"
 
 nameCObject :: String -> String
-nameCObject hash = "call_" ++ hash ++ ".o"
+nameCObject hash = nameCFunction hash ++ ".o"
 
 nameCFunction :: String -> String
 nameCFunction hash = "call_" ++ hash

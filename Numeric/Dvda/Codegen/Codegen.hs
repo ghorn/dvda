@@ -72,14 +72,13 @@ buildCFunction inputs outputs = do
   return (srcHash, cObjectFile)
   
 
-
 toFunction :: RealFrac a => [Expr a] -> [Expr a] -> IO (Function a)
 toFunction inputs outputs = do
   -- TODO: make sure all inputs are accounted for - issue 19
-  (hash, cobj) <- buildCFunction inputs outputs
+  (hash, objPath) <- buildCFunction inputs outputs
 
-  dl <- dlopen cobj []
-  funptr <- dlsym dl "call"
+  dl <- dlopen objPath []
+  funptr <- dlsym dl $ Config.nameCFunction hash
 
   return $ Function { funInputs  = inputs
                     , funOutputs = outputs
