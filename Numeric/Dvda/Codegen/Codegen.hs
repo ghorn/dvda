@@ -16,14 +16,29 @@ import Numeric.Dvda.Function
 import Numeric.Dvda.Codegen.GenerateC(generateCSource)
 import Numeric.Dvda.Expr.Expr(Expr(..))
 
+
+-- shorten path name for display purposes
+shortName :: String -> String
+shortName full
+  | length name <= maxN = name ++ extension
+  | otherwise           = (take firstN name) ++ "..." ++ (drop (length name - lastN) name) ++ extension
+  where
+    firstN = 20
+    lastN  = 10
+    maxN = firstN + lastN
+
+    (name, extension) = break (== '.') $ reverse $ takeWhile (/= '/') (reverse full)
+
+
 -- take in name of source and future object, compile object
 callGcc :: FilePath -> FilePath -> IO ()
 callGcc srcname objname = do
   -- compile new object
-  let compileString = "gcc -O2 -fPIC -shared " ++ srcname ++ " -o " ++ objname
-  
+  let compileString = Config.gccString srcname objname
+      displayString = Config.gccString (shortName srcname) (shortName objname)
+
   -- print compilation string
-  putStrLn compileString
+  putStrLn displayString
   
   -- run compilation string
   p <- runCommand compileString

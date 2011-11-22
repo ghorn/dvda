@@ -9,6 +9,7 @@ module Numeric.Dvda.Codegen.Config( cType
                                   , nameCInclude
                                   , nameCObject
                                   , nameCFunction
+                                  , gccString
                                   ) where
 
 import System.Directory
@@ -31,6 +32,11 @@ dvdaDir = do
   createDirectoryIfMissing True dir
   
   return dir
+
+
+-- take in source file and object, return string suitible for calling to compile
+gccString :: FilePath -> FilePath -> String
+gccString src obj = "gcc -O2 -fPIC -shared " ++ src ++ " -o " ++ obj
 
 
 functionDir :: String -> IO FilePath
