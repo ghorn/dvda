@@ -65,12 +65,12 @@ toC _ (x:[]) (GOutput out) = (outputArrayHack out) ++ " = " ++ nodeName x ++ ";"
 toC idx _ (GSource sym@(Sym _)) = assign idx ++ show sym ++ ";"
 toC idx _ src@(GSource _) = assign idx ++ show src ++ ";"
 toC idx (x:y:[]) (GOp2 op2t) = assign idx ++ nodeName x ++" "++ show op2t ++" "++ nodeName y ++ ";"
-toC idx (x:[]) (GElemwise Inv) = assign idx ++ "1 / " ++ show x ++ ";"
-toC idx (x:[]) (GElemwise ewt) = assign idx ++ show ewt ++"( " ++ show x ++ " )" ++ ";"
+toC idx (x:[]) (GElemwise Inv) = assign idx ++ "1.0 / " ++ nodeName x ++ ";"
+toC idx (x:[]) (GElemwise ewt) = assign idx ++ show ewt ++"( " ++ nodeName x ++ " )" ++ ";"
 
-toC idx pres (GElemwise ew) = "GElemwise fail: "++show (idx, pres, ew)
-toC idx pres (GOp2 op2) = "GOp2 fail: "++show (idx, pres, op2)
-toC idx pres (GOutput out) = "GOutput fail: " ++ show (idx, pres, out)
+toC idx pres (GElemwise ew) = error $ "GElemwise fail: "++show (idx, pres, ew)
+toC idx pres (GOp2 op2) = error $ "GOp2 fail: "++show (idx, pres, op2)
+toC idx pres (GOutput out) = error $ "GOutput fail: " ++ show (idx, pres, out)
 
 nodeName :: Int -> String
 nodeName idx = 't':show idx
