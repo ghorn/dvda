@@ -17,5 +17,5 @@ Library
                      Numeric.Dvda.Expr.Expr
                      Numeric.Dvda.Simplify
                      Numeric.Dvda.Examples
-  Build-depends:     base, graphviz, fgl, text
+  Build-depends:     base, graphviz, fgl, text, directory, MissingH, process, unix
   Ghc-options:       -O2

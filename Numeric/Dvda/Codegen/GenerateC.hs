@@ -2,40 +2,48 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Codegen.GenerateC( functionToCSource
+module Numeric.Dvda.Codegen.GenerateC( generateCSource
                                      ) where
 
 import Data.Graph.Inductive hiding(out)
 import Data.Maybe(fromJust)
+import Data.Hash.MD5(md5s, Str(..))
 
-import Numeric.Dvda.Function
+import qualified Numeric.Dvda.Codegen.Config as Config
 import Numeric.Dvda.Expr.Expr
 import Numeric.Dvda.Expr.ExprToGraph
 import Numeric.Dvda.Expr.ElemwiseType
 import Numeric.Dvda.Expr.SourceType
---import Numeric.Dvda.Expr.Misc(outputNames)
 
-cType :: String
-cType = "double"
-
-functionToCSource :: (Eq a, Show a) => Function a -> (String, String)
-functionToCSource fun = (src, include)
+generateCSource :: (Eq a, Show a) => [Expr a] -> [Expr a] -> (String, String, String)
+generateCSource inputs outputs = (src, include, hash)
   where
-    prototype = unlines [ "void call(const double * const in,"
-                        , "          double * const out)"
+    hash = md5s (Str src)
+    
+    prototype = unlines [ "void call(const double in[],"
+                        , "          double out[])"
                         ]
-    include = prototype ++ ";"
-    src = "#include \"math.h\"\n\n" ++ 
-          prototype ++
-          "\n{\n" ++
-          inputDeclarations ++
-          "\n" ++
-          body ++
-          "}"
+    
+    include = unlines ["#ifndef __" ++ hash ++ "__"
+                      , ""
+                      , prototype ++ ";"
+                      , ""
+                      , "#endif //__" ++ hash ++ "__"
+                      ]
+
+    src = unlines ["#include \"math.h\""
+                   , ""
+                   , prototype
+                   , "{" 
+                   , inputDeclarations
+                   , ""
+                   , body
+                   , "}"
+                   ]
       where
         inputDeclarations = unlines $ zipWith (\x k -> "    double " ++ show x ++" = in["++show k++"];")
-                            (funInputs fun) [(0::Integer)..]
-        body = unlines $ exprsToC (funOutputs fun)
+                            inputs [(0::Integer)..]
+        body = unlines $ exprsToC outputs
     
 
 exprsToC :: (Eq a, Show a) => [Expr a] -> [String]
@@ -68,4 +76,4 @@ nodeName :: Int -> String
 nodeName idx = 't':show idx
 
 assign :: Int -> String
-assign idx = cType ++ " " ++ nodeName idx ++ " = "
+assign idx = Config.cType ++ " " ++ nodeName idx ++ " = "

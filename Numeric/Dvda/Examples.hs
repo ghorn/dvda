@@ -8,6 +8,7 @@ module Numeric.Dvda.Examples( fadExample
                             , pruneExample
                             , exprToGraphTest
                             , substituteExample
+                            , codegenExample
                             ) where
 
 import Numeric.Dvda.AD.Fad(fad)
@@ -16,6 +17,9 @@ import Numeric.Dvda.Expr.Expr(symbolic, Expr)
 import Numeric.Dvda.Expr.Apply
 import Numeric.Dvda.Simplify(fastSimplify, pruneZerosOnce)
 import Numeric.Dvda.Expr.ExprToGraph
+
+import Numeric.Dvda.Codegen.Codegen(toFunction)
+import Numeric.Dvda.Function
 
 
 fadExample :: IO ()
@@ -100,3 +104,29 @@ substituteExample = do
   previewGraph_ $ lexprToGraph ("f", e0)
   previewGraph_ $ lexprToGraph ("f", e1)
   previewGraph_ $ lexprToGraph ("f", e2)
+
+
+codegenExample :: IO ()
+codegenExample = do
+
+  let testFun :: Floating a => [a] -> [a]
+      testFun [x',y'] = [y'/cos(x'), 23423*atan(100*x')]
+      testFun _ = error "bad testFun inputs"
+
+      x = symbolic "x"
+      y = symbolic "y"
+  
+      outputs = testFun [x,y]
+      
+  -- make function
+  fun <- toFunction [x,y] outputs
+  
+  -- call different ways
+  putStr "call testFun directly: "
+  print $ testFun [12,13::Double]
+  
+  putStr "callNative Function:   "
+  print $ callNative fun [12,13]
+  
+  putStr "callC Function:        "
+  print $ callC fun [12,13::Double]
