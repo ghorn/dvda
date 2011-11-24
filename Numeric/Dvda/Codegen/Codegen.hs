@@ -38,7 +38,7 @@ callGcc srcname objname = do
       displayString = Config.gccString (shortName srcname) (shortName objname)
 
   -- print compilation string
-  putStrLn displayString
+  when Config.spewGccCall $ putStrLn displayString
   
   -- run compilation string
   p <- runCommand compileString

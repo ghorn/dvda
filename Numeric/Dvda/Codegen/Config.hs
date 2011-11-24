@@ -10,6 +10,7 @@ module Numeric.Dvda.Codegen.Config( cType
                                   , nameCObject
                                   , nameCFunction
                                   , gccString
+                                  , spewGccCall
                                   ) where
 
 import System.Directory
@@ -17,6 +18,10 @@ import Control.Monad(when)
 
 cType :: String
 cType = "double"
+
+-- print the gcc call when generating code
+spewGccCall :: Bool
+spewGccCall = False
 
 -- return directory to use for temp files
 -- create this directory and print message if it doesn't exist
