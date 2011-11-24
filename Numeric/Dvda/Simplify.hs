@@ -18,11 +18,18 @@ fastSimplify = removeTimesOne . pruneZeros
 
 -- only need to be called once
 removeTimesOne :: Expr a -> Expr a
-removeTimesOne (Op2 Mul (Source (I 1)) x) = removeTimesOne x
-removeTimesOne (Op2 Mul x (Source (I 1))) = removeTimesOne x
-removeTimesOne (Op2 asm x y) = Op2 asm (removeTimesOne x) (removeTimesOne y)
-removeTimesOne (Elemwise ewo x) = Elemwise ewo (removeTimesOne x)
-removeTimesOne src@(Source _) = src
+removeTimesOne (Op2 {op2Type = Mul, arg1 = Source {sourceType = I 1, dim = 0}, arg2 = y}) = removeTimesOne y
+removeTimesOne (Op2 {op2Type = Mul, arg2 = Source {sourceType = I 1, dim = 0}, arg1 = x}) = removeTimesOne x
+removeTimesOne op2@(Op2 {}) = Op2 {op2Type = op2Type op2
+                                  , arg1 = removeTimesOne (arg1 op2)
+                                  , arg2 = removeTimesOne (arg2 op2)
+                                  , dim = dim op2
+                                  }
+removeTimesOne ew@(Elemwise {}) = Elemwise { elemwiseType = elemwiseType ew
+                                           , arg = removeTimesOne (arg ew)
+                                           , dim = dim ew
+                                           }
+removeTimesOne src@(Source {}) = src
 
 pruneZeros :: Num a => Expr a -> Expr a
 pruneZeros x 
@@ -31,27 +38,40 @@ pruneZeros x
   where
     xPruned = pruneZerosOnce x
 
+
+
 pruneZerosOnce :: Num a => Expr a -> Expr a
-pruneZerosOnce (Op2 op2Type x y) = op2PruneZeros op2Type x y
-pruneZerosOnce (Elemwise elemwiseType x) = elemwisePruneZeros elemwiseType x
-pruneZerosOnce (Source x) = (Source x)
-
--- elemwise prune zeros
-elemwisePruneZeros :: Num a => ElemwiseType -> Expr a -> Expr a
-elemwisePruneZeros Abs (Source (I 0)) = Source (I 0)
-elemwisePruneZeros Signum (Source (I 0)) = Source (I 0)
-elemwisePruneZeros Neg (Source (I 0)) = Source (I 0)
-elemwisePruneZeros Inv (Source (I 0)) = error "divide by zero in elemwisePruneZeros Inv"
-elemwisePruneZeros ewt x = Elemwise ewt $ pruneZeros x
-
--- op2 prune zeros
-op2PruneZeros :: Num a => Op2Type -> Expr a -> Expr a -> Expr a
-op2PruneZeros Mul (Source (I 0)) _ = Source (I 0)
-op2PruneZeros Mul _ (Source (I 0)) = Source (I 0)
-op2PruneZeros Mul x y = Op2 Mul (pruneZeros x) (pruneZeros y)
-op2PruneZeros Add (Source (I 0)) (Source (I 0)) = Source (I 0)
-op2PruneZeros Add (Source (I 0)) y = pruneZeros y
-op2PruneZeros Add x (Source (I 0)) = pruneZeros x
-op2PruneZeros Add x y = Op2 Add (pruneZeros x) (pruneZeros y)
-op2PruneZeros Pow x y = Op2 Pow x y
-op2PruneZeros LogBase x y = Op2 LogBase x y
+-- source:
+pruneZerosOnce src@(Source {}) = src
+-- elementwise:
+pruneZerosOnce (Elemwise { elemwiseType = Abs
+                         , arg = Source {sourceType = (I 0), dim = dim'}}) = Source {sourceType = I 0, dim = dim'}
+pruneZerosOnce (Elemwise { elemwiseType = Signum
+                         , arg = Source {sourceType = (I 0), dim = dim'}}) = Source {sourceType = I 0, dim = dim'}
+pruneZerosOnce (Elemwise { elemwiseType = Neg
+                         , arg = Source {sourceType = (I 0), dim = dim'}}) = Source {sourceType = I 0, dim = dim'}
+pruneZerosOnce (Elemwise { elemwiseType = Inv
+                         , arg = Source {sourceType = (I 0)}}) = error "divide by zero in pruneZerosOnce Inv"
+pruneZerosOnce (Elemwise {elemwiseType = ewt
+                         , arg = x, dim = dim'}) = Elemwise {elemwiseType = ewt, arg = pruneZeros x, dim = dim'}
+-- op2
+pruneZerosOnce (Op2 {op2Type = Mul, arg1 = Source {sourceType = I 0}, dim = 0}) = Source { sourceType = I 0, dim = 0 }
+pruneZerosOnce (Op2 {op2Type = Mul, arg2 = Source {sourceType = I 0}, dim = 0}) = Source { sourceType = I 0, dim = 0 }
+pruneZerosOnce op2@(Op2 {op2Type = Mul}) = Op2 { op2Type = Mul
+                                              , arg1 = pruneZerosOnce (arg1 op2)
+                                              , arg2 = pruneZerosOnce (arg2 op2)
+                                              , dim = dim op2}
+pruneZerosOnce (Op2 {op2Type = Add, arg1 = (Source {sourceType = I 0}), arg2 = y, dim = 0}) = pruneZeros y
+pruneZerosOnce (Op2 {op2Type = Add, arg2 = (Source {sourceType = I 0}), arg1 = x, dim = 0}) = pruneZeros x
+pruneZerosOnce op2@(Op2 {op2Type = Add}) = Op2 { op2Type = Add
+                                              , arg1 = pruneZerosOnce (arg1 op2)
+                                              , arg2 = pruneZerosOnce (arg2 op2)
+                                              , dim = dim op2}
+pruneZerosOnce op2@(Op2 {op2Type = Pow}) = Op2 { op2Type = Pow
+                                              , arg1 = pruneZerosOnce (arg1 op2)
+                                              , arg2 = pruneZerosOnce (arg2 op2)
+                                              , dim = dim op2}
+pruneZerosOnce op2@(Op2 {op2Type = LogBase}) = Op2 { op2Type = LogBase
+                                              , arg1 = pruneZerosOnce (arg1 op2)
+                                              , arg2 = pruneZerosOnce (arg2 op2)
+                                              , dim = dim op2}

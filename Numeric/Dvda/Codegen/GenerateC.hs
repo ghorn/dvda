@@ -60,23 +60,35 @@ exprsToC exprs = map (\x -> "    "++x)  body
 grToC :: (Eq a, Show a) => Gr (GraphOp a) b -> [String]
 grToC gr = map f (topsort gr)
   where
-    f idx = toC idx (pre gr idx) (fromJust $ lab gr idx)
+    graphOpDim (GSource _ d) = d
+    graphOpDim (GElemwise _ d) = d
+    graphOpDim (GOp2 _ d) = d
+    graphOpDim (GOutput _ d) = d
+
+    f idx 
+      | graphOpDim graphOp == 0 = toC idx (pre gr idx) graphOp
+      | otherwise               = error "tensor code gen not yet supported"
+      where
+        graphOp = fromJust $ lab gr idx
+
 
 outputArrayHack :: String -> String
 outputArrayHack ('o':'u':'t':num) = "out["++num++"]"
 outputArrayHack _ = error "outputArrayHack fail"
 
 toC :: (Eq a, Show a) => Node -> [Node] -> GraphOp a -> String
-toC _ (x:[]) (GOutput out) = (outputArrayHack out) ++ " = " ++ nodeName x ++ ";"
-toC idx _ (GSource sym@(Sym _)) = assign idx ++ show sym ++ ";"
-toC idx _ src@(GSource _) = assign idx ++ show src ++ ";"
-toC idx (x:y:[]) (GOp2 op2t) = assign idx ++ nodeName x ++" "++ show op2t ++" "++ nodeName y ++ ";"
-toC idx (x:[]) (GElemwise Inv) = assign idx ++ "1.0 / " ++ nodeName x ++ ";"
-toC idx (x:[]) (GElemwise ewt) = assign idx ++ show ewt ++"( " ++ nodeName x ++ " )" ++ ";"
+toC _ (x:[]) (GOutput out _) = (outputArrayHack out) ++ " = " ++ nodeName x ++ ";"
+toC idx _ (GSource sym@(Sym _) _) = assign idx ++ show sym ++ ";"
+toC idx _ src@(GSource _ _) = assign idx ++ show src ++ ";"
+toC idx (x:y:[]) (GOp2 op2t _) = assign idx ++ nodeName x ++" "++ show op2t ++" "++ nodeName y ++ ";"
+toC idx (x:[]) (GElemwise Inv _) = assign idx ++ "1.0 / " ++ nodeName x ++ ";"
+toC idx (x:[]) (GElemwise ewt _) = assign idx ++ show ewt ++"( " ++ nodeName x ++ " )" ++ ";"
 
-toC idx pres (GElemwise ew) = error $ "GElemwise fail: "++show (idx, pres, ew)
-toC idx pres (GOp2 op2) = error $ "GOp2 fail: "++show (idx, pres, op2)
-toC idx pres (GOutput out) = error $ "GOutput fail: " ++ show (idx, pres, out)
+toC idx pres (GElemwise ew _) = error $ "GElemwise fail: "++show (idx, pres, ew)
+toC idx pres (GOp2 op2 _) = error $ "GOp2 fail: "++show (idx, pres, op2)
+toC idx pres (GOutput out _) = error $ "GOutput fail: " ++ show (idx, pres, out)
+
+
 
 nodeName :: Int -> String
 nodeName idx = 't':show idx

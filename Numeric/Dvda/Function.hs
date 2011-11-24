@@ -26,7 +26,7 @@ data Function a = Function { funInputs :: [Expr a]
 inputNames :: (Eq a, Show a) => Function a -> [String]
 inputNames (Function {funInputs = inputs}) = map f inputs
   where
-    f (Source (Sym name)) = name
+    f (Source {sourceType = Sym name}) = name
     -- remove after issue 18 is fixed:
     f _ = error "non-source Function input detected in " ++ show inputs
 

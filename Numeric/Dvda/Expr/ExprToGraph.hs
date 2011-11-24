@@ -9,7 +9,6 @@ module Numeric.Dvda.Expr.ExprToGraph( exprToGraph
                                     , previewGraph
                                     , previewGraph_
                                     , GraphOp(..)
-                                    , nodeToExpr
                                     ) where
 
 import Data.Graph.Inductive hiding (nodes, edges)
@@ -34,16 +33,16 @@ previewGraph_ g = do
   preview $ emap (\_ -> "") g
   threadDelay 10000
 
-data GraphOp a = GSource (SourceType a)
-               | GElemwise ElemwiseType
-               | GOp2 Op2Type
-               | GOutput String
+data GraphOp a = GSource (SourceType a) Dim
+               | GElemwise ElemwiseType Dim
+               | GOp2 Op2Type Dim
+               | GOutput String Dim
 
 instance (Eq a, Show a) => Show (GraphOp a) where
-  show (GSource sourceType) = show sourceType
-  show (GElemwise elemwiseType) = show elemwiseType
-  show (GOp2 op2Type) = show op2Type
-  show (GOutput name) = name
+  show (GSource st _) = show st
+  show (GElemwise ewt _) = show ewt
+  show (GOp2 op2t _) = show op2t
+  show (GOutput name _) = name
 
 
 instance (Show a, Eq a) => Labellable (GraphOp a) where
@@ -67,24 +66,15 @@ addOutput :: Eq a => (String, Expr a) -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp 
 addOutput (name, expr) graph = graphGobbler newIdx expr newGraph
   where
     newIdx = head $ newNodes 1 graph
-    newGraph = insNode (newIdx, GOutput name) graph
+    newGraph = insNode (newIdx, GOutput name (dim expr)) graph
 
-nodeToExpr :: Node -> Gr (GraphOp a) (Expr a) -> Expr a
-nodeToExpr idx graph = f $ fromJust $ lab graph idx
-  where
-    children = pre graph idx
-    f (GOutput _) = nodeToExpr (head children) graph
-    f (GSource sourcetype) = Source sourcetype
-    f (GElemwise elemwiseType) = Elemwise elemwiseType (nodeToExpr (head children) graph)
-    f (GOp2 op2Type) = Op2 op2Type (nodeToExpr (children !! 0) graph) (nodeToExpr (children !! 1) graph)
-        
 graphGobbler :: Eq a => Int -> Expr a -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
 graphGobbler parentIdx expr oldGraph    
   | isJust existingNode = insEdge (existingIdx, parentIdx, expr) oldGraph
-  | otherwise           = case expr of (Source _)     -> newGraph
-                                       (Elemwise _ x) -> graphGobbler newIdx x newGraph
-                                       (Op2 _ x y)    -> graphGobbler newIdx y $
-                                                         graphGobbler newIdx x newGraph
+  | otherwise           = case expr of (Source {})      -> newGraph
+                                       ew@(Elemwise {}) -> graphGobbler newIdx (arg ew) newGraph
+                                       op2@(Op2 {})     -> graphGobbler newIdx (arg2 op2) $
+                                                           graphGobbler newIdx (arg1 op2) newGraph
       where
         existingNode = lookupBy (\(_,_,a) -> a) expr (labEdges oldGraph)
         (existingIdx,_,_) = fromJust existingNode
@@ -95,6 +85,6 @@ lookupBy :: Eq a => (b -> a) -> a -> [b] -> Maybe b
 lookupBy f a bs = lookup a $ map (\x -> (f x, x)) bs
 
 getGraphOp :: Expr a -> GraphOp a
-getGraphOp (Source s) = GSource s
-getGraphOp (Elemwise ewt _) = GElemwise ewt
-getGraphOp (Op2 op2 _ _) = GOp2 op2
+getGraphOp src@(Source {}) = GSource (sourceType src) (dim src)
+getGraphOp ew@(Elemwise {}) = GElemwise (elemwiseType ew) (dim ew)
+getGraphOp op2@(Op2 {}) = GOp2 (op2Type op2) (dim op2)
