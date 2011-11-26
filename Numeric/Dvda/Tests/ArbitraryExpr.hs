@@ -15,7 +15,7 @@ import Numeric.Dvda.Expr.Apply(evaluate)
 data Pair a = Pair a (Expr a)
 
 instance Floating a => Show (Pair a) where
-  show (Pair x ex) = "Pair " ++ show x ++ " " ++ show (evaluate ex) ++ " " ++ show ex
+  show (Pair x ex) = "Pair\nFloating:   " ++ show x ++ "\nevaluated:  " ++ show (evaluate ex) ++ "\nexpression: " ++ show ex
 
 instance (Arbitrary a, Floating a) => Arbitrary (Pair a) where
   arbitrary = do
