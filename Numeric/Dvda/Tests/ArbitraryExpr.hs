@@ -56,6 +56,6 @@ instance (Arbitrary a, Floating a) => Arbitrary (Expr a) where
     let (Pair _ ex) = fx
     return ex
   
-  shrink ew@(Elemwise {}) = [arg ew]
-  shrink op2@(Op2 {}) = [arg1 op2, arg2 op2] ++ shrink (arg1 op2) ++ shrink(arg2 op2)
+  shrink ew@(Unary {}) = [arg ew]
+  shrink bin@(Binary {}) = [arg1 bin, arg2 bin] ++ shrink (arg1 bin) ++ shrink(arg2 bin)
   shrink (Source {}) = []

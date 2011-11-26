@@ -24,15 +24,15 @@ pert (Dual _ b) = b
 getSensitivities :: Floating a => Expr a -> Expr a -> [(Expr a, Expr a)]
 getSensitivities primal@(Source {sourceType =Sym _}) sens = [(primal, removeIdentities sens)]
 getSensitivities (Source {}) _ = []
-getSensitivities (Op2 { op2Type = op2t 
-                      , arg1 = x 
-                      , arg2 = y}) sens = (getSensitivities x (sens*dfdx))++
-                                          (getSensitivities y (sens*dfdy))
+getSensitivities (Binary { binaryType = bint
+                         , arg1 = x 
+                         , arg2 = y}) sens = (getSensitivities x (sens*dfdx))++
+                                             (getSensitivities y (sens*dfdy))
   where
-    f = applyOp2 op2t
+    f = applyBinary bint
     dfdx = pert $ f (Dual x 1) (Dual y 0)
     dfdy = pert $ f (Dual x 0) (Dual y 1)
-getSensitivities (Elemwise {elemwiseType = ewt, arg = x}) sens = getSensitivities x (sens*dfdx)
+getSensitivities (Unary {unaryType = ewt, arg = x}) sens = getSensitivities x (sens*dfdx)
   where
-    f = applyElemwise ewt
+    f = applyUnary ewt
     dfdx = pert $ f (Dual x 1)

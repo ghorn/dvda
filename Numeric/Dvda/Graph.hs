@@ -31,14 +31,14 @@ previewGraph_ g = do
   threadDelay 10000
 
 data GraphOp a = GSource (SourceType a) Dim
-               | GElemwise ElemwiseType Dim
-               | GOp2 Op2Type Dim
+               | GUnary UnaryType Dim
+               | GBinary BinaryType Dim
                | GOutput String Dim
 
 instance (Eq a, Show a) => Show (GraphOp a) where
   show (GSource st _) = show st
-  show (GElemwise ewt _) = show ewt
-  show (GOp2 op2t _) = show op2t
+  show (GUnary ewt _) = show ewt
+  show (GBinary binaryt _) = show binaryt
   show (GOutput name _) = name
 
 
@@ -68,10 +68,10 @@ addOutput (name, expr) graph = graphGobbler newIdx expr newGraph
 graphGobbler :: Eq a => Int -> Expr a -> Gr (GraphOp a) (Expr a) -> Gr (GraphOp a) (Expr a)
 graphGobbler parentIdx expr oldGraph    
   | isJust existingNode = insEdge (existingIdx, parentIdx, expr) oldGraph
-  | otherwise           = case expr of (Source {})      -> newGraph
-                                       ew@(Elemwise {}) -> graphGobbler newIdx (arg ew) newGraph
-                                       op2@(Op2 {})     -> graphGobbler newIdx (arg2 op2) $
-                                                           graphGobbler newIdx (arg1 op2) newGraph
+  | otherwise           = case expr of (Source {})        -> newGraph
+                                       ew@(Unary {})      -> graphGobbler newIdx (arg ew) newGraph
+                                       binary@(Binary {}) -> graphGobbler newIdx (arg1 binary) $
+                                                             graphGobbler newIdx (arg2 binary) newGraph
       where
         existingNode = lookupBy (\(_,_,a) -> a) expr (labEdges oldGraph)
         (existingIdx,_,_) = fromJust existingNode
@@ -83,5 +83,5 @@ lookupBy f a bs = lookup a $ map (\x -> (f x, x)) bs
 
 getGraphOp :: Expr a -> GraphOp a
 getGraphOp src@(Source {}) = GSource (sourceType src) (dim src)
-getGraphOp ew@(Elemwise {}) = GElemwise (elemwiseType ew) (dim ew)
-getGraphOp op2@(Op2 {}) = GOp2 (op2Type op2) (dim op2)
+getGraphOp ew@(Unary {}) = GUnary (unaryType ew) (dim ew)
+getGraphOp binary@(Binary {}) = GBinary (binaryType binary) (dim binary)
