@@ -11,7 +11,7 @@ import Numeric.Dvda.Expr.Op2Type
 import Numeric.Dvda.Expr.ElemwiseType
 import Numeric.Dvda.Expr.SourceType
 import Numeric.Dvda.Simplify
-import Numeric.Dvda.AD.Fad
+import Numeric.Dvda.AD.Dual
 
 rad :: Floating a => Expr a -> [Expr a] -> [Expr a]
 rad expr args = map getXSens args
