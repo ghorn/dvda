@@ -35,24 +35,33 @@ instance (Show a, Eq a) => Show (Expr a) where
   show src@(Source {}) = show $ sourceType src
   show ew@(Elemwise {}) = show (elemwiseType ew) ++ "(" ++ show (arg ew) ++ ")"
 
-getCompatibleDims :: (Show a, Eq a) => Expr a -> Expr a -> Dim
-getCompatibleDims x y
-  | dim x == dim y = dim x
-  | dim x == 0     = dim y
-  | dim y == 0     = dim x
-  | otherwise      = error $ "mismatching dimensions in\n"++show x++"\n"++show y
+
+-- takes expression and dimensions
+-- broadcast expression to given dimensions
+broadcast :: Expr a -> Dim -> Expr a
+broadcast expr dim' = Elemwise { elemwiseType = Broadcast
+                               , arg = expr
+                               , dim = dim'
+                               }
+
+broadcastOp2 :: Num a => (Expr a, Expr a) -> Op2Type -> Expr a
+broadcastOp2 (x, y) op2t 
+    | dim x == dim y = Op2 {op2Type = op2t, arg1 = x, arg2 = y, dim = dim x}
+    | dim x == 0     = broadcast x (dim y) + y
+    | dim y == 0     = x + broadcast y (dim x)
+    | otherwise      = error $ "dimension mismatch in broadcastOp2 (" ++ show op2t ++ ")"
 
 instance (Show a, Eq a, Num a) => Num (Expr a) where
-  x + y = Op2 {op2Type = Add, arg1 = x, arg2 = y, dim = getCompatibleDims x y}
-  x * y = Op2 {op2Type = Mul, arg1 = x, arg2 = y, dim = getCompatibleDims x y}
-  x - y = Op2 {op2Type = Sub, arg1 = x, arg2 = y, dim = getCompatibleDims x y}
+  x + y = broadcastOp2 (x,y) Add
+  x * y = broadcastOp2 (x,y) Mul
+  x - y = broadcastOp2 (x,y) Sub
   negate x = Elemwise {elemwiseType = Neg, arg = x, dim = dim x}
   abs x = Elemwise {elemwiseType = Abs, arg = x, dim = dim x}
   signum x = Elemwise {elemwiseType = Signum, arg = x, dim = dim x}
   fromInteger x = Source {sourceType = I x, dim = 0}
 
 instance Num a => Fractional (Expr a) where
-  x / y = Op2 {op2Type = Div, arg1 = x, arg2 = y, dim = getCompatibleDims x y}
+  x / y = broadcastOp2 (x, y) Div
   fromRational x = num/den
     where
       num = fromIntegral $ numerator x
@@ -65,8 +74,8 @@ instance Floating a => Floating (Expr a) where
   sqrt x = Elemwise { elemwiseType = Sqrt, arg = x, dim = dim x }
   log x  = Elemwise { elemwiseType = Log,  arg = x, dim = dim x }
   
-  x**y = Op2 { op2Type = Pow, arg1 = x, arg2 = y, dim = getCompatibleDims x y }
-  logBase x y = Op2 { op2Type = LogBase, arg1 = x, arg2 = y, dim = getCompatibleDims x y }
+  x**y = broadcastOp2 (x,y) Pow
+  logBase x y = broadcastOp2 (x,y) LogBase
   
   sin x = Elemwise { elemwiseType = Sin, arg = x, dim = dim x }
   cos x = Elemwise { elemwiseType = Cos, arg = x, dim = dim x }

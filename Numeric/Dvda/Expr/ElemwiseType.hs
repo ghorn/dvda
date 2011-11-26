@@ -28,7 +28,9 @@ data ElemwiseType = Abs
 
                   | ASinh
                   | ACosh
-                  | ATanh deriving Eq
+                  | ATanh 
+                  
+                  | Broadcast deriving Eq
 
 applyElemwise :: Floating a => ElemwiseType -> (a -> a)
 applyElemwise Abs    = abs   
@@ -49,6 +51,7 @@ applyElemwise Tanh   = tanh
 applyElemwise ASinh  = asinh
 applyElemwise ACosh  = acosh
 applyElemwise ATanh  = atanh
+--applyElemwise Broadcast
 
 instance Show ElemwiseType where
   show Abs = "abs"
@@ -74,3 +77,5 @@ instance Show ElemwiseType where
   show ASinh = "asinh"
   show ACosh = "acosh"
   show ATanh = "atanh"
+
+  show Broadcast = "broadcast"
