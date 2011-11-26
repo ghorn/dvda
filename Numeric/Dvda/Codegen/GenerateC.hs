@@ -12,7 +12,6 @@ import Data.Hash.MD5(md5s, Str(..))
 import qualified Numeric.Dvda.Codegen.Config as Config
 import Numeric.Dvda.Expr.Expr
 import Numeric.Dvda.Expr.ExprToGraph
-import Numeric.Dvda.Expr.ElemwiseType
 import Numeric.Dvda.Expr.SourceType
 
 generateCSource :: (Eq a, Show a) => [Expr a] -> [Expr a] -> (String, String, String)
@@ -81,7 +80,6 @@ toC _ (x:[]) (GOutput out _) = (outputArrayHack out) ++ " = " ++ nodeName x ++ "
 toC idx _ (GSource sym@(Sym _) _) = assign idx ++ show sym ++ ";"
 toC idx _ src@(GSource _ _) = assign idx ++ show src ++ ";"
 toC idx (x:y:[]) (GOp2 op2t _) = assign idx ++ nodeName x ++" "++ show op2t ++" "++ nodeName y ++ ";"
-toC idx (x:[]) (GElemwise Inv _) = assign idx ++ "1.0 / " ++ nodeName x ++ ";"
 toC idx (x:[]) (GElemwise ewt _) = assign idx ++ show ewt ++"( " ++ nodeName x ++ " )" ++ ";"
 
 toC idx pres (GElemwise ew _) = error $ "GElemwise fail: "++show (idx, pres, ew)

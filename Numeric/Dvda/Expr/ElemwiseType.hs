@@ -8,8 +8,7 @@ module Numeric.Dvda.Expr.ElemwiseType( ElemwiseType(..)
 
 data ElemwiseType = Abs
                   | Signum
-                  | Neg 
-                  | Inv 
+                  | Neg
                     
                   | Exp
                   | Sqrt
@@ -35,7 +34,6 @@ applyElemwise :: Floating a => ElemwiseType -> (a -> a)
 applyElemwise Abs    = abs   
 applyElemwise Signum = signum
 applyElemwise Neg    = \x -> -x
-applyElemwise Inv    = \x -> 1/x
 applyElemwise Exp    = exp
 applyElemwise Sqrt   = sqrt
 applyElemwise Log    = log
@@ -56,7 +54,6 @@ instance Show ElemwiseType where
   show Abs = "abs"
   show Signum = "signum"
   show Neg = "-"
-  show Inv = "inv"
 
   show Exp = "exp"
   show Sqrt = "sqrt"

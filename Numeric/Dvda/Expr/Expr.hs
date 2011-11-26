@@ -45,14 +45,14 @@ getCompatibleDims x y
 instance (Show a, Eq a, Num a) => Num (Expr a) where
   x + y = Op2 {op2Type = Add, arg1 = x, arg2 = y, dim = getCompatibleDims x y}
   x * y = Op2 {op2Type = Mul, arg1 = x, arg2 = y, dim = getCompatibleDims x y}
-  x - y = Op2 {op2Type = Add, arg1 = x, arg2 = -y, dim = getCompatibleDims x y}
+  x - y = Op2 {op2Type = Sub, arg1 = x, arg2 = y, dim = getCompatibleDims x y}
   negate x = Elemwise {elemwiseType = Neg, arg = x, dim = dim x}
   abs x = Elemwise {elemwiseType = Abs, arg = x, dim = dim x}
   signum x = Elemwise {elemwiseType = Signum, arg = x, dim = dim x}
   fromInteger x = Source {sourceType = I x, dim = 0}
 
 instance Num a => Fractional (Expr a) where
-  x / y = x*(Elemwise {elemwiseType = Inv, arg = y, dim = dim y})
+  x / y = Op2 {op2Type = Div, arg1 = x, arg2 = y, dim = getCompatibleDims x y}
   fromRational x = num/den
     where
       num = fromIntegral $ numerator x

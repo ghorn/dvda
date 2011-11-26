@@ -31,7 +31,7 @@ instance (Arbitrary a, Floating a) => Arbitrary (Pair a) where
               , (5, return $! Pair (x * y) (ex * ey))
               , (5, return $! Pair (x + y) (ex + ey))
               , (5, return $! Pair (x - y) (ex - ey))
---              , (5, return $! Pair (x / y) (ex / ey))
+              , (5, return $! Pair (x / y) (ex / ey))
               , (1, return $! Pair (abs x) (abs ex))
 --              , (1, return $! Pair (signum x) (signum ex))
               , (1, return $! Pair (-x) (-ex))
