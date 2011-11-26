@@ -15,7 +15,7 @@ import Numeric.Dvda.AD.Fad(fad)
 import Numeric.Dvda.AD.Rad(rad)
 import Numeric.Dvda.Expr.Expr(symbolic, Expr)
 import Numeric.Dvda.Expr.Apply
-import Numeric.Dvda.Simplify(fastSimplify, pruneZerosOnce)
+import Numeric.Dvda.Simplify
 import Numeric.Dvda.Expr.ExprToGraph
 
 import Numeric.Dvda.Codegen.Codegen(toFunction)
@@ -27,7 +27,7 @@ fadExample = do
   let f x = [x*34 + 5, x*34 + 4/x, sin x]
       y = symbolic "y" :: Expr Double
       expr = f y
-      g = map fastSimplify $ fad f y
+      g = map simplify $ fad f y
 
   print expr
   print $ expr
@@ -61,7 +61,7 @@ exprExample = do
   
   print exampleExpr
   previewGraph $ exprToGraph exampleExpr
-  previewGraph $ exprToGraph $ pruneZerosOnce exampleExpr
+  previewGraph $ exprToGraph $ removeIdentities exampleExpr
 
 
 pruneExample :: IO ()
@@ -71,8 +71,9 @@ pruneExample = do
         where
           y = symbolic "y"
   print exampleExpr
+  print $ removeIdentities exampleExpr
   previewGraph $ exprToGraph exampleExpr
-  previewGraph $ exprToGraph $ pruneZerosOnce exampleExpr
+  previewGraph $ exprToGraph $ removeIdentities exampleExpr
 
 
 exprToGraphTest :: IO ()
@@ -95,7 +96,7 @@ substituteExample = do
       y = symbolic "y"
       z = symbolic "z"
       e1 = substitutes e0 [(x,4), (y,2), (z,-3)]
-      e2 = fastSimplify e1
+      e2 = removeIdentities e1
 
   print e0
   print e1

@@ -17,7 +17,7 @@ rad :: Floating a => Expr a -> [Expr a] -> [Expr a]
 rad expr args = map getXSens args
   where
     senss = getSensitivities expr 1
-    getXSens x = fastSimplify $ sum $ map snd $ filter (\y -> x == fst y) senss
+    getXSens x = removeIdentities $ sum $ map snd $ filter (\y -> x == fst y) senss
 
 
 pert :: Dual a -> a
@@ -25,7 +25,7 @@ pert (Dual _ b) = b
 
 
 getSensitivities :: Floating a => Expr a -> Expr a -> [(Expr a, Expr a)]
-getSensitivities primal@(Source {sourceType =Sym _}) sens = [(primal, fastSimplify sens)]
+getSensitivities primal@(Source {sourceType =Sym _}) sens = [(primal, removeIdentities sens)]
 getSensitivities (Source {}) _ = []
 getSensitivities (Op2 { op2Type = op2t 
                       , arg1 = x 

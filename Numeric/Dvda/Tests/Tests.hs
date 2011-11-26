@@ -26,8 +26,7 @@ evaluateEqSimplifyEvaluate :: RealFloat a => Pair a -> Bool
 evaluateEqSimplifyEvaluate (Pair _ ex) = ex0 == exSimp || isNaN ex0
   where
     ex0 = evaluate ex
-    exSimp = evaluate $ fastSimplify ex
-
+    exSimp = evaluate $ simplify ex
 evaluateEqualsCallNative :: RealFloat a => Expr a -> Bool
 evaluateEqualsCallNative expr = unsafePerformIO $ do
   fun <- toFunction [] [expr]
