@@ -7,10 +7,7 @@ module Numeric.Dvda.Tests.ArbitraryExpr( Pair(..)
 
 import Test.QuickCheck
 
-import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.SourceType
-import Numeric.Dvda.Expr.Apply(evaluate)
-
+import Numeric.Dvda.Expr
 
 data Pair a = Pair a (Expr a)
 

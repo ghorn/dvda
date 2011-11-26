@@ -1,15 +1,15 @@
--- ExprToGraph.hs
+-- Graph.hs
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Expr.ExprToGraph( exprToGraph
-                                    , exprsToGraph
-                                    , lexprToGraph
-                                    , lexprsToGraph
-                                    , previewGraph
-                                    , previewGraph_
-                                    , GraphOp(..)
-                                    ) where
+module Numeric.Dvda.Graph( exprToGraph
+                         , exprsToGraph
+                         , lexprToGraph
+                         , lexprsToGraph
+                         , previewGraph
+                         , previewGraph_
+                         , GraphOp(..)
+                         ) where
 
 import Data.Graph.Inductive hiding (nodes, edges)
 import Data.GraphViz
@@ -17,10 +17,7 @@ import Data.Text.Lazy(pack)
 import Data.Maybe
 import Control.Concurrent(threadDelay)
 
-import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.SourceType
-import Numeric.Dvda.Expr.ElemwiseType
-import Numeric.Dvda.Expr.Op2Type
+import Numeric.Dvda.Expr
 import Numeric.Dvda.Expr.Misc(outputNames)
 
 previewGraph :: (DynGraph gr, Labellable nl, Show b) => gr nl b -> IO ()

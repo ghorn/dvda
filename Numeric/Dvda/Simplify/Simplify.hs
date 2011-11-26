@@ -6,7 +6,7 @@ module Numeric.Dvda.Simplify.Simplify( simplify
                                      , removeIdentities
                                      ) where
 
-import Numeric.Dvda.Expr.Expr
+import Numeric.Dvda.Expr
 
 import Numeric.Dvda.Simplify.RemoveTimesOne
 import Numeric.Dvda.Simplify.RemovePlusZero

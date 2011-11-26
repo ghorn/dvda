@@ -13,10 +13,9 @@ module Numeric.Dvda.Examples( fadExample
 
 import Numeric.Dvda.AD.Fad(fad)
 import Numeric.Dvda.AD.Rad(rad)
-import Numeric.Dvda.Expr.Expr(symbolic, Expr)
-import Numeric.Dvda.Expr.Apply
+import Numeric.Dvda.Expr
 import Numeric.Dvda.Simplify
-import Numeric.Dvda.Expr.ExprToGraph
+import Numeric.Dvda.Graph
 
 import Numeric.Dvda.Codegen.Codegen(toFunction)
 import Numeric.Dvda.Function

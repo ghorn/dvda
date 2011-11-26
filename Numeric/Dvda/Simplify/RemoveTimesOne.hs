@@ -5,10 +5,7 @@
 module Numeric.Dvda.Simplify.RemoveTimesOne( removeTimesOne
                                            ) where
 
-import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.Op2Type
-import Numeric.Dvda.Expr.ElemwiseType
-import Numeric.Dvda.Expr.SourceType
+import Numeric.Dvda.Expr
 
 -- may need to be called more than once
 removeTimesOne :: Expr a -> Expr a

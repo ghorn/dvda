@@ -14,7 +14,7 @@ import Control.Monad(when)
 import qualified Numeric.Dvda.Codegen.Config as Config
 import Numeric.Dvda.Function
 import Numeric.Dvda.Codegen.GenerateC(generateCSource)
-import Numeric.Dvda.Expr.Expr(Expr(..))
+import Numeric.Dvda.Expr(Expr(..))
 
 
 -- shorten path name for display purposes

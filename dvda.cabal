@@ -12,9 +12,9 @@ Description:         DVDA Verifiably Differentiates Algorithmically
 Cabal-version:       >=1.2
 
 Library
-  Exposed-modules:   Numeric.Dvda.AD.Rad
-                     Numeric.Dvda.AD.Fad
-                     Numeric.Dvda.Expr.Expr
+  Exposed-modules:   Numeric.Dvda
+                     Numeric.Dvda.AD
+                     Numeric.Dvda.Expr
                      Numeric.Dvda.Simplify
                      Numeric.Dvda.Examples
                      Numeric.Dvda.Tests.Tests

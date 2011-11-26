@@ -11,8 +11,7 @@ import System.IO.Unsafe
 import Numeric.Dvda.Function
 import Numeric.Dvda.Codegen.Codegen
 import Numeric.Dvda.Simplify
-import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.Apply(evaluate)
+import Numeric.Dvda.Expr
 import Numeric.Dvda.Tests.ArbitraryExpr
 
 

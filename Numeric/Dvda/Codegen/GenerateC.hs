@@ -10,9 +10,8 @@ import Data.Maybe(fromJust)
 import Data.Hash.MD5(md5s, Str(..))
 
 import qualified Numeric.Dvda.Codegen.Config as Config
-import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.ExprToGraph
-import Numeric.Dvda.Expr.SourceType
+import Numeric.Dvda.Expr
+import Numeric.Dvda.Graph
 
 generateCSource :: (Eq a, Show a) => [Expr a] -> [Expr a] -> (String, String, String)
 generateCSource inputs outputs = (src, include, hash)

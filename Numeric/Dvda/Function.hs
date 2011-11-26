@@ -11,9 +11,7 @@ module Numeric.Dvda.Function( Function(..)
 import Foreign.Ptr(FunPtr)
 
 import Numeric.Dvda.Codegen.CallWrapper(callCFunction)
-import Numeric.Dvda.Expr.Apply(substitutes, evaluate)
-import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.SourceType
+import Numeric.Dvda.Expr
 
 data Function a = Function { funInputs :: [Expr a]
                            , funOutputs :: [Expr a]
