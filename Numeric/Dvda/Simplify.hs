@@ -50,8 +50,6 @@ pruneZerosOnce (Elemwise { elemwiseType = Signum
                          , arg = Source {sourceType = (I 0), dim = dim'}}) = Source {sourceType = I 0, dim = dim'}
 pruneZerosOnce (Elemwise { elemwiseType = Neg
                          , arg = Source {sourceType = (I 0), dim = dim'}}) = Source {sourceType = I 0, dim = dim'}
-pruneZerosOnce (Elemwise { elemwiseType = Inv
-                         , arg = Source {sourceType = (I 0)}}) = error "divide by zero in pruneZerosOnce Inv"
 pruneZerosOnce (Elemwise {elemwiseType = ewt
                          , arg = x, dim = dim'}) = Elemwise {elemwiseType = ewt, arg = pruneZeros x, dim = dim'}
 -- op2
@@ -61,9 +59,21 @@ pruneZerosOnce op2@(Op2 {op2Type = Mul}) = Op2 { op2Type = Mul
                                               , arg1 = pruneZerosOnce (arg1 op2)
                                               , arg2 = pruneZerosOnce (arg2 op2)
                                               , dim = dim op2}
+pruneZerosOnce (Op2 {op2Type = Div, arg1 = Source {sourceType = I 0}, dim = 0}) = Source { sourceType = I 0, dim = 0 }
+--pruneZerosOnce (Op2 {op2Type = Div, arg2 = Source {sourceType = I 0}, dim = 0}) = error "divide by zero in pruneZerosOnce Div"
+pruneZerosOnce op2@(Op2 {op2Type = Div}) = Op2 { op2Type = Div
+                                               , arg1 = pruneZerosOnce (arg1 op2)
+                                               , arg2 = pruneZerosOnce (arg2 op2)
+                                               , dim = dim op2}
 pruneZerosOnce (Op2 {op2Type = Add, arg1 = (Source {sourceType = I 0}), arg2 = y, dim = 0}) = pruneZeros y
 pruneZerosOnce (Op2 {op2Type = Add, arg2 = (Source {sourceType = I 0}), arg1 = x, dim = 0}) = pruneZeros x
 pruneZerosOnce op2@(Op2 {op2Type = Add}) = Op2 { op2Type = Add
+                                              , arg1 = pruneZerosOnce (arg1 op2)
+                                              , arg2 = pruneZerosOnce (arg2 op2)
+                                              , dim = dim op2}
+pruneZerosOnce (Op2 {op2Type = Sub, arg1 = (Source {sourceType = I 0}), arg2 = y, dim = 0}) = negate $ pruneZeros y
+pruneZerosOnce (Op2 {op2Type = Sub, arg2 = (Source {sourceType = I 0}), arg1 = x, dim = 0}) = pruneZeros x
+pruneZerosOnce op2@(Op2 {op2Type = Sub}) = Op2 { op2Type = Sub
                                               , arg1 = pruneZerosOnce (arg1 op2)
                                               , arg2 = pruneZerosOnce (arg2 op2)
                                               , dim = dim op2}
