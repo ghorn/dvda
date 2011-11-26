@@ -11,8 +11,8 @@ import System.IO.Unsafe
 import Numeric.Dvda.Function
 import Numeric.Dvda.Codegen.Codegen
 import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.Arbitrary
 import Numeric.Dvda.Expr.Apply(evaluate)
+import Numeric.Dvda.Tests.ArbitraryExpr
 
 
 (~=) :: RealFloat a => a -> a -> Bool
@@ -42,8 +42,8 @@ runTests = do
   putStrLn "\nbuilding arbitrary expressions and evaluating them"
   quickCheck (buildAndEvaluate :: Pair Double -> Bool)
 
-  putStrLn "\nevaluate fun [] == callNative fun [] ..."
+  putStrLn "\nevaluate fun [] ~= callNative fun [] ..."
   quickCheck (evaluateEqualsCallNative :: Expr Double -> Bool)
 
-  putStrLn "\ncallNative fun [] == callC fun [] ..."
+  putStrLn "\ncallNative fun [] ~= callC fun [] ..."
   quickCheck (callNativeEqualsCallC :: Expr Double -> Bool)

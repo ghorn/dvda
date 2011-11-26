@@ -1,9 +1,9 @@
--- Arbitrary.hs
+-- ArbitraryExpr.hs
 
 {-# OPTIONS_GHC -Wall -fno-warn-orphans #-}
 
-module Numeric.Dvda.Expr.Arbitrary( Pair(..)
-                                  ) where
+module Numeric.Dvda.Tests.ArbitraryExpr( Pair(..)
+                                       ) where
 
 import Test.QuickCheck
 

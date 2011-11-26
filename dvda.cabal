@@ -20,8 +20,3 @@ Library
                      Numeric.Dvda.Tests.Tests
   Build-depends:     base, graphviz, fgl, text, directory, MissingH, process, unix, QuickCheck
   Ghc-options:       -O2
-
-Executable runTests
-  Main-is:           RunTests.hs
-  Hs-Source-Dirs:    .
-  Ghc-options:       -O2
