@@ -16,7 +16,7 @@ Library
                      Numeric.Dvda.AD
                      Numeric.Dvda.Expr
                      Numeric.Dvda.Simplify
-                     Numeric.Dvda.Examples
-                     Numeric.Dvda.Tests.Tests
-  Build-depends:     base, graphviz, fgl, text, directory, MissingH, process, unix, QuickCheck
+--                     Numeric.Dvda.Examples
+--                     Numeric.Dvda.Tests.Tests
+  Build-depends:     base, graphviz, fgl, text, directory, MissingH, process, unix, QuickCheck, repa
   Ghc-options:       -O2 -Wall

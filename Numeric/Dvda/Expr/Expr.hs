@@ -1,101 +1,228 @@
 -- Expr.hs
 
 {-# OPTIONS_GHC -Wall #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+
+{-# LANGUAGE PolymorphicComponents, ExistentialQuantification #-}
+-- {-# LANGUAGE FlexibleInstances, RankNTypes #-}  -- , ExistentialQuantification #-}
+-- {-# LANGUAGE FlexibleInstances, RankNTypes, ExistentialQuantification #-}
+-- {-# LANGUAGE TypeOperators #-} -- needed for einsum
 
 module Numeric.Dvda.Expr.Expr( Expr(..)
+                             , dot
+                             , applyDot
                              , symbolic
-                             , Dim
+                             , symTensor
                              ) where
 
 import Data.Ratio(numerator, denominator)
 import Data.GraphViz(Labellable(..))
 import Data.Text.Lazy(pack)
+import qualified Data.Array.Repa as R
 
 import Numeric.Dvda.Expr.BinaryType
 import Numeric.Dvda.Expr.UnaryType
-import Numeric.Dvda.Expr.SourceType
+import Numeric.Dvda.Expr.Scalar
 
-type Dim = Int
 
-data Expr a = Source { sourceType :: SourceType a
-                     , dim :: Dim
+data Expr sh a = Sym { name :: String
+                     , dim :: sh
                      }
-            | Unary { unaryType :: UnaryType
-                    , arg :: Expr a
-                    , dim :: Dim
-                    }
-            | Binary { binaryType :: BinaryType
-                     , arg1 :: Expr a
-                     , arg2 :: Expr a
-                     , dim :: Dim
-                     } deriving Eq
+               | EScalar (Scalar a)
+               | Broadcast { arg' :: Scalar a
+                           , dim :: sh
+                           }
+               | Tensor (R.Array sh a)
+               | Unary { unaryType :: UnaryType
+                       , arg :: Expr sh a
+                       }
+               | Binary { binaryType :: BinaryType
+                        , arg1 :: Expr sh a
+                        , arg2 :: Expr sh a
+                        }
+               | forall sh1 sh2 . (R.Shape sh1, R.Shape sh2, Dottable sh1 sh2 sh) =>
+                 Dot { arg1' :: Expr sh1 a
+                     , arg2' :: Expr sh2 a
+                     , dim :: sh
+                     }
 
-instance (Show a, Eq a) => Show (Expr a) where
-  show binary@(Binary {}) = "( " ++ show (arg1 binary) ++" "++ show (binaryType binary) ++" "++ show (arg2 binary) ++ " )"
-  show src@(Source {}) = show $ sourceType src
+
+getDim :: Expr sh a -> sh
+getDim (Sym { dim = d}) = d
+getDim (EScalar _) = error "can't call getDim on EScalar"
+getDim (Broadcast {dim = d}) = d
+getDim (Tensor a) = R.extent a
+getDim (Unary { arg = a }) = getDim a
+getDim (Binary { arg1 = a }) = getDim a
+getDim (Dot { dim = d }) = d
+
+
+class Dottable a b c | a b -> c where
+  dot :: (Num e, R.Elt e) => Expr a e -> Expr b e -> Expr c e
+  applyDot :: (Num e, R.Elt e) => R.Array a e -> R.Array b e -> R.Array c e
+
+-- vector `dot` vector = scalar
+instance Dottable R.DIM1 R.DIM1 R.DIM0 where
+  {-# INLINE dot #-}
+  dot x y = Dot { arg1' = x, arg2' = y, dim = R.Z }
+  applyDot x y = R.force $ R.sum $ R.zipWith (*) x y
+
+---- matrix `dot` vector = vector
+--instance (Num a, R.Elt a) => Dottable (Expr R.DIM2 a) (Expr R.DIM1 a) (Expr R.DIM1 a) where
+--  {-# INLINE dot #-}
+--  dot x y
+--    | n == n' = Dot { arg1' = x, arg2' = y, dim = (R.Z :. m) }
+--    | otherwise = error $ unlines $ [ "??? Error using ==> dot"
+--                                    , "Inner matrix dimensions must agree."
+--                                    , "dot( " ++ show (m,n) ++ ", " ++ show n' ++ ")"
+--                                    ]
+--    where
+--      (R.Z :. n :. m) = getDim x
+--      (R.Z :. n') = getDim y
+---- vector `dot` matrix = vector
+--instance (Num a, R.Elt a) => Dottable (Expr R.DIM1 a) (Expr R.DIM2 a) (Expr R.DIM1 a) where
+--  {-# INLINE dot #-}
+--  dot x y
+--    | m == m' = Dot { arg1' = x, arg2' = y, dim = (R.Z :. n) }
+--    | otherwise = error $ unlines $ [ "??? Error using ==> dot"
+--                                    , "Inner matrix dimensions must agree."
+--                                    , "dot( " ++ show m' ++ ", " ++ show (m,n) ++ ")"
+--                                    ]
+--    where
+--      (R.Z :. m') = getDim x
+--      (R.Z :. n :. m) = getDim y
+--
+---- matrix `dot` matrix = matrix
+--instance Dottable R.DIM2 R.DIM2 R.DIM2 where
+--  {-# INLINE dot #-}
+--  dot x y
+--    | nx == my = Dot { arg1' = x, arg2' = y, dim = (R.Z :. mx :. ny) }
+--    | otherwise = error $ unlines $ [ "??? Error using ==> dot"
+--                                    , "Inner matrix dimensions must agree."
+--                                    , "dot( " ++ show (mx, nx) ++ ", " ++ show (my,ny) ++ ")"
+--                                    ]
+--    where
+--      (R.Z :. nx :. mx) = getDim x
+--      (R.Z :. ny :. my) = getDim y
+--  applyDot = mmMult
+
+
+
+
+
+--f :: Expr R.DIM0 Double
+--f = (x `dot` y) + 4.3
+----f = head [4.3, (x `dot` y)]
+--  where
+--    x = Tensor $ R.fromList (R.Z :. (3::Int)) [0,1,2::Double]
+--    y = Tensor $ R.fromList (R.Z :. (3::Int)) [0,1,2::Double]
+--
+
+-- Eq instance
+instance (R.Shape sh, R.Elt a, Eq a) => Eq (Expr sh a) where
+  (==) (Sym {name = n1, dim = dim1}) (Sym {name = n2, dim = dim2}) = and [n1 == n2, dim1 == dim2]
+  (==) (EScalar x) (EScalar y) = (x == y)
+  (==) (Tensor x) (Tensor y) = (x == y)
+  (==) (Broadcast {arg' = a1, dim = dim1}) (Broadcast {arg' = a2, dim = dim2}) = and [a1 == a2, dim1 == dim2]
+  (==) (Unary { unaryType = t0, arg = a1 }) (Unary { unaryType = t1, arg = a2 }) = and [t0 == t1, a1 == a2]
+  (==) (Binary { binaryType = bt0, arg1 = a01, arg2 = a02 }) (Binary { binaryType = bt1, arg1 = a11, arg2 = a12 }) = and [bt0 == bt1, a01 == a11, a02 == a12]
+--  (==) x@(Dot {arg1' = dx1, arg2' = dx2}) y@(Dot {arg1' = dy1, arg2' = dy2}) = and [dx1 == dy1, dx2 == dy2, getDim x == getDim y]
+  (==) _ _ = False
+  
+
+instance (R.Shape sh, R.Elt a) => Show (Expr sh a) where
+  show sym@(Sym {}) = show (name sym)
+  show (EScalar s) = show s
+  show (Broadcast {arg' = a, dim = d}) = "broadcast(" ++ R.showShape d ++ ": "++ show a ++ ")"
+  show (Tensor t) = show t
   show ew@(Unary {}) = show (unaryType ew) ++ "(" ++ show (arg ew) ++ ")"
+  show binary@(Binary {}) = "( " ++ show (arg1 binary) ++" "++ show (binaryType binary) ++" "++ show (arg2 binary) ++ " )"
+  show (Dot {arg1' = a1, arg2' = a2}) = "dot( " ++ show a1 ++ ", " ++ show a2 ++ " )"
 
 
--- takes expression and dimensions
--- broadcast expression to given dimensions
-broadcast :: Expr a -> Dim -> Expr a
-broadcast expr dim' = Unary { unaryType = Broadcast
-                            , arg = expr
-                            , dim = dim'
-                            }
+isScalar :: Expr sh a -> Bool
+isScalar (EScalar _) = True
+isScalar _ = False
 
-broadcastBinary :: Num a => (Expr a, Expr a) -> BinaryType -> Expr a
-broadcastBinary (x, y) binaryt 
-    | dim x == dim y = Binary {binaryType = binaryt, arg1 = x, arg2 = y, dim = dim x}
-    | dim x == 0     = broadcast x (dim y) + y
-    | dim y == 0     = x + broadcast y (dim x)
-    | otherwise      = error $ "dimension mismatch in broadcastBinary (" ++ show binaryt ++ ")"
+toBinary :: Eq sh => (Expr sh a, Expr sh a) -> BinaryType -> Expr sh a 
+toBinary (x,y) binType
+  | or [isScalar x, isScalar y, getDim x == getDim y] = Binary {binaryType = binType, arg1 = x, arg2 = y}
+  | otherwise      = error $ "type mismatch in toBinary (" ++ show binType ++ ")"
 
-instance (Show a, Eq a, Num a) => Num (Expr a) where
-  x + y = broadcastBinary (x,y) Add
-  x * y = broadcastBinary (x,y) Mul
-  x - y = broadcastBinary (x,y) Sub
-  negate x = Unary {unaryType = Neg, arg = x, dim = dim x}
-  abs x = Unary {unaryType = Abs, arg = x, dim = dim x}
-  signum x = Unary {unaryType = Signum, arg = x, dim = dim x}
-  fromInteger x = Source {sourceType = I x, dim = 0}
+broadcast :: Scalar a -> Expr sh a -> Expr sh a
+broadcast scalar expr = Broadcast { arg' = scalar
+                                  , dim = getDim expr
+                                  }
 
-instance Num a => Fractional (Expr a) where
-  x / y = broadcastBinary (x, y) Div
+instance (R.Shape sh, R.Elt a, Num a) => Num (Expr sh a) where
+  -- (+)
+  (EScalar x) + (EScalar y) = EScalar (x + y)
+  (EScalar x) + y = (broadcast x y) + y
+  x + (EScalar y) = x + (broadcast y x)
+  x + y = toBinary (x,y) Add
+  
+  -- (*)
+  (EScalar x) * (EScalar y) = EScalar (x * y)
+  (EScalar x) * y = (broadcast x y) * y
+  x * (EScalar y) = x * (broadcast y x)
+  x * y = toBinary (x,y) Mul
+
+  -- (-)
+  (EScalar x) - (EScalar y) = EScalar (x - y)
+  (EScalar x) - y = (broadcast x y) - y
+  x - (EScalar y) = x - (broadcast y x)
+  x - y = toBinary (x,y) Sub
+
+  negate x = Unary {unaryType = Neg, arg = x}
+  abs x = Unary {unaryType = Abs, arg = x}
+  signum x = Unary {unaryType = Signum, arg = x}
+  fromInteger x = EScalar $ I (fromInteger x)
+
+instance (Fractional a, R.Elt a, R.Shape sh) => Fractional (Expr sh a) where
+  (EScalar x) / (EScalar y) = EScalar (x / y)
+  (EScalar x) / y = (broadcast x y) / y
+  x / (EScalar y) = x / (broadcast y x)
+  x / y = toBinary (x,y) Div
+
   fromRational x = num / den
     where
       num = fromIntegral $ numerator x
       den = fromIntegral $ denominator x
 
-instance Floating a => Floating (Expr a) where
-  pi = Source {sourceType = Number pi, dim = 0}
+
+instance (Floating a, R.Elt a, R.Shape sh) => Floating (Expr sh a) where
+  pi = EScalar $ N pi
   
-  exp x  = Unary { unaryType = Exp,  arg = x, dim = dim x }
-  sqrt x = Unary { unaryType = Sqrt, arg = x, dim = dim x }
-  log x  = Unary { unaryType = Log,  arg = x, dim = dim x }
+  exp x  = Unary { unaryType = Exp,  arg = x }
+  sqrt x = Unary { unaryType = Sqrt, arg = x }
+  log x  = Unary { unaryType = Log,  arg = x }
   
-  x**y = broadcastBinary (x,y) Pow
-  logBase x y = broadcastBinary (x,y) LogBase
+  x**y = toBinary (x,y) Pow
+  logBase x y = toBinary (x,y) LogBase
   
-  sin x = Unary { unaryType = Sin, arg = x, dim = dim x }
-  cos x = Unary { unaryType = Cos, arg = x, dim = dim x }
-  tan x = Unary { unaryType = Tan, arg = x, dim = dim x }
+  sin x = Unary { unaryType = Sin, arg = x }
+  cos x = Unary { unaryType = Cos, arg = x }
+  tan x = Unary { unaryType = Tan, arg = x }
                    
-  asin x = Unary { unaryType = ASin, arg = x, dim = dim x }
-  acos x = Unary { unaryType = ACos, arg = x, dim = dim x }
-  atan x = Unary { unaryType = ATan, arg = x, dim = dim x }
+  asin x = Unary { unaryType = ASin, arg = x }
+  acos x = Unary { unaryType = ACos, arg = x }
+  atan x = Unary { unaryType = ATan, arg = x }
 
-  sinh x = Unary { unaryType = Sinh, arg = x, dim = dim x }
-  cosh x = Unary { unaryType = Cosh, arg = x, dim = dim x }
-  tanh x = Unary { unaryType = Tanh, arg = x, dim = dim x }
+  sinh x = Unary { unaryType = Sinh, arg = x }
+  cosh x = Unary { unaryType = Cosh, arg = x }
+  tanh x = Unary { unaryType = Tanh, arg = x }
 
-  asinh x = Unary { unaryType = ASinh, arg = x, dim = dim x }
-  acosh x = Unary { unaryType = ACosh, arg = x, dim = dim x }
-  atanh x = Unary { unaryType = ATanh, arg = x, dim = dim x }
+  asinh x = Unary { unaryType = ASinh, arg = x }
+  acosh x = Unary { unaryType = ACosh, arg = x }
+  atanh x = Unary { unaryType = ATanh, arg = x }
 
 
-instance (Show a, Num a) => Labellable (Expr a) where
-  toLabelValue go = toLabelValue $ pack $ show go
+instance (Show a, Num a, R.Elt a, Show sh, R.Shape sh) => Labellable (Expr sh a) where
+  toLabelValue go = toLabelValue $ pack $ show go ++ "["++show (getDim go)++"]"
 
-symbolic :: String -> Expr a
-symbolic name = Source {sourceType = Sym name, dim = 0}
+symbolic :: String -> Expr R.Z a
+symbolic name' = Sym {name = name', dim = R.Z}
+
+symTensor :: R.Shape sh => String -> [Int] -> Expr sh a
+symTensor name' dim' = Sym {name = name', dim = R.shapeOfList dim'}

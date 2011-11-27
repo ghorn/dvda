@@ -28,9 +28,8 @@ data UnaryType = Abs
 
                | ASinh
                | ACosh
-               | ATanh 
+               | ATanh deriving Eq 
 
-               | Broadcast deriving Eq
 
 applyUnary :: Floating a => UnaryType -> (a -> a)
 applyUnary Abs    = abs   
@@ -51,7 +50,7 @@ applyUnary Tanh   = tanh
 applyUnary ASinh  = asinh
 applyUnary ACosh  = acosh
 applyUnary ATanh  = atanh
---applyUnary Broadcast = 
+
 
 instance Show UnaryType where
   show Abs = "abs"
@@ -77,5 +76,3 @@ instance Show UnaryType where
   show ASinh = "asinh"
   show ACosh = "acosh"
   show ATanh = "atanh"
-
-  show Broadcast = "broadcast"
