@@ -13,7 +13,12 @@ evalScalar (N x) = x
 evalScalar (I x) = fromIntegral x
 
 data Scalar a = N a
-              | I Int deriving (Eq, Show)
+              | I Int deriving Eq
+
+instance Show a => Show (Scalar a) where
+  show (N x) = show x
+  show (I x) = show x
+
 instance Num a => Num (Scalar a) where
   (N x) + (N y) = N $ x + y
   (I x) + (I y) = I $ x + y

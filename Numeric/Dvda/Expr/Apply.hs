@@ -7,52 +7,38 @@ module Numeric.Dvda.Expr.Apply( getSyms
                               , substitutes
                               ) where
 
-import qualified Data.Array.Repa as R
-import Data.List(foldl')
+import Data.List(nub)
+import Data.Maybe
 
 import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.SourceType
-import Numeric.Dvda.Expr.UnaryType
-import Numeric.Dvda.Expr.BinaryType
-
 
 -- get all the symbolic variables
---getSyms :: Expr a -> [Expr a]
-getSyms = getSyms' []
+getSyms :: Eq a => Expr a -> [Expr a]
+getSyms expr = nub $ getSyms' [] expr
   where
-    getSyms' acc (Binary {arg1=x, arg2=y}) = getSyms' (getSyms' acc x) y
-    getSyms' acc (Unary {arg=x}) = getSyms' acc x
-    getSyms' acc sym@(Sym {}) = acc++[sym]
-    getSyms' acc (Broadcast {arg'=x}) = getSyms' acc x
-    getSyms' acc _ = acc
-
+    getSyms' acc x@(Sym _ _) = acc++[x]
+    getSyms' acc (EScalar _) = acc
+    getSyms' acc (Vector _ _) = acc
+    getSyms' acc (Matrix _ _) = acc
+    getSyms' acc (Unary _ x) = getSyms' acc x
+    getSyms' acc (Binary _ x y) = getSyms' (getSyms' acc x) y
+    getSyms' acc (Broadcast _ _) = acc
 
 -- traverse an expression and apply a function on the sources
---mapSources :: Eq a => (Expr a -> Expr b) -> Expr a -> Expr b
-mapSources f binary@(Binary {}) = Binary { binaryType = (binaryType binary)
-                                         , arg1 = mapSources f (arg1 binary) 
-                                         , arg2 = mapSources f (arg2 binary)
---                                         , dim = dim binary
-                                         }
-mapSources f ew@(Unary {}) = Unary { unaryType = unaryType ew
-                                   , arg = mapSources f (arg ew)
---                                   , dim = dim ew
-                                   }
-mapSources f src@(I {}) = f src
-mapSources f src@(Number {}) = f src
-mapSources f src@(Sym {}) = f src
-
-
--- substitute one symbolic variable for another
---substitute :: Eq a => Expr a -> (Expr a, Expr a) -> Expr a
-substitute oldExpr (oldValue, newValue) = mapSources f oldExpr
+substitutes :: Eq a => [(Expr a, Expr a)] -> Expr a -> Expr a
+substitutes subRules expr0 = substitutes' expr0
   where
-    f src@(Sym {})
-      | src == oldValue = newValue
-      | otherwise       = src
-    f src = src
+    substitutes' x@(Sym _ _)
+      | isNothing newSym = x
+      | otherwise        = fromJust newSym
+      where
+        newSym = lookup x subRules
+    substitutes' x@(EScalar _) = x
+    substitutes' x@(Vector _ _) = x
+    substitutes' x@(Matrix _ _) = x
+    substitutes' (Unary op x) = Unary op $ substitutes' x
+    substitutes' (Binary op x y) = Binary op (substitutes' x) (substitutes' y)
+    substitutes' (Broadcast d x) = Broadcast d (substitutes' x)
 
-
--- substitute list of symbolic variable
---substitutes :: Eq a => Expr a -> [(Expr a,Expr a)] -> Expr a
-substitutes oldExpr subPairs = foldl' substitute oldExpr subPairs
+substitute :: Eq a => (Expr a, Expr a) -> Expr a -> Expr a
+substitute x = substitutes [x]
