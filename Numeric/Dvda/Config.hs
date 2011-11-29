@@ -2,29 +2,35 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Codegen.Config( cType
-                                  , dvdaDir
-                                  , functionDir
-                                  , nameCSource
-                                  , nameCInclude
-                                  , nameCObject
-                                  , nameCFunction
-                                  , gccString
-                                  , spewGccCall
-                                  ) where
+module Numeric.Dvda.Config( cType
+                          , dvdaDir
+                          , functionDir
+                          , nameCSource
+                          , nameCInclude
+                          , nameCObject
+                          , nameCFunction
+                          , gccString
+                          , spewGccCall
+                          , outputNames
+                          ) where
 
 import System.Directory
 import Control.Monad(when)
 
+-- | what symbolic variable names to use when generating a function
+outputNames :: [String]
+outputNames = map (\x -> "out"++show x) [(0::Integer)..]
+
+-- | type to use when generating c code
 cType :: String
 cType = "double"
 
--- print the gcc call when generating code
+-- | whether to print the gcc call when generating code
 spewGccCall :: Bool
 spewGccCall = False
 
--- return directory to use for temp files
--- create this directory and print message if it doesn't exist
+-- | return directory to use for temp files
+-- | create this directory and print message if it doesn't exist
 dvdaDir :: IO FilePath
 dvdaDir = do
   dir <- getAppUserDataDirectory "dvda"
@@ -39,7 +45,7 @@ dvdaDir = do
   return dir
 
 
--- take in source file and object, return string suitible for calling to compile
+-- | take in source file and object, return string suitible for calling to compile
 gccString :: FilePath -> FilePath -> String
 gccString src obj = "gcc -O2 -fPIC -shared " ++ src ++ " -o " ++ obj
 
@@ -62,4 +68,3 @@ nameCObject hash = nameCFunction hash ++ ".o"
 
 nameCFunction :: String -> String
 nameCFunction hash = "call_" ++ hash
-
