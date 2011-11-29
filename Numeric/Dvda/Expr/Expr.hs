@@ -11,6 +11,10 @@ module Numeric.Dvda.Expr.Expr( Expr(..)
                              , vec
                              , mat
                              , subs
+                             , Scalar(..)
+                             , Vector(..)
+                             , Matrix(..)
+                             , getChildren
                              ) where
 
 --import Data.GraphViz(Labellable(..))
@@ -586,3 +590,24 @@ subs subslist expr
       | otherwise        = fromJust newSym
       where
         newSym = lookup arg sublist
+
+
+----------------------------------------------------------------------
+-------------------------- get children  -----------------------------
+----------------------------------------------------------------------
+-- | get all the children of an Expr a
+-- | will be [], (x):[], or (x):(y):[]
+getChildren :: Eq a => Expr a -> [Expr a]
+getChildren (EScalar (SUnary (Unary _ x))) = [EScalar x]
+getChildren (EScalar (SBinary (Binary _ x y))) = [EScalar x, EScalar y]
+getChildren (EScalar _) = []
+
+getChildren (EVector (VUnary (Unary _ x))) = [EVector x]
+getChildren (EVector (VBinary (Binary _ x y))) = [EVector x, EVector y]
+getChildren (EVector (VBroadcast _ x)) = [EScalar x]
+getChildren (EVector _) = []
+
+getChildren (EMatrix (MUnary (Unary _ x))) = [EMatrix x]
+getChildren (EMatrix (MBinary (Binary _ x y))) = [EMatrix x, EMatrix y]
+getChildren (EMatrix (MBroadcast _ x)) = [EScalar x]
+getChildren (EMatrix _) = []
