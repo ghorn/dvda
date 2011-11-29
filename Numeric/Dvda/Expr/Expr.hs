@@ -4,17 +4,21 @@
 {-# LANGUAGE Rank2Types #-}
 
 module Numeric.Dvda.Expr.Expr( Expr(..)
-                             , symbolic
+                             , sym
                              , symVec
                              , symMat
+                             , getSyms
                              , vec
                              , mat
+                             , subs
                              ) where
 
 --import Data.GraphViz(Labellable(..))
 --import Data.Text.Lazy(pack)
 ----instance (Show a, Num a, R.Elt a, Show sh, R.Shape sh) => Labellable (Expr sh a) where
 ----  toLabelValue go = toLabelValue $ pack $ show go ++ "["++show (getDim go)++"]"
+import Data.List(nubBy)
+import Data.Maybe(isNothing, fromJust)
 
 import Numeric.Dvda.Expr.Binary
 import Numeric.Dvda.Expr.Unary
@@ -59,7 +63,39 @@ instance Show a => Show (Matrix a) where
   show (MBinary x) = show x
   show (MBroadcast d x) = "broadcast{ " ++ show d ++ " <- " ++ show x ++ " }"
 
-  
+
+------------------------------------------------------------
+----------------- get symbolic variables -------------------
+------------------------------------------------------------
+sGetSyms :: Scalar a -> [Expr a]
+sGetSyms (SNum _) = []
+sGetSyms (SInt _) = []
+sGetSyms x@(SSym _) = [EScalar x]
+sGetSyms (SUnary (Unary _ x)) = sGetSyms x
+sGetSyms (SBinary (Binary _ x y)) = sGetSyms x ++ sGetSyms y
+
+vGetSyms :: Vector a -> [Expr a]
+vGetSyms (VNum _ _) = []
+vGetSyms x@(VSym _ _) = [EVector x]
+vGetSyms (VUnary (Unary _ x)) = vGetSyms x
+vGetSyms (VBinary (Binary _ x y)) = vGetSyms x ++ vGetSyms y
+vGetSyms (VBroadcast _ x) = sGetSyms x
+
+mGetSyms :: Matrix a -> [Expr a]
+mGetSyms (MNum _ _) = []
+mGetSyms x@(MSym _ _) = [EMatrix x]
+mGetSyms (MUnary (Unary _ x)) = mGetSyms x
+mGetSyms (MBinary (Binary _ x y)) = mGetSyms x ++ mGetSyms y
+mGetSyms (MBroadcast _ x) = sGetSyms x
+
+-- | get all the symbolic variables in an expression
+getSyms :: Expr a -> [Expr a]
+getSyms (EScalar x) = sGetSyms x
+getSyms (EVector x) = vGetSyms x
+getSyms (EMatrix x) = mGetSyms x
+
+
+-- get dimensions of vector
 vecDim :: Vector a -> Int
 vecDim (VNum d _) = d
 vecDim (VSym d _) = d
@@ -69,7 +105,7 @@ vecDim (VBinary (Binary _ vx vy))
   | vecDim vx == vecDim vy = vecDim vx
   | otherwise              = error "vecDim found mismatched dimensions in VBinary - this indicates the absence of proper checking during construction"
 
-
+-- get dimensions of matrix (rows, cols)
 matDim :: Matrix a -> (Int, Int)
 matDim (MNum d _) = d
 matDim (MSym d _) = d
@@ -79,16 +115,17 @@ matDim (MBinary (Binary _ mx my))
   | matDim mx == matDim my = matDim mx
   | otherwise              = error "matDim found mismatched dimensions in MBinary - this indicates the absence of proper checking during construction"
 
-
-
+-- test if scalar == SInt x
 sIsI :: Int -> Scalar a -> Bool
 sIsI i (SInt si) = i == si
 sIsI _ _ = False
 
+-- test if vector is broadcast from (SInt x)
 vIsI :: Int -> Vector a -> Bool
 vIsI i (VBroadcast _ s) = sIsI i s
 vIsI _ _ = False
 
+-- test if matrix is broadcast from (SInt x)
 mIsI :: Int -> Matrix a -> Bool
 mIsI i (MBroadcast _ s) = sIsI i s
 mIsI _ _ = False
@@ -307,9 +344,6 @@ instance (Floating a) => Floating (Matrix a) where
 
 
 
-
-
-
 --------------------------------------------------------------------
 --------- please eliminate the following code duplication: ---------
 --------------------------------------------------------------------
@@ -474,27 +508,81 @@ instance (Floating a) => Floating (Expr a) where
   atanh x = safeUnaryConstructFloating atanh x
 
 
+----------------------------------------------------------------------
+------------------------ api constructors ----------------------------
+----------------------------------------------------------------------
+-- | create symbolic scalar
+sym :: String -> Expr a
+sym name = EScalar $ SSym name
 
--- api constructors:
-symbolic :: String -> Expr a
-symbolic name = EScalar $ SSym name
-
+-- | create symbolic vector with length
 symVec :: Int -> String -> Expr a
 symVec d name 
   | d > 0     = EVector $ VSym d name
   | otherwise = error $ "symVec can't make vector with length: " ++ show d
 
+-- | create symbolic matrix with specified (rows, columns)
 symMat :: (Int,Int) -> String -> Expr a
 symMat (r,c) name
   | r > 0 && c > 0 = EMatrix $ MSym (r,c) name
   | otherwise      = error $ "symMat can't make matrix with dimensions: " ++ show (r,c)
 
+-- | create numeric vector
 vec :: [a] -> Expr a
 vec xs 
   | length xs > 0 = EVector $ VNum (length xs) xs
   | otherwise     = error "Improper dimensions in vec :: [a] -> Expr a"
 
+-- | Create numeric matrix with specified (rows, cols). List is taken rowwise.
 mat :: (Int,Int) -> [a] -> Expr a
 mat (r,c) xs 
   | and [length xs == r*c, r > 0, c > 0] = EMatrix $ MNum (r,c) xs
   | otherwise        = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
+
+
+----------------------------------------------------------------------
+---------------------------- substitute ------------------------------
+----------------------------------------------------------------------
+-- | substitute a list of pairs [(matchThis, replaceWithThis)] in an expression
+subs :: Floating a => [(Expr a, Expr a)] -> Expr a -> Expr a
+subs subslist expr
+  | length subslist == length (nubBy contradictingSub subslist) = callCorrectSub expr
+  | otherwise = error "Error in subs: same input in substitute pairs list twice with different outputs"
+  where
+    contradictingSub (x0,x1) (y0,y1) = (x0 == y0) && (x1 /= y1)
+    
+    callCorrectSub (EScalar s) = sSubs s
+    callCorrectSub (EVector v) = vSubs v
+    callCorrectSub (EMatrix m) = mSubs m
+    
+    (scalarSubs, vectorSubs, matrixSubs) = foldr sortSubs ([],[],[]) subslist
+    
+    sortSubs (EScalar x, EScalar y) (ss,vs,ms) = ( ss ++ [(x,y)], vs           , ms            )
+    sortSubs (EVector x, EVector y) (ss,vs,ms) = ( ss           , vs ++ [(x,y)], ms            )
+    sortSubs (EMatrix x, EMatrix y) (ss,vs,ms) = ( ss           , vs           , ms ++ [(x,y)] )
+    sortSubs xy _ = error $ "Can't substitute two unlike quantities, must be scalar -> scalar, vector -> vector, or matrix -> matrix)\noffending pair: " ++ show xy
+
+    sSubs x@(SNum _) = EScalar x
+    sSubs x@(SInt _) = EScalar x
+    sSubs x@(SSym _) = EScalar $ sub scalarSubs x
+    sSubs (SUnary (Unary unOp x)) = applyUnary unOp $ sSubs x
+    sSubs (SBinary (Binary binOp x y)) = applyBinary binOp (sSubs x) (sSubs y)
+    
+    vSubs x@(VNum _ _) = EVector x
+    vSubs x@(VSym _ _) = EVector $ sub vectorSubs x
+    vSubs (VUnary (Unary unOp x)) = (applyUnary unOp) (vSubs x)
+    vSubs (VBinary (Binary binOp x y)) = applyBinary binOp (vSubs x) (vSubs y)
+    vSubs (VBroadcast _ x) = sSubs x
+    
+    mSubs x@(MNum _ _) = EMatrix x
+    mSubs x@(MSym _ _) = EMatrix $ sub matrixSubs x
+    mSubs (MUnary (Unary unOp x)) = applyUnary unOp $ mSubs x
+    mSubs (MBinary (Binary binOp x y)) = applyBinary binOp (mSubs x) (mSubs y)
+    mSubs (MBroadcast _ x) = sSubs x
+
+    sub :: Eq a => [(a,a)] -> a -> a
+    sub sublist arg 
+      | isNothing newSym = arg
+      | otherwise        = fromJust newSym
+      where
+        newSym = lookup arg sublist

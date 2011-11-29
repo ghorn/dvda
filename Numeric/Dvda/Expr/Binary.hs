@@ -19,7 +19,7 @@ data BinaryType = Mul
                 | Pow
                 | LogBase deriving Eq
 
-applyBinary :: Floating a => BinaryType -> (a -> a -> a)
+applyBinary :: Floating a => BinaryType -> a -> a -> a
 applyBinary Mul     = (*)
 applyBinary Add     = (+)
 applyBinary Div     = (/)

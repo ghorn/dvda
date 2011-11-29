@@ -8,5 +8,5 @@ module Numeric.Dvda.Expr.Properties(properties
 import Numeric.Dvda.Expr.Expr
 
 properties :: [Bool]
-properties = map (\f -> (f "x" :: Expr Double) == f "x" + 0) [symbolic, symVec 13, symMat (7,2)]
+properties = map (\f -> (f "x" :: Expr Double) == f "x" + 0) [sym, symVec 13, symMat (7,2)]
     
