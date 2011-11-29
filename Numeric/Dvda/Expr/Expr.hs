@@ -38,10 +38,6 @@ data Matrix a = MNum (Int,Int) [a]
               | MBinary (Binary (Matrix a))
               | MBroadcast (Int,Int) (Scalar a) deriving (Eq, Show)
 
---class Exprlike a where
---  binaryConstructor :: Binary a -> a
---  unaryConstructor :: Unary a -> a
---  add :: a -> a -> a
   
 vecDim :: Vector a -> Int
 vecDim (VNum d _) = d
@@ -77,8 +73,11 @@ mIsI i (MBroadcast _ s) = sIsI i s
 mIsI _ _ = False
 
 
+------------------------------------------------------------------------------
+---------------------Scalar/Vector/Matrix Num instances-----------------------
+------------------------------------------------------------------------------
 instance Num a => Num (Scalar a) where
-  fromInteger = SInt . fromInteger
+  fromInteger = error "API error: fromInteger (in Num a => Num (Vector a)) should not be accessible by the user"
   abs x 
     | sIsI 0 x = SInt 0
     | otherwise = SUnary (Unary Abs x)
@@ -119,7 +118,7 @@ instance Num a => Num (Scalar a) where
 
 
 instance Num a => Num (Vector a) where
-  fromInteger = error "API problem: fromInteger (in Num a => Num (Vector a)) should not be accessible by the user"
+  fromInteger = error "API error: fromInteger (in Num a => Num (Vector a)) should not be accessible by the user"
   abs x 
     | vIsI 0 x = VBroadcast (vecDim x) (SInt 0)
     | otherwise = VUnary (Unary Abs x)
@@ -147,7 +146,7 @@ instance Num a => Num (Vector a) where
 
 
 instance Num a => Num (Matrix a) where
-  fromInteger = error "API problem: fromInteger (in Num a => Num (Matrix a)) should not be accessible by the user"
+  fromInteger = error "API error: fromInteger (in Num a => Num (Matrix a)) should not be accessible by the user"
   abs x 
     | mIsI 0 x = MBroadcast (matDim x) (SInt 0)
     | otherwise = MUnary (Unary Abs x)
@@ -173,19 +172,139 @@ instance Num a => Num (Matrix a) where
     | otherwise = MBinary (Binary Mul x y)
 
 
+------------------------------------------------------------------------------
+-----------------Scalar/Vector/Matrix Fractional instances--------------------
+------------------------------------------------------------------------------
+instance Fractional a => Fractional (Scalar a) where
+  -- (SInt x) / (SInt y) = SNum $ fromRational (toInteger x % toInteger y)
+  (SNum x) / (SNum y) = SNum $ x / y
+  (SNum x) / (SInt y) = SNum $ x / (fromIntegral y)
+  (SInt x) / (SNum y) = SNum $ (fromIntegral x) / y
+  x / y = SBinary $ Binary Div x y
+  fromRational = error "API error: fromRational (in Fractional a => Fractional (Vector a)) should not be accessible by the user"
+
+instance Fractional a => Fractional (Vector a) where
+  (VNum d x) / (VNum _ y) = VNum d $ zipWith (/) x y
+  x / y = VBinary $ Binary Div x y
+  fromRational = error "API error: fromRational (in Fractional a => Fractional (Vector a)) should not be accessible by the user"
+
+instance Fractional a => Fractional (Matrix a) where
+  (MNum d x) / (MNum _ y) = MNum d $ zipWith (/) x y
+  x / y = MBinary $ Binary Div x y
+  fromRational = error "API error: fromRational (in Fractional a => Fractional (Matrix a)) should not be accessible by the user"
+
+
+------------------------------------------------------------------------------
+-------------------Scalar/Vector/Matrix Floating instances--------------------
+------------------------------------------------------------------------------
+instance (Floating a) => Floating (Scalar a) where
+  pi = error "API error: pi (in Floating a => Floating (Scalar a)) should not be accessible by the user"  
+  
+  exp x  = SUnary (Unary Exp x)
+  sqrt x = SUnary (Unary Sqrt x)
+  log x  = SUnary (Unary Log x)
+  
+  _ ** (SInt 0) = SInt 1
+  x ** (SInt 1) = x
+  x ** y = SBinary (Binary Pow x y)
+  logBase x y = SBinary (Binary LogBase x y)
+  
+  sin x = SUnary (Unary Sin x)
+  cos x = SUnary (Unary Cos x)
+  tan x = SUnary (Unary Tan x)
+                   
+  asin x = SUnary (Unary ASin x)
+  acos x = SUnary (Unary ACos x)
+  atan x = SUnary (Unary ATan x)
+
+  sinh x = SUnary (Unary Sinh x)
+  cosh x = SUnary (Unary Cosh x)
+  tanh x = SUnary (Unary Tanh x)
+
+  asinh x = SUnary (Unary ASinh x)
+  acosh x = SUnary (Unary ACosh x)
+  atanh x = SUnary (Unary ATanh x)
+
+
+instance (Floating a) => Floating (Vector a) where
+  pi = error "API error: pi (in Floating a => Floating (Vector a)) should not be accessible by the user"  
+  
+  exp x  = VUnary (Unary Exp x)
+  sqrt x = VUnary (Unary Sqrt x)
+  log x  = VUnary (Unary Log x)
+  
+  _ ** (VBroadcast d (SInt 0)) = VBroadcast d (SInt 1)
+  x ** (VBroadcast _ (SInt 1)) = x
+  x ** y = VBinary (Binary Pow x y)
+  logBase x y = VBinary (Binary LogBase x y)
+  
+  sin x = VUnary (Unary Sin x)
+  cos x = VUnary (Unary Cos x)
+  tan x = VUnary (Unary Tan x)
+                   
+  asin x = VUnary (Unary ASin x)
+  acos x = VUnary (Unary ACos x)
+  atan x = VUnary (Unary ATan x)
+
+  sinh x = VUnary (Unary Sinh x)
+  cosh x = VUnary (Unary Cosh x)
+  tanh x = VUnary (Unary Tanh x)
+
+  asinh x = VUnary (Unary ASinh x)
+  acosh x = VUnary (Unary ACosh x)
+  atanh x = VUnary (Unary ATanh x)
+
+
+instance (Floating a) => Floating (Matrix a) where
+  pi = error "API error: pi (in Floating a => Floating (Matrix a)) should not be accessible by the user"  
+  
+  exp x  = MUnary (Unary Exp x)
+  sqrt x = MUnary (Unary Sqrt x)
+  log x  = MUnary (Unary Log x)
+  
+  _ ** (MBroadcast d (SInt 0)) = MBroadcast d (SInt 1)
+  x ** (MBroadcast _ (SInt 1)) = x
+  x ** y = MBinary (Binary Pow x y)
+  logBase x y = MBinary (Binary LogBase x y)
+  
+  sin x = MUnary (Unary Sin x)
+  cos x = MUnary (Unary Cos x)
+  tan x = MUnary (Unary Tan x)
+                   
+  asin x = MUnary (Unary ASin x)
+  acos x = MUnary (Unary ACos x)
+  atan x = MUnary (Unary ATan x)
+
+  sinh x = MUnary (Unary Sinh x)
+  cosh x = MUnary (Unary Cosh x)
+  tanh x = MUnary (Unary Tanh x)
+
+  asinh x = MUnary (Unary ASinh x)
+  acosh x = MUnary (Unary ACosh x)
+  atanh x = MUnary (Unary ATanh x)
+
+
+
+
+
+
+
+--------------------------------------------------------------------
+--------- please eliminate the following code duplication: ---------
+--------------------------------------------------------------------
 -- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instanecs of Vector/Matrix
--- this is because those Num instances aren't exported and are only called through safeBinaryConstruct
-safeBinaryConstruct :: Num a => (forall b . Num b => b -> b -> b) -> Expr a -> Expr a -> Expr a
+-- this is because those Num instances aren't exported and are only called through safeBinaryConstructNum
+safeBinaryConstructNum :: Num a => (forall b . Num b => b -> b -> b) -> Expr a -> Expr a -> Expr a
 -- normal combination:
-safeBinaryConstruct f (EScalar x) (EScalar y) = EScalar $ f x y
-safeBinaryConstruct f (EVector x) (EVector y) 
+safeBinaryConstructNum f (EScalar x) (EScalar y) = EScalar $ f x y
+safeBinaryConstructNum f (EVector x) (EVector y) 
   | vecDim x == vecDim y = EVector $ f x y
   | otherwise            = error $ unlines [ "Dimension mismatch in EVector + EVector"
                                            , "v1: " ++ show x
                                            , ""
                                            , "v2: " ++ show y
                                            ]
-safeBinaryConstruct f (EMatrix x) (EMatrix y)
+safeBinaryConstructNum f (EMatrix x) (EMatrix y)
   | matDim x == matDim y = EMatrix $ f x y
   | otherwise            = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
                                            , "m1: " ++ show x
@@ -193,35 +312,144 @@ safeBinaryConstruct f (EMatrix x) (EMatrix y)
                                            , "m2: " ++ show y
                                            ]
 -- broadcast scalar to vector:
-safeBinaryConstruct f (EScalar x) (EVector y) = EVector $ f (VBroadcast (vecDim y) x) y
-safeBinaryConstruct f (EVector x) (EScalar y) = EVector $ f x (VBroadcast (vecDim x) y)
+safeBinaryConstructNum f (EScalar x) (EVector y) = EVector $ f (VBroadcast (vecDim y) x) y
+safeBinaryConstructNum f (EVector x) (EScalar y) = EVector $ f x (VBroadcast (vecDim x) y)
 -- broadcast scalar to matrix:
-safeBinaryConstruct f (EScalar x) (EMatrix y) = EMatrix $ f (MBroadcast (matDim y) x) y
-safeBinaryConstruct f (EMatrix x) (EScalar y) = EMatrix $ f x (MBroadcast (matDim x) y)
+safeBinaryConstructNum f (EScalar x) (EMatrix y) = EMatrix $ f (MBroadcast (matDim y) x) y
+safeBinaryConstructNum f (EMatrix x) (EScalar y) = EMatrix $ f x (MBroadcast (matDim x) y)
 -- illegal combination:
-safeBinaryConstruct _ (EVector _) (EMatrix _) = error "safeBinaryConstruct error: Can't combine vector with matrix"
-safeBinaryConstruct _ (EMatrix _) (EVector _) = error "safeBinaryConstruct error: Can't combine vector with matrix"
+safeBinaryConstructNum _ (EVector _) (EMatrix _) = error "safeBinaryConstructNum: Can't combine vector with matrix"
+safeBinaryConstructNum _ (EMatrix _) (EVector _) = error "safeBinaryConstructNum: Can't combine vector with matrix"
 
 
-safeUnaryConstruct :: Num a => (forall b . Num b => b -> b) -> Expr a -> Expr a
-safeUnaryConstruct f (EScalar x) = EScalar $ f x
-safeUnaryConstruct f (EVector x) = EVector $ f x
-safeUnaryConstruct f (EMatrix x) = EMatrix $ f x
+safeUnaryConstructNum :: Num a => (forall b . Num b => b -> b) -> Expr a -> Expr a
+safeUnaryConstructNum f (EScalar x) = EScalar $ f x
+safeUnaryConstructNum f (EVector x) = EVector $ f x
+safeUnaryConstructNum f (EMatrix x) = EMatrix $ f x
 
-instance Num a => Num (Expr a) where
-  x + y = safeBinaryConstruct (+) x y
-  x * y = safeBinaryConstruct (*) x y
-  x - y = safeBinaryConstruct (-) x y
-  abs = safeUnaryConstruct abs
-  signum = safeUnaryConstruct abs
-  fromInteger i = EScalar (SInt (fromInteger i))
-  
 
+
+-- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instanecs of Vector/Matrix
+-- this is because those Num instances aren't exported and are only called through safeBinaryConstructFrac
+safeBinaryConstructFrac :: Fractional a => (forall b . Fractional b => b -> b -> b) -> Expr a -> Expr a -> Expr a
+-- normal combination:
+safeBinaryConstructFrac f (EScalar x) (EScalar y) = EScalar $ f x y
+safeBinaryConstructFrac f (EVector x) (EVector y) 
+  | vecDim x == vecDim y = EVector $ f x y
+  | otherwise            = error $ unlines [ "Dimension mismatch in EVector + EVector"
+                                           , "v1: " ++ show x
+                                           , ""
+                                           , "v2: " ++ show y
+                                           ]
+safeBinaryConstructFrac f (EMatrix x) (EMatrix y)
+  | matDim x == matDim y = EMatrix $ f x y
+  | otherwise            = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
+                                           , "m1: " ++ show x
+                                           , ""
+                                           , "m2: " ++ show y
+                                           ]
+-- broadcast scalar to vector:
+safeBinaryConstructFrac f (EScalar x) (EVector y) = EVector $ f (VBroadcast (vecDim y) x) y
+safeBinaryConstructFrac f (EVector x) (EScalar y) = EVector $ f x (VBroadcast (vecDim x) y)
+-- broadcast scalar to matrix:
+safeBinaryConstructFrac f (EScalar x) (EMatrix y) = EMatrix $ f (MBroadcast (matDim y) x) y
+safeBinaryConstructFrac f (EMatrix x) (EScalar y) = EMatrix $ f x (MBroadcast (matDim x) y)
+-- illegal combination:
+safeBinaryConstructFrac _ (EVector _) (EMatrix _) = error "safeBinaryConstructFrac: Can't combine vector with matrix"
+safeBinaryConstructFrac _ (EMatrix _) (EVector _) = error "safeBinaryConstructFrac: Can't combine vector with matrix"
+
+
+-- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instanecs of Vector/Matrix
+-- this is because those Num instances aren't exported and are only called through safeBinaryConstructFloating
+safeBinaryConstructFloating :: Floating a => (forall b . Floating b => b -> b -> b) -> Expr a -> Expr a -> Expr a
+-- normal combination:
+safeBinaryConstructFloating f (EScalar x) (EScalar y) = EScalar $ f x y
+safeBinaryConstructFloating f (EVector x) (EVector y) 
+  | vecDim x == vecDim y = EVector $ f x y
+  | otherwise            = error $ unlines [ "Dimension mismatch in EVector + EVector"
+                                           , "v1: " ++ show x
+                                           , ""
+                                           , "v2: " ++ show y
+                                           ]
+safeBinaryConstructFloating f (EMatrix x) (EMatrix y)
+  | matDim x == matDim y = EMatrix $ f x y
+  | otherwise            = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
+                                           , "m1: " ++ show x
+                                           , ""
+                                           , "m2: " ++ show y
+                                           ]
+-- broadcast scalar to vector:
+safeBinaryConstructFloating f (EScalar x) (EVector y) = EVector $ f (VBroadcast (vecDim y) x) y
+safeBinaryConstructFloating f (EVector x) (EScalar y) = EVector $ f x (VBroadcast (vecDim x) y)
+-- broadcast scalar to matrix:
+safeBinaryConstructFloating f (EScalar x) (EMatrix y) = EMatrix $ f (MBroadcast (matDim y) x) y
+safeBinaryConstructFloating f (EMatrix x) (EScalar y) = EMatrix $ f x (MBroadcast (matDim x) y)
+-- illegal combination:
+safeBinaryConstructFloating _ (EVector _) (EMatrix _) = error "safeBinaryConstructFloating: Can't combine vector with matrix"
+safeBinaryConstructFloating _ (EMatrix _) (EVector _) = error "safeBinaryConstructFloating: Can't combine vector with matrix"
+
+
+safeUnaryConstructFloating :: Floating a => (forall b . Floating b => b -> b) -> Expr a -> Expr a
+safeUnaryConstructFloating f (EScalar x) = EScalar $ f x
+safeUnaryConstructFloating f (EVector x) = EVector $ f x
+safeUnaryConstructFloating f (EMatrix x) = EMatrix $ f x
+
+--------------------------------------------------------------------------
+--------------- (end of horrible hacky code duplication) -----------------
+--------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+---------------------------------- Expr --------------------------------------
+------------------------------------------------------------------------------
 data Expr a = EScalar (Scalar a)
             | EVector (Vector a)
             | EMatrix (Matrix a) deriving (Eq, Show)
 
 
+instance Num a => Num (Expr a) where
+  x + y = safeBinaryConstructNum (+) x y
+  x * y = safeBinaryConstructNum (*) x y
+  x - y = safeBinaryConstructNum (-) x y
+  abs = safeUnaryConstructNum abs
+  signum = safeUnaryConstructNum abs
+  fromInteger i = EScalar (SInt (fromInteger i))
+
+
+instance Fractional a => Fractional (Expr a) where
+  x / y = safeBinaryConstructFrac (/) x y
+  fromRational r = EScalar $ SNum (fromRational r)
+
+
+instance (Floating a) => Floating (Expr a) where
+  pi = EScalar $ SNum pi
+  
+  exp x  = safeUnaryConstructFloating exp x
+  sqrt x = safeUnaryConstructFloating sqrt x
+  log x  = safeUnaryConstructFloating log x
+  
+  x**y = safeBinaryConstructFloating (**) x y
+  logBase x y = safeBinaryConstructFloating logBase x y
+  
+  sin x = safeUnaryConstructFloating sin x
+  cos x = safeUnaryConstructFloating cos x
+  tan x = safeUnaryConstructFloating tan x
+                   
+  asin x = safeUnaryConstructFloating asin x
+  acos x = safeUnaryConstructFloating acos x
+  atan x = safeUnaryConstructFloating atan x
+
+  sinh x = safeUnaryConstructFloating sinh x
+  cosh x = safeUnaryConstructFloating cosh x
+  tanh x = safeUnaryConstructFloating tanh x
+
+  asinh x = safeUnaryConstructFloating asinh x
+  acosh x = safeUnaryConstructFloating acosh x
+  atanh x = safeUnaryConstructFloating atanh x
+
+
+
+-- api constructors:
 symbolic :: String -> Expr a
 symbolic name = EScalar $ SSym name
 
@@ -245,6 +473,8 @@ mat (r,c) xs
   | and [length xs == r*c, r > 0, c > 0] = EMatrix $ MNum (r,c) xs
   | otherwise        = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
 
+
+
 --instance Show a => Show (Expr a) where
 --  show (Sym _ name) = name
 --  show (EScalar x) = show x
@@ -255,48 +485,6 @@ mat (r,c) xs
 --  show (Broadcast d x) = "broadcast(" ++ show x ++ ", " ++ show d ++ ")"
 ----  show (Tensor t) = show t
 ----  show (Dot {arg1' = a1, arg2' = a2}) = "dot( " ++ show a1 ++ ", " ++ show a2 ++ " )"
---
---
---
---instance Fractional a => Fractional (Expr a) where
---  (EScalar x) / (EScalar y) = EScalar (x / y)
---  (EScalar x) / y = (broadcast x (getDim y)) / y
---  x / (EScalar y) = x / (broadcast y (getDim x))
---  x / y = zipBinary Div x y
---
---  fromRational x = EScalar $ fromRational x
---  fromRational x = num / den
---    where
---      num = fromIntegral $ numerator x
---      den = fromIntegral $ denominator x
---
---
---instance (Floating a) => Floating (Expr a) where
---  pi = EScalar $ N pi
---  
---  exp x  = mapUnary Exp x
---  sqrt x = mapUnary Sqrt x
---  log x  = mapUnary Log x
---  
---  x**y = zipBinary Pow x y
---  logBase x y = zipBinary Pow x y
---  
---  sin x = mapUnary Sin x
---  cos x = mapUnary Cos x
---  tan x = mapUnary Tan x
---                   
---  asin x = mapUnary ASin x
---  acos x = mapUnary ACos x
---  atan x = mapUnary ATan x
---
---  sinh x = mapUnary Sinh x
---  cosh x = mapUnary Cosh x
---  tanh x = mapUnary Tanh x
---
---  asinh x = mapUnary ASinh x
---  acosh x = mapUnary ACosh x
---  atanh x = mapUnary ATanh x
---
 --
 ----instance (Show a, Num a, R.Elt a, Show sh, R.Shape sh) => Labellable (Expr sh a) where
 ----  toLabelValue go = toLabelValue $ pack $ show go ++ "["++show (getDim go)++"]"
