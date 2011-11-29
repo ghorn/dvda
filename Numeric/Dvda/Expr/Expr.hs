@@ -13,30 +13,51 @@ module Numeric.Dvda.Expr.Expr( Expr(..)
 
 --import Data.GraphViz(Labellable(..))
 --import Data.Text.Lazy(pack)
+----instance (Show a, Num a, R.Elt a, Show sh, R.Shape sh) => Labellable (Expr sh a) where
+----  toLabelValue go = toLabelValue $ pack $ show go ++ "["++show (getDim go)++"]"
 
-import Numeric.Dvda.Expr.BinaryType
-import Numeric.Dvda.Expr.UnaryType
-
-data Binary a = Binary BinaryType a a deriving (Show, Eq)
-data Unary a = Unary UnaryType a deriving (Show, Eq)
+import Numeric.Dvda.Expr.Binary
+import Numeric.Dvda.Expr.Unary
 
 data Scalar a = SNum a
               | SSym String
               | SUnary (Unary (Scalar a))
               | SBinary (Binary (Scalar a))
-              | SInt Int deriving (Eq, Show)
+              | SInt Int deriving Eq
 
 data Vector a = VNum Int [a]
               | VSym Int String
               | VUnary (Unary (Vector a))
               | VBinary (Binary (Vector a))
-              | VBroadcast Int (Scalar a) deriving (Eq, Show)
+              | VBroadcast Int (Scalar a) deriving Eq
 
 data Matrix a = MNum (Int,Int) [a]
               | MSym (Int,Int) String
               | MUnary (Unary (Matrix a))
               | MBinary (Binary (Matrix a))
-              | MBroadcast (Int,Int) (Scalar a) deriving (Eq, Show)
+              | MBroadcast (Int,Int) (Scalar a) deriving Eq
+
+
+instance Show a => Show (Scalar a) where
+  show (SNum x) = show x
+  show (SInt x) = show x
+  show (SSym x) = x
+  show (SUnary x) = show x
+  show (SBinary x) = show x
+
+instance Show a => Show (Vector a) where
+  show (VNum _ x) = show x
+  show (VSym d x) = "{" ++ show d ++ ":" ++ x ++ "}"
+  show (VUnary x) = show x
+  show (VBinary x) = show x
+  show (VBroadcast d x) = "broadcast{ " ++ show d ++ " <- " ++ show x ++ " }"
+
+instance Show a => Show (Matrix a) where
+  show (MNum _ x) = show x
+  show (MSym d x) = "{" ++ show d ++ ":" ++ x ++ "}"
+  show (MUnary x) = show x
+  show (MBinary x) = show x
+  show (MBroadcast d x) = "broadcast{ " ++ show d ++ " <- " ++ show x ++ " }"
 
   
 vecDim :: Vector a -> Int
@@ -404,7 +425,12 @@ safeUnaryConstructFloating f (EMatrix x) = EMatrix $ f x
 ------------------------------------------------------------------------------
 data Expr a = EScalar (Scalar a)
             | EVector (Vector a)
-            | EMatrix (Matrix a) deriving (Eq, Show)
+            | EMatrix (Matrix a) deriving Eq
+
+instance Show a => Show (Expr a) where
+  show (EScalar x) = show x
+  show (EVector x) = show x
+  show (EMatrix x) = show x
 
 
 instance Num a => Num (Expr a) where
@@ -472,20 +498,3 @@ mat :: (Int,Int) -> [a] -> Expr a
 mat (r,c) xs 
   | and [length xs == r*c, r > 0, c > 0] = EMatrix $ MNum (r,c) xs
   | otherwise        = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
-
-
-
---instance Show a => Show (Expr a) where
---  show (Sym _ name) = name
---  show (EScalar x) = show x
---  show (Vector _ v) = show v
---  show (Matrix _ m) = show m
---  show (Unary unaryType arg) = show unaryType ++ "(" ++ show arg ++ ")"
---  show (Binary binaryType arg1 arg2) = "( " ++ show arg1 ++" "++ show binaryType ++" "++ show arg2 ++ " )"
---  show (Broadcast d x) = "broadcast(" ++ show x ++ ", " ++ show d ++ ")"
-----  show (Tensor t) = show t
-----  show (Dot {arg1' = a1, arg2' = a2}) = "dot( " ++ show a1 ++ ", " ++ show a2 ++ " )"
---
-----instance (Show a, Num a, R.Elt a, Show sh, R.Shape sh) => Labellable (Expr sh a) where
-----  toLabelValue go = toLabelValue $ pack $ show go ++ "["++show (getDim go)++"]"
---

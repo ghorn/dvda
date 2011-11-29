@@ -1,10 +1,16 @@
--- UnaryType.hs
+-- Unary.hs
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Expr.UnaryType( UnaryType(..)
-                                  , applyUnary
-                                  ) where
+module Numeric.Dvda.Expr.Unary( Unary(..)
+                              , UnaryType(..)
+                              , applyUnary
+                              ) where
+
+data Unary a = Unary UnaryType a deriving Eq
+
+instance Show a => Show (Unary a) where
+  show (Unary unaryType x) = show unaryType ++ "( " ++ show x ++ " )"
 
 data UnaryType = Abs
                | Signum

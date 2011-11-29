@@ -1,10 +1,16 @@
--- BinaryType.hs
+-- Binary.hs
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Expr.BinaryType( BinaryType(..)
-                                   , applyBinary
-                                   ) where
+module Numeric.Dvda.Expr.Binary( Binary(..)
+                               , BinaryType(..)
+                               , applyBinary
+                               ) where
+
+data Binary a = Binary BinaryType a a deriving Eq
+
+instance Show a => Show (Binary a) where
+  show (Binary binaryType x y) = "( " ++ show x ++ " " ++ show binaryType ++ " " ++ show y ++ ")"
 
 data BinaryType = Mul
                 | Add
