@@ -64,29 +64,29 @@ matDim (MBinary (Binary _ mx my))
 
 
 
-sIsZero :: Scalar a -> Bool
-sIsZero (SInt 0) = True
-sIsZero _ = False
+sIsI :: Int -> Scalar a -> Bool
+sIsI i (SInt si) = i == si
+sIsI _ _ = False
 
-vIsZero :: Vector a -> Bool
-vIsZero (VBroadcast _ s) = sIsZero s
-vIsZero _ = False
+vIsI :: Int -> Vector a -> Bool
+vIsI i (VBroadcast _ s) = sIsI i s
+vIsI _ _ = False
 
-mIsZero :: Matrix a -> Bool
-mIsZero (MBroadcast _ s) = sIsZero s
-mIsZero _ = False
+mIsI :: Int -> Matrix a -> Bool
+mIsI i (MBroadcast _ s) = sIsI i s
+mIsI _ _ = False
 
 
 instance Num a => Num (Scalar a) where
   fromInteger = SInt . fromInteger
   abs x 
-    | sIsZero x = SInt 0
+    | sIsI 0 x = SInt 0
     | otherwise = SUnary (Unary Abs x)
   signum x 
-    | sIsZero x = SInt 0
+    | sIsI 0 x = SInt 0
     | otherwise = SUnary (Unary Signum x)
   negate x 
-    | sIsZero x = SInt 0
+    | sIsI 0 x = SInt 0
     | otherwise = SUnary (Unary Neg x)
 
   (SInt x) + (SInt y) = SInt $ x + y
@@ -94,62 +94,104 @@ instance Num a => Num (Scalar a) where
   (SNum x) + (SInt y) = SNum $ x + (fromIntegral y)
   (SInt x) + (SNum y) = SNum $ (fromIntegral x) + y
   x + y
-    | sIsZero x = y
-    | sIsZero y = x
+    | sIsI 0 x = y
+    | sIsI 0 y = x
     | otherwise = SBinary (Binary Add x y)
-  (*) = undefined
-  (-) = undefined
+
+  (SInt x) - (SInt y) = SInt $ x - y
+  (SNum x) - (SNum y) = SNum $ x - y
+  (SNum x) - (SInt y) = SNum $ x - (fromIntegral y)
+  (SInt x) - (SNum y) = SNum $ (fromIntegral x) - y
+  x - y
+    | sIsI 0 x = negate y
+    | sIsI 0 y = x
+    | otherwise = SBinary (Binary Sub x y)
+
+  (SInt x) * (SInt y) = SInt $ x * y
+  (SNum x) * (SNum y) = SNum $ x * y
+  (SNum x) * (SInt y) = SNum $ x * (fromIntegral y)
+  (SInt x) * (SNum y) = SNum $ (fromIntegral x) * y
+  x * y
+    | sIsI 1 x = y
+    | sIsI 1 y = x
+    | sIsI 0 x || sIsI 0 y = SInt 0
+    | otherwise = SBinary (Binary Add x y)
 
 
 instance Num a => Num (Vector a) where
   fromInteger = error "API problem: fromInteger (in Num a => Num (Vector a)) should not be accessible by the user"
   abs x 
-    | vIsZero x = VBroadcast (vecDim x) (SInt 0)
+    | vIsI 0 x = VBroadcast (vecDim x) (SInt 0)
     | otherwise = VUnary (Unary Abs x)
   signum x 
-    | vIsZero x = VBroadcast (vecDim x) (SInt 0)
+    | vIsI 0 x = VBroadcast (vecDim x) (SInt 0)
     | otherwise = VUnary (Unary Signum x)
   negate x 
-    | vIsZero x = VBroadcast (vecDim x) (SInt 0)
+    | vIsI 0 x = VBroadcast (vecDim x) (SInt 0)
     | otherwise = VUnary (Unary Neg x)
-  (VNum dx xs) + (VNum dy ys)
-    | dx == dy  = VNum dx $ zipWith (+) xs ys
-    | otherwise = error "Dimension mismatch in VNum + VNum"
+
+  (VNum dx xs) + (VNum _ ys) = VNum dx $ zipWith (+) xs ys
   x + y
-    | vIsZero x = y
-    | vIsZero y = x
+    | vIsI 0 x = y
+    | vIsI 0 y = x
     | otherwise = VBinary (Binary Add x y)
-  (*) = undefined
-  (-) = undefined
+  x - y
+    | vIsI 0 x = negate y
+    | vIsI 0 y = x
+    | otherwise = VBinary (Binary Sub x y)
+  x * y
+    | vIsI 1 x = y
+    | vIsI 1 y = x
+    | vIsI 0 x || vIsI 0 y = VBroadcast (vecDim x) (SInt 0)
+    | otherwise = VBinary (Binary Mul x y)
 
 
 instance Num a => Num (Matrix a) where
   fromInteger = error "API problem: fromInteger (in Num a => Num (Matrix a)) should not be accessible by the user"
   abs x 
-    | mIsZero x = MBroadcast (matDim x) (SInt 0)
+    | mIsI 0 x = MBroadcast (matDim x) (SInt 0)
     | otherwise = MUnary (Unary Abs x)
   signum x 
-    | mIsZero x = MBroadcast (matDim x) (SInt 0)
+    | mIsI 0 x = MBroadcast (matDim x) (SInt 0)
     | otherwise = MUnary (Unary Signum x)
   negate x 
-    | mIsZero x = MBroadcast (matDim x) (SInt 0)
+    | mIsI 0 x = MBroadcast (matDim x) (SInt 0)
     | otherwise = MUnary (Unary Neg x)
-  (MNum dx xs) + (MNum dy ys)
-    | dx == dy  = MNum dx $ zipWith (+) xs ys
-    | otherwise = error "Dimension mismatch in MNum + MNum"
+  (MNum dx xs) + (MNum _ ys) = MNum dx $ zipWith (+) xs ys
   x + y
-    | mIsZero x = y
-    | mIsZero y = x
+    | mIsI 0 x = y
+    | mIsI 0 y = x
     | otherwise = MBinary (Binary Add x y)
-  (*) = undefined
-  (-) = undefined
+  x - y
+    | mIsI 0 x = negate y
+    | mIsI 0 y = x
+    | otherwise = MBinary (Binary Sub x y)
+  x * y
+    | mIsI 1 x = y
+    | mIsI 1 y = x
+    | mIsI 0 x || mIsI 0 y = MBroadcast (matDim x) (SInt 0)
+    | otherwise = MBinary (Binary Mul x y)
 
 
+-- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instanecs of Vector/Matrix
+-- this is because those Num instances aren't exported and are only called through safeBinaryConstruct
 safeBinaryConstruct :: Num a => (forall b . Num b => b -> b -> b) -> Expr a -> Expr a -> Expr a
 -- normal combination:
 safeBinaryConstruct f (EScalar x) (EScalar y) = EScalar $ f x y
-safeBinaryConstruct f (EVector x) (EVector y) = EVector $ f x y
-safeBinaryConstruct f (EMatrix x) (EMatrix y) = EMatrix $ f x y
+safeBinaryConstruct f (EVector x) (EVector y) 
+  | vecDim x == vecDim y = EVector $ f x y
+  | otherwise            = error $ unlines [ "Dimension mismatch in EVector + EVector"
+                                           , "v1: " ++ show x
+                                           , ""
+                                           , "v2: " ++ show y
+                                           ]
+safeBinaryConstruct f (EMatrix x) (EMatrix y)
+  | matDim x == matDim y = EMatrix $ f x y
+  | otherwise            = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
+                                           , "m1: " ++ show x
+                                           , ""
+                                           , "m2: " ++ show y
+                                           ]
 -- broadcast scalar to vector:
 safeBinaryConstruct f (EScalar x) (EVector y) = EVector $ f (VBroadcast (vecDim y) x) y
 safeBinaryConstruct f (EVector x) (EScalar y) = EVector $ f x (VBroadcast (vecDim x) y)
@@ -183,18 +225,24 @@ data Expr a = EScalar (Scalar a)
 symbolic :: String -> Expr a
 symbolic name = EScalar $ SSym name
 
-symVec :: String -> Int -> Expr a
-symVec name d = EVector $ VSym d name
+symVec :: Int -> String -> Expr a
+symVec d name 
+  | d > 0     = EVector $ VSym d name
+  | otherwise = error $ "symVec can't make vector with length: " ++ show d
 
-symMat :: String -> (Int,Int) -> Expr a
-symMat name d = EMatrix $ MSym d name
+symMat :: (Int,Int) -> String -> Expr a
+symMat (r,c) name
+  | r > 0 && c > 0 = EMatrix $ MSym (r,c) name
+  | otherwise      = error $ "symMat can't make matrix with dimensions: " ++ show (r,c)
 
 vec :: [a] -> Expr a
-vec xs = EVector $ VNum (length xs) xs
+vec xs 
+  | length xs > 0 = EVector $ VNum (length xs) xs
+  | otherwise     = error "Improper dimensions in vec :: [a] -> Expr a"
 
 mat :: (Int,Int) -> [a] -> Expr a
 mat (r,c) xs 
-  | length xs == r*c = EMatrix $ MNum (r,c) xs
+  | and [length xs == r*c, r > 0, c > 0] = EMatrix $ MNum (r,c) xs
   | otherwise        = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
 
 --instance Show a => Show (Expr a) where
