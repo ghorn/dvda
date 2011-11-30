@@ -2,15 +2,14 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.ExprGraph( exprToGNodes
---                             , exprsToGNodes
+module Numeric.Dvda.ExprGraph( exprsToGNodes
                              , exprOfGNode
                              , GNode(..)
                              ) where
 
 import Data.Graph.Inductive hiding (nodes, edges)
 import Data.Maybe
-import Data.Tuple.Utils
+import Data.List(foldl')
 
 import Numeric.Dvda.Expr.Expr
 --import Numeric.Dvda.Config(outputNames)
@@ -35,12 +34,14 @@ gmatch expr gnodes = case dropWhile (\x -> exprOfGNode x /= expr) gnodes
                          x:_ -> Just x
 
 
---  where                     
---    f (topNode, nextFreeNode, gnodes) nextExpr = exprGobbler gnodes
+exprsToGNodes :: Eq a => [Expr a] -> ([GNode a], [Node])
+exprsToGNodes exprs = (gnodesOut, topNodesOut)
+  where
+    (topNodesOut, _, gnodesOut) = foldl' f ([],0,[]) exprs
+    f (topNodes, nextFreeNode, gnodes) expr = (topNodes ++ [topNode], nextFreeNode', gnodes ++ gnodes')
+      where
+        (topNode, nextFreeNode', gnodes') = exprGobbler gnodes nextFreeNode expr
 
-exprToGNodes :: Eq a => Expr a -> [GNode a]
-exprToGNodes expr' = thd3 $ exprGobbler [] 0 expr'
-    
 -- | take all the GNodes already in the graph
 -- | take an assignment node and an expression
 -- | return the assignment or existing node, the next free node, and any added Gnodes

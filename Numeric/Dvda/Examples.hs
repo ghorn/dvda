@@ -22,15 +22,14 @@ simpleGraph :: IO ()
 simpleGraph = do
   let x = sym "x" :: Expr Double
       y = x*2 + cos(x)/5
-  previewExpr y
+  previewExprs [y, x*x]
 
 tensorGraph :: IO ()
 tensorGraph = do
   let x = symMat (3,5) "x"
       y = sym "y"
       z = x*2 + cos(x)/5 + y
-  previewExpr (z :: Expr Double)
-
+  previewExprs [z :: Expr Double]
 
 --fadExample :: IO ()
 --fadExample = do
