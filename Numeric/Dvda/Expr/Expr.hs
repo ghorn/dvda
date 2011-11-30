@@ -11,16 +11,13 @@ module Numeric.Dvda.Expr.Expr( Expr(..)
                              , vec
                              , mat
                              , subs
-                             , Scalar(..)
-                             , Vector(..)
-                             , Matrix(..)
+                             , Children(..)
                              , getChildren
+                             , showNode
+                             , showType
+                             , showDim
                              ) where
 
---import Data.GraphViz(Labellable(..))
---import Data.Text.Lazy(pack)
-----instance (Show a, Num a, R.Elt a, Show sh, R.Shape sh) => Labellable (Expr sh a) where
-----  toLabelValue go = toLabelValue $ pack $ show go ++ "["++show (getDim go)++"]"
 import Data.List(nubBy)
 import Data.Maybe(isNothing, fromJust)
 
@@ -55,18 +52,57 @@ instance Show a => Show (Scalar a) where
 
 instance Show a => Show (Vector a) where
   show (VNum _ x) = show x
-  show (VSym d x) = "{" ++ show d ++ ":" ++ x ++ "}"
+  show (VSym _ x) = "{" ++ x ++ "}"
   show (VUnary x) = show x
   show (VBinary x) = show x
-  show (VBroadcast d x) = "broadcast{ " ++ show d ++ " <- " ++ show x ++ " }"
+  show (VBroadcast d x) = "BC( " ++ show x ++ " -> " ++ show d ++ " )"
 
 instance Show a => Show (Matrix a) where
   show (MNum _ x) = show x
-  show (MSym d x) = "{" ++ show d ++ ":" ++ x ++ "}"
+  show (MSym _ x) = "{{" ++ x ++ "}}"
   show (MUnary x) = show x
   show (MBinary x) = show x
-  show (MBroadcast d x) = "broadcast{ " ++ show d ++ " <- " ++ show x ++ " }"
+  show (MBroadcast d x) = "BC( " ++ show x ++ " -> " ++ show d ++ " )"
 
+-- what will be displayed in the graphviz
+sShowNode :: Show a => Scalar a -> String
+--sShowNode (SNum x) = "{N}:" ++ show x
+--sShowNode (SInt x) = "{I}:" ++ show x
+sShowNode (SNum x) = show x
+sShowNode (SInt x) = show x
+sShowNode (SSym x) = x
+sShowNode (SUnary (Unary unOp _)) = show unOp
+sShowNode (SBinary (Binary binOp _ _)) = show binOp
+
+vShowNode :: Show a => Vector a -> String
+vShowNode x@(VNum _ _) = show x
+vShowNode x@(VSym _ _) = show x
+vShowNode (VBroadcast d _) = "BC["++ show d ++ "]"
+vShowNode (VUnary (Unary unOp _)) = show unOp
+vShowNode (VBinary (Binary binOp _ _)) = show binOp
+
+mShowNode :: Show a => Matrix a -> String
+mShowNode x@(MNum _ _) = show x
+mShowNode x@(MSym _ _) = show x
+mShowNode (MBroadcast d _) = "BC["++ show d ++ "]"
+mShowNode (MUnary (Unary unOp _)) = show unOp
+mShowNode (MBinary (Binary binOp _ _)) = show binOp
+
+showNode :: Show a => Expr a -> String
+showNode (EScalar x) = sShowNode x
+showNode (EVector x) = vShowNode x
+showNode (EMatrix x) = mShowNode x
+
+
+showType :: Show a => Expr a -> String
+showType (EScalar (SNum _)) = "N"
+showType (EScalar (SInt _)) = "I"
+showType _ = ""
+
+showDim :: Show a => Expr a -> String
+showDim (EScalar _) = ""
+showDim (EVector x) = show $ [vecDim x]
+showDim (EMatrix x) = show $ matDim x
 
 ------------------------------------------------------------
 ----------------- get symbolic variables -------------------
@@ -595,19 +631,22 @@ subs subslist expr
 ----------------------------------------------------------------------
 -------------------------- get children  -----------------------------
 ----------------------------------------------------------------------
--- | get all the children of an Expr a
--- | will be [], (x):[], or (x):(y):[]
-getChildren :: Eq a => Expr a -> [Expr a]
-getChildren (EScalar (SUnary (Unary _ x))) = [EScalar x]
-getChildren (EScalar (SBinary (Binary _ x y))) = [EScalar x, EScalar y]
-getChildren (EScalar _) = []
+data Children a = CSource
+                | CUnary a
+                | CBinary a a
 
-getChildren (EVector (VUnary (Unary _ x))) = [EVector x]
-getChildren (EVector (VBinary (Binary _ x y))) = [EVector x, EVector y]
-getChildren (EVector (VBroadcast _ x)) = [EScalar x]
-getChildren (EVector _) = []
+-- | get all the children of an Expr
+getChildren :: Expr a -> Children (Expr a)
+getChildren (EScalar (SUnary (Unary _ x))) = CUnary (EScalar x)
+getChildren (EScalar (SBinary (Binary _ x y))) = CBinary (EScalar x) (EScalar y)
+getChildren (EScalar _) = CSource
 
-getChildren (EMatrix (MUnary (Unary _ x))) = [EMatrix x]
-getChildren (EMatrix (MBinary (Binary _ x y))) = [EMatrix x, EMatrix y]
-getChildren (EMatrix (MBroadcast _ x)) = [EScalar x]
-getChildren (EMatrix _) = []
+getChildren (EVector (VUnary (Unary _ x))) = CUnary (EVector x)
+getChildren (EVector (VBinary (Binary _ x y))) = CBinary (EVector x) (EVector y)
+getChildren (EVector (VBroadcast _ x)) = CUnary (EScalar x)
+getChildren (EVector _) = CSource
+
+getChildren (EMatrix (MUnary (Unary _ x))) = CUnary (EMatrix x)
+getChildren (EMatrix (MBinary (Binary _ x y))) = CBinary (EMatrix x) (EMatrix y)
+getChildren (EMatrix (MBroadcast _ x)) = CUnary (EScalar x)
+getChildren (EMatrix _) = CSource

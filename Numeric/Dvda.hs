@@ -13,10 +13,10 @@
  -}
 
 module Numeric.Dvda( module Numeric.Dvda.Expr
-                   , module Numeric.Dvda.Simplify
-                   , module Numeric.Dvda.AD
+                   , module Numeric.Dvda.Vis
+--                   , module Numeric.Dvda.AD
                    ) where
 
 import Numeric.Dvda.Expr
-import Numeric.Dvda.Simplify
-import Numeric.Dvda.AD
+import Numeric.Dvda.Vis
+--import Numeric.Dvda.AD
