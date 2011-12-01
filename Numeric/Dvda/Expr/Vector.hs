@@ -84,10 +84,12 @@ instance Num a => Num (Vector a) where
     | vIsI 0 x = y
     | vIsI 0 y = x
     | otherwise = VBinary (Binary Add x y)
+  (VNum dx xs) - (VNum _ ys) = VNum dx $ zipWith (-) xs ys
   x - y
     | vIsI 0 x = negate y
     | vIsI 0 y = x
     | otherwise = VBinary (Binary Sub x y)
+  (VNum dx xs) * (VNum _ ys) = VNum dx $ zipWith (*) xs ys
   x * y
     | vIsI 1 x = y
     | vIsI 1 y = x

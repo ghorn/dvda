@@ -81,10 +81,12 @@ instance Num a => Num (Matrix a) where
     | mIsI 0 x = y
     | mIsI 0 y = x
     | otherwise = MBinary (Binary Add x y)
+  (MNum dx xs) - (MNum _ ys) = MNum dx $ zipWith (-) xs ys
   x - y
     | mIsI 0 x = negate y
     | mIsI 0 y = x
     | otherwise = MBinary (Binary Sub x y)
+  (MNum dx xs) * (MNum _ ys) = MNum dx $ zipWith (*) xs ys
   x * y
     | mIsI 1 x = y
     | mIsI 1 y = x
