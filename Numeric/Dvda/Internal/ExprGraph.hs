@@ -2,16 +2,15 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.ExprGraph( exprsToGNodes
-                             ) where
+module Numeric.Dvda.Internal.ExprGraph( exprsToGNodes
+                                      ) where
 
 import Data.Graph.Inductive hiding (nodes, edges)
 import Data.Maybe
 import Data.List(foldl')
 
 import Numeric.Dvda.Expr
-import Numeric.Dvda.GNode
---import Numeric.Dvda.Config(outputNames)
+import Numeric.Dvda.Internal.GNode
 
 exprsToGNodes :: Eq a => [Expr a] -> ([GNode (Expr a)], [Node])
 exprsToGNodes exprs = (gnodesOut, topNodesOut)
@@ -47,15 +46,3 @@ exprGobbler oldGNodes thisIdx expr
     existingGNode = gmatch expr oldGNodes
     -- existingNode = fmap getIdx $ gmatch expr oldGNodes
     existingNode = getIdx $ fromJust existingGNode
-
-
---addOutput :: Eq a => (String, Expr a) -> Gr (GExpr a) (Expr a) -> Gr (GExpr a) (Expr a)
---addOutput (name, expr) graph = graphGobbler newIdx expr newGraph
---  where
---    newIdx = head $ newNodes 1 graph
---    newGraph = insNode (newIdx, GOutput name (dim expr)) graph
-
---getGraphOp :: Expr a -> GraphOp a
---getGraphOp src@(Source {}) = GSource (sourceType src) (dim src)
---getGraphOp ew@(Unary {}) = GUnary (unaryType ew) (dim ew)
---getGraphOp binary@(Binary {}) = GBinary (binaryType binary) (dim binary)

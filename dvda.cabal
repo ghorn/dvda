@@ -13,10 +13,27 @@ Cabal-version:       >=1.2
 
 Library
   Exposed-modules:   Numeric.Dvda
---                     Numeric.Dvda.AD
+                     Numeric.Dvda.AD
                      Numeric.Dvda.Expr
                      Numeric.Dvda.Vis
+                     Numeric.Dvda.Function
                      Numeric.Dvda.Examples
+                     Numeric.Dvda.Substitute
 --                     Numeric.Dvda.Tests.Tests
+
+  Other-modules:     Numeric.Dvda.Internal.Matrix
+                     Numeric.Dvda.Internal.Scalar
+                     Numeric.Dvda.Internal.Vector
+                     Numeric.Dvda.Internal.Binary
+                     Numeric.Dvda.Internal.Unary
+                     Numeric.Dvda.Internal.GNode
+                     Numeric.Dvda.Internal.ExprGraph
+                     Numeric.Dvda.AD.Dual
+                     Numeric.Dvda.AD.Rad
+                     Numeric.Dvda.AD.Fad
+                     Numeric.Dvda.Config
+                     Numeric.Dvda.Codegen.Codegen
+                     Numeric.Dvda.Codegen.CallWrapper
+                     Numeric.Dvda.Codegen.WriteC
   Build-depends:     base, graphviz, fgl, text, directory, MissingH, process, unix, QuickCheck, containers
   Ghc-options:       -O2 -Wall

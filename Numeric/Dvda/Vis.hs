@@ -13,9 +13,9 @@ import Data.Text.Lazy(pack)
 import Control.Concurrent(threadDelay)
 import Data.List(foldl')
 
-import Numeric.Dvda.GNode
-import Numeric.Dvda.ExprGraph
 import Numeric.Dvda.Expr
+import Numeric.Dvda.Internal.GNode
+import Numeric.Dvda.Internal.ExprGraph
 
 previewExprs :: (Eq a, Show a) => [Expr a] -> IO ()
 previewExprs exprs = do

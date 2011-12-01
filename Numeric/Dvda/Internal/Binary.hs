@@ -2,10 +2,10 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Expr.Binary( Binary(..)
-                               , BinaryType(..)
-                               , applyBinary
-                               ) where
+module Numeric.Dvda.Internal.Binary( Binary(..)
+                                   , BinaryType(..)
+                                   , applyBinary
+                                   ) where
 
 data Binary a = Binary BinaryType a a deriving Eq
 

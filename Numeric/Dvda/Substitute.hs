@@ -2,19 +2,19 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Expr.Substitute( subs
-                                   ) where
+module Numeric.Dvda.Substitute( subs
+                              ) where
 
 
 import Data.List(nubBy)
 import Data.Maybe(isNothing, fromJust)
 
-import Numeric.Dvda.Expr.Expr
-import Numeric.Dvda.Expr.Binary
-import Numeric.Dvda.Expr.Unary
-import Numeric.Dvda.Expr.Scalar
-import Numeric.Dvda.Expr.Vector
-import Numeric.Dvda.Expr.Matrix
+import Numeric.Dvda.Expr
+import Numeric.Dvda.Internal.Binary
+import Numeric.Dvda.Internal.Unary
+import Numeric.Dvda.Internal.Scalar
+import Numeric.Dvda.Internal.Vector
+import Numeric.Dvda.Internal.Matrix
 
 -- | substitute a list of pairs [(matchThis, replaceWithThis)] in an expression
 subs :: Floating a => [(Expr a, Expr a)] -> Expr a -> Expr a

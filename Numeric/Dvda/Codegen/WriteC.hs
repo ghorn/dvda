@@ -9,8 +9,8 @@ import Data.Hash.MD5(md5s, Str(..))
 
 import qualified Numeric.Dvda.Config as Config
 import Numeric.Dvda.Expr
-import Numeric.Dvda.ExprGraph
-import Numeric.Dvda.GNode(topSort)
+import Numeric.Dvda.Internal.ExprGraph
+import Numeric.Dvda.Internal.GNode(topSort)
 
 writeCSource :: (Eq a, Show a) => [Expr a] -> [Expr a] -> (String, String, String)
 writeCSource inputs outputs = (src, include, hash)

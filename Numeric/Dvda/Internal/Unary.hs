@@ -2,10 +2,10 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Expr.Unary( Unary(..)
-                              , UnaryType(..)
-                              , applyUnary
-                              ) where
+module Numeric.Dvda.Internal.Unary( Unary(..)
+                                  , UnaryType(..)
+                                  , applyUnary
+                                  ) where
 
 data Unary a = Unary UnaryType a deriving Eq
 

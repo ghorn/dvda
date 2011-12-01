@@ -2,19 +2,19 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Expr.Matrix( Matrix(..)
-                               , mShowNode
-                               , mGetSyms
-                               , matDim
-                               , mIsI
-                               , mToCCode
-                               , mEval
-                               ) where
+module Numeric.Dvda.Internal.Matrix( Matrix(..)
+                                   , mShowNode
+                                   , mGetSyms
+                                   , matDim
+                                   , mIsI
+                                   , mToCCode
+                                   , mEval
+                                   ) where
 
-import Numeric.Dvda.Expr.Binary
-import Numeric.Dvda.Expr.Unary
-import Numeric.Dvda.Expr.Scalar
-import Numeric.Dvda.GNode
+import Numeric.Dvda.Internal.GNode
+import Numeric.Dvda.Internal.Binary
+import Numeric.Dvda.Internal.Unary
+import Numeric.Dvda.Internal.Scalar
 
 data Matrix a = MNum (Int,Int) [a]
               | MSym (Int,Int) String

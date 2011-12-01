@@ -16,6 +16,7 @@ import Foreign.Ptr(FunPtr)
 import qualified Numeric.Dvda.Config as Config
 import Numeric.Dvda.Codegen.CallWrapper(callCFunction)
 import Numeric.Dvda.Codegen.Codegen(buildCFunction)
+import Numeric.Dvda.Substitute
 import Numeric.Dvda.Expr
 
 data Function a = Function { funInputs :: [Expr a]

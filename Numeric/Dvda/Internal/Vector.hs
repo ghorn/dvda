@@ -2,19 +2,19 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Expr.Vector( Vector(..)
-                               , vShowNode
-                               , vGetSyms
-                               , vecDim
-                               , vIsI
-                               , vToCCode
-                               , vEval
-                               ) where
+module Numeric.Dvda.Internal.Vector( Vector(..)
+                                   , vShowNode
+                                   , vGetSyms
+                                   , vecDim
+                                   , vIsI
+                                   , vToCCode
+                                   , vEval
+                                   ) where
 
-import Numeric.Dvda.Expr.Binary
-import Numeric.Dvda.Expr.Unary
-import Numeric.Dvda.Expr.Scalar
-import Numeric.Dvda.GNode
+import Numeric.Dvda.Internal.GNode
+import Numeric.Dvda.Internal.Binary
+import Numeric.Dvda.Internal.Unary
+import Numeric.Dvda.Internal.Scalar
 
 data Vector a = VNum Int [a]
               | VSym Int String

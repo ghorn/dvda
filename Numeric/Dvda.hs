@@ -3,20 +3,24 @@
 -- haddock doc example:
 {- |
    Module      : Numeric.Dvda
-   Description : supposed to be description
+   Description : Top level module
    Copyright   : (c) yo
    License     : license yo
    Maintainer  : email yo
 
-   Yo Yo YO, top level module blah.
+   This is the top level module.
    Reference to 'Numeric.Dvda.Expr', why not?
  -}
 
-module Numeric.Dvda( module Numeric.Dvda.Expr
+module Numeric.Dvda( module Numeric.Dvda.AD
+                   , module Numeric.Dvda.Expr
                    , module Numeric.Dvda.Vis
---                   , module Numeric.Dvda.AD
+                   , module Numeric.Dvda.Function
+                   , module Numeric.Dvda.Substitute
                    ) where
 
+import Numeric.Dvda.AD
 import Numeric.Dvda.Expr
 import Numeric.Dvda.Vis
---import Numeric.Dvda.AD
+import Numeric.Dvda.Function
+import Numeric.Dvda.Substitute

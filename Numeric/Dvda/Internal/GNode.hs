@@ -2,12 +2,12 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.GNode( getIdx
-                         , exprOfGNode
-                         , GNode(..)
-                         , gmatch
-                         , topSort
-                         ) where
+module Numeric.Dvda.Internal.GNode( getIdx
+                                  , exprOfGNode
+                                  , GNode(..)
+                                  , gmatch
+                                  , topSort
+                                  ) where
 
 import Data.Graph.Inductive(Node)
 import qualified Data.IntMap as IntMap

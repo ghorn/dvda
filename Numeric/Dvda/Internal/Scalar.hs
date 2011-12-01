@@ -2,18 +2,18 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Expr.Scalar( Scalar(..)
-                               , sShowNode
-                               , sGetSyms
-                               , sIsI
-                               , sToCCode
-                               , sEval
-                               ) where
+module Numeric.Dvda.Internal.Scalar( Scalar(..)
+                                   , sShowNode
+                                   , sGetSyms
+                                   , sIsI
+                                   , sToCCode
+                                   , sEval
+                                   ) where
 
-import Numeric.Dvda.Expr.Binary
-import Numeric.Dvda.Expr.Unary
 import Numeric.Dvda.Config(cType, cName)
-import Numeric.Dvda.GNode
+import Numeric.Dvda.Internal.GNode
+import Numeric.Dvda.Internal.Binary
+import Numeric.Dvda.Internal.Unary
 
 data Scalar a = SNum a
               | SSym String

@@ -8,9 +8,11 @@ module Numeric.Dvda.AD.Rad( rad
 
 import Numeric.Dvda.AD.Dual
 import Numeric.Dvda.Expr
-import Numeric.Dvda.Expr.Scalar
-import Numeric.Dvda.Expr.Vector
-import Numeric.Dvda.Expr.Matrix
+import Numeric.Dvda.Internal.Binary
+import Numeric.Dvda.Internal.Unary
+import Numeric.Dvda.Internal.Scalar
+import Numeric.Dvda.Internal.Vector
+import Numeric.Dvda.Internal.Matrix
 
 rad :: Floating a => Expr a -> [Expr a] -> [Expr a]
 rad expr args = map getXSens args
