@@ -90,7 +90,7 @@ instance Num a => Num (Scalar a) where
     | sIsI 1 x = y
     | sIsI 1 y = x
     | sIsI 0 x || sIsI 0 y = SInt 0
-    | otherwise = SBinary (Binary Add x y)
+    | otherwise = SBinary (Binary Mul x y)
 
 -- fractional instance
 instance Fractional a => Fractional (Scalar a) where
