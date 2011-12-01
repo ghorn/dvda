@@ -9,7 +9,9 @@
 
 module Numeric.Dvda.AD( fad
                       , rad
+                      , Dual
                       ) where
 
 import Numeric.Dvda.AD.Rad
 import Numeric.Dvda.AD.Fad
+import Numeric.Dvda.AD.Dual
