@@ -9,7 +9,12 @@ Category:            Math
 Build-type:          Simple
 Synopsis:            Automatic differentiation on symbolic expression trees.
 Description:         DVDA Verifiably Differentiates Algorithmically
-Cabal-version:       >=1.2
+Cabal-version:       >= 1.6
+
+source-repository head
+  type: git
+  location: git://github.com/ghorn/dvda.git
+--  tag: 
 
 Library
   Exposed-modules:   Numeric.Dvda
@@ -35,5 +40,15 @@ Library
                      Numeric.Dvda.Codegen.Codegen
                      Numeric.Dvda.Codegen.CallWrapper
                      Numeric.Dvda.Codegen.WriteC
-  Build-depends:     base, graphviz, fgl, text, directory, MissingH, process, unix, QuickCheck, containers
+
+  Build-depends:     base       >= 4     && < 5,
+                     graphviz,
+                     fgl,
+                     text,
+                     directory,
+                     MissingH,
+                     process,
+                     unix,
+                     QuickCheck,
+                     containers
   Ghc-options:       -O2 -Wall
