@@ -93,7 +93,10 @@ instance Num a => Num (Matrix a) where
 -- Fractional instance
 instance Fractional a => Fractional (Matrix a) where
   (MNum d x) / (MNum _ y) = MNum d $ zipWith (/) x y
-  x / y = MBinary $ Binary Div x y
+  x / y 
+    | mIsI 0 y  = error "Matrix divide by zero"
+    | mIsI 0 x  = MBroadcast (matDim x) (SInt 0)
+    | otherwise = MBinary $ Binary Div x y
   fromRational = error "API error: fromRational (in Fractional a => Fractional (Matrix a)) should not be accessible by the user"
 
 -- Floating instance

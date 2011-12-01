@@ -97,7 +97,11 @@ instance Num a => Num (Vector a) where
 -- Fractional instance
 instance Fractional a => Fractional (Vector a) where
   (VNum d x) / (VNum _ y) = VNum d $ zipWith (/) x y
-  x / y = VBinary $ Binary Div x y
+  x / y 
+    | vIsI 0 y  = error "Vector divide by zero"
+    | vIsI 0 x  = VBroadcast (vecDim x) (SInt 0)
+    | otherwise = VBinary $ Binary Div x y
+
   fromRational = error "API error: fromRational (in Fractional a => Fractional (Vector a)) should not be accessible by the user"
 
 -- Floating instance

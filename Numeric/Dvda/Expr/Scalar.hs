@@ -98,7 +98,10 @@ instance Fractional a => Fractional (Scalar a) where
   (SNum x) / (SNum y) = SNum $ x / y
   (SNum x) / (SInt y) = SNum $ x / (fromIntegral y)
   (SInt x) / (SNum y) = SNum $ (fromIntegral x) / y
-  x / y = SBinary $ Binary Div x y
+  x / y 
+    | sIsI 0 y  = error "Scalar divide by zero"
+    | sIsI 0 x  = SInt 0
+    | otherwise = SBinary $ Binary Div x y
   fromRational = error "API error: fromRational (in Fractional a => Fractional (Vector a)) should not be accessible by the user"
 
 
