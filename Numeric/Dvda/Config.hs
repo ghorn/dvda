@@ -52,7 +52,7 @@ dvdaDir = do
 
 -- | take in source file and object, return string suitible for calling to compile
 gccString :: FilePath -> FilePath -> String
-gccString src obj = "gcc -O2 -fPIC -shared " ++ src ++ " -o " ++ obj
+gccString src obj = "gcc -O2 -fPIC -shared -Wall -Wextra -Werror " ++ src ++ " -o " ++ obj
 
 
 functionDir :: String -> IO FilePath
