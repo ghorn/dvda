@@ -9,7 +9,8 @@ import Data.Graph.Inductive hiding (nodes, edges)
 import Data.Maybe
 import Data.List(foldl')
 
-import Numeric.Dvda.Expr
+import Numeric.Dvda.Internal.Expr
+import Numeric.Dvda.Internal.ExprUtils
 import Numeric.Dvda.Internal.GNode
 
 exprsToGNodes :: Eq a => [Expr a] -> ([GNode (Expr a)], [Node])

@@ -1,21 +1,21 @@
-{-# OPTIONS_GHC -Wall #-}
-
--- haddock doc example:
 {- |
    Module      : Numeric.Dvda
    Description : Top level module
-   Copyright   : (c) yo
-   License     : license yo
-   Maintainer  : email yo
 
-   This is the top level module.
-   Reference to 'Numeric.Dvda.Expr', why not?
+   This is the top level module which exports the API
  -}
 
-module Numeric.Dvda( module X ) where
+{-# OPTIONS_GHC -Wall #-}
 
-import Numeric.Dvda.AD as X
-import Numeric.Dvda.Expr as X
-import Numeric.Dvda.Vis as X
-import Numeric.Dvda.Function as X
-import Numeric.Dvda.Substitute as X
+module Numeric.Dvda( module Numeric.Dvda.AD
+                   , module Numeric.Dvda.Symbolic
+                   , module Numeric.Dvda.Vis
+                   , module Numeric.Dvda.Function
+                   , Expr
+                   ) where
+
+import Numeric.Dvda.AD
+import Numeric.Dvda.Symbolic
+import Numeric.Dvda.Vis
+import Numeric.Dvda.Function
+import Numeric.Dvda.Internal.Expr(Expr)

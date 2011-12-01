@@ -12,7 +12,7 @@ import Control.Monad(when)
 
 import qualified Numeric.Dvda.Config as Config
 import Numeric.Dvda.Codegen.WriteC(writeCSource)
-import Numeric.Dvda.Expr(Expr(..))
+import Numeric.Dvda.Internal.Expr
 
 
 -- | shorten path name for display purposes

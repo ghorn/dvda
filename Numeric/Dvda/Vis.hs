@@ -1,4 +1,9 @@
--- Vis.hs
+{- |
+   Module      : Numeric.Dvda.Vis
+   Description : Make pretty GraphViz plots of expressions
+
+   Turn one or more expressions into a pretty GraphViz plot. The graph displayed is exactly representitive of the C code that is generated in `Numeric.Dvda.Function.toFunction` and called in `Numeric.Dvda.Function.callC`.
+ -}
 
 {-# OPTIONS_GHC -Wall #-}
 
@@ -13,15 +18,18 @@ import Data.Text.Lazy(pack)
 import Control.Concurrent(threadDelay)
 import Data.List(foldl')
 
-import Numeric.Dvda.Expr
+import Numeric.Dvda.Internal.Expr
+import Numeric.Dvda.Internal.ExprUtils
 import Numeric.Dvda.Internal.GNode
 import Numeric.Dvda.Internal.ExprGraph
 
+-- | Plot a graph visualizing a list of `Numeric.Dvda.Expr.Expr`s. The edges of the graph will be labeled with the local expression's value.
 previewExprs :: (Eq a, Show a) => [Expr a] -> IO ()
 previewExprs exprs = do
   preview $ nmap ShowOp $ emap ShowExpr (exprsToGraph exprs)
   threadDelay 10000
 
+-- | Plot a graph visualizing a list of `Numeric.Dvda.Expr.Expr`s. The edges of the graph will be unlabeled.
 previewExprs_ :: (Eq a, Show a) => [Expr a] -> IO ()
 previewExprs_ exprs = do
   preview $ nmap ShowOp $ emap HideExpr (exprsToGraph exprs)

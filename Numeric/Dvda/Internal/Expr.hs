@@ -1,145 +1,20 @@
--- Expr.hs
+{- |
+   Module      : Numeric.Dvda.Internal.Expr
+   Description : Basic symbolic expression type
+
+   This module instances 'Numeric.Dvda.Expr.Expr` as `Prelude.Num`\/`Prelude.Fractional`\/`Prelude.Floating`.
+ -}
 
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE Rank2Types #-}
 
-module Numeric.Dvda.Expr( Expr(..)
-                        , sym
-                        , symVec
-                        , symMat
-                        , getSyms
-                        , vec
-                        , mat
-                        , Children(..)
-                        , getChildren
-                        , showNode
-                        , showType
-                        , showDim
-                        , symName
-                        , toCCode
-                        , eval
-                        ) where
+module Numeric.Dvda.Internal.Expr( Expr(..)
+                                 ) where
 
-import Numeric.Dvda.Internal.Binary
-import Numeric.Dvda.Internal.Unary
 import Numeric.Dvda.Internal.Scalar
 import Numeric.Dvda.Internal.Vector
 import Numeric.Dvda.Internal.Matrix
-import Numeric.Dvda.Internal.GNode
 
-
-eval :: Floating a => Expr a -> Expr a
-eval (EScalar x) = EScalar $ SNum (sEval x)
-eval (EVector x) = EVector $ VNum d v
-  where
-    (d, v) = vEval x
-eval (EMatrix x) = EMatrix $ MNum d m
-  where
-    (d, m) = mEval x
-
-showNode :: Show a => Expr a -> String
-showNode (EScalar x) = sShowNode x
-showNode (EVector x) = vShowNode x
-showNode (EMatrix x) = mShowNode x
-
-showType :: Show a => Expr a -> String
-showType (EScalar (SNum _)) = "N"
-showType (EScalar (SInt _)) = "I"
-showType _ = ""
-
-showDim :: Show a => Expr a -> String
-showDim (EScalar _) = ""
-showDim (EVector x) = show [vecDim x]
-showDim (EMatrix x) = show $ matDim x
-
--- | convert Expr gnode to c code string
-toCCode :: (Eq a, Show a) => GNode (Expr a) -> String
-toCCode (GSource i (EScalar x)) = sToCCode $ GSource i x
-toCCode (GSource i (EVector x)) = vToCCode $ GSource i x
-toCCode (GSource i (EMatrix x)) = mToCCode $ GSource i x
-
-toCCode (GUnary i (EScalar x) ix) = sToCCode $ GUnary i x ix
-toCCode (GUnary i (EVector x) ix) = vToCCode $ GUnary i x ix
-toCCode (GUnary i (EMatrix x) ix) = mToCCode $ GUnary i x ix
-
-toCCode (GBinary i (EScalar x) (ix, iy)) = sToCCode $ GBinary i x (ix, iy)
-toCCode (GBinary i (EVector x) (ix, iy)) = vToCCode $ GBinary i x (ix, iy)
-toCCode (GBinary i (EMatrix x) (ix, iy)) = mToCCode $ GBinary i x (ix, iy)
-
--- | get name if variable is symbolic
-symName :: Expr a -> Maybe String
-symName (EScalar (SSym n)) = Just n
-symName (EVector (VSym _ n)) = Just n
-symName (EMatrix (MSym _ n)) = Just n
-symName _ = Nothing
-
-
--- | get all the symbolic variables in an expression
-getSyms :: Expr a -> [Expr a]
-getSyms (EScalar x) = map EScalar $ sGetSyms x
-getSyms (EVector x) = map EVector vs ++ map EScalar ss
-  where
-    (vs, ss) = vGetSyms x
-getSyms (EMatrix x) = map EMatrix ms ++ map EScalar ss
-  where
-    (ms, ss) = mGetSyms x
-
--- | data type containing children of an expression
-data Children a = CSource
-                | CUnary a
-                | CBinary a a
-
--- | get all the children of an Expr
-getChildren :: Expr a -> Children (Expr a)
-getChildren (EScalar (SUnary (Unary _ x))) = CUnary (EScalar x)
-getChildren (EScalar (SBinary (Binary _ x y))) = CBinary (EScalar x) (EScalar y)
-getChildren (EScalar _) = CSource
-
-getChildren (EVector (VUnary (Unary _ x))) = CUnary (EVector x)
-getChildren (EVector (VBinary (Binary _ x y))) = CBinary (EVector x) (EVector y)
-getChildren (EVector (VBroadcast _ x)) = CUnary (EScalar x)
-getChildren (EVector _) = CSource
-
-getChildren (EMatrix (MUnary (Unary _ x))) = CUnary (EMatrix x)
-getChildren (EMatrix (MBinary (Binary _ x y))) = CBinary (EMatrix x) (EMatrix y)
-getChildren (EMatrix (MBroadcast _ x)) = CUnary (EScalar x)
-getChildren (EMatrix _) = CSource
-
-----------------------------------------------------------------------
------------------------- api constructors ----------------------------
-----------------------------------------------------------------------
--- | create symbolic scalar
-sym :: String -> Expr a
-sym name = EScalar $ SSym name
-
--- | create symbolic vector with length
-symVec :: Int -> String -> Expr a
-symVec d name 
-  | d > 0     = EVector $ VSym d name
-  | otherwise = error $ "symVec can't make vector with length: " ++ show d
-
--- | create symbolic matrix with specified (rows, columns)
-symMat :: (Int,Int) -> String -> Expr a
-symMat (r,c) name
-  | r > 0 && c > 0 = EMatrix $ MSym (r,c) name
-  | otherwise      = error $ "symMat can't make matrix with dimensions: " ++ show (r,c)
-
--- | create numeric vector
-vec :: [a] -> Expr a
-vec xs 
-  | length xs > 0 = EVector $ VNum (length xs) xs
-  | otherwise     = error "Improper dimensions in vec :: [a] -> Expr a"
-
--- | Create numeric matrix with specified (rows, cols). List is taken rowwise.
-mat :: (Int,Int) -> [a] -> Expr a
-mat (r,c) xs 
-  | (length xs == r*c) && (r > 0) && (c > 0) = EMatrix $ MNum (r,c) xs
-  | otherwise                                = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
-
-
-------------------------------------------------------------------------------
----------------------------------- Expr --------------------------------------
-------------------------------------------------------------------------------
 data Expr a = EScalar (Scalar a)
             | EVector (Vector a)
             | EMatrix (Matrix a) deriving Eq

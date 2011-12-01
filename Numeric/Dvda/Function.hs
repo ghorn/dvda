@@ -1,12 +1,17 @@
--- Function.hs
+{- |
+   Module      : Numeric.Dvda.Function
+   Description : Interface for numerically evaluating `Numeric.Dvda.Expr.Expr`
+
+   Turn  `Numeric.Dvda.Expr.Expr`s into functions callable through automatically generated C code or through a slow native function.
+ -}
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Function( Function(..)
-                            , inputNames
-                            , callNative
+module Numeric.Dvda.Function( toFunction
+                            , Function(..)
                             , callC
-                            , toFunction
+                            , callNative
+                            , inputNames
                             ) where
 
 import Data.Maybe
@@ -16,8 +21,9 @@ import Foreign.Ptr(FunPtr)
 import qualified Numeric.Dvda.Config as Config
 import Numeric.Dvda.Codegen.CallWrapper(callCFunction)
 import Numeric.Dvda.Codegen.Codegen(buildCFunction)
-import Numeric.Dvda.Substitute
-import Numeric.Dvda.Expr
+import Numeric.Dvda.Symbolic
+import Numeric.Dvda.Internal.Expr
+import Numeric.Dvda.Internal.ExprUtils
 
 data Function a = Function { funInputs :: [Expr a]
                            , funOutputs :: [Expr a]
@@ -25,7 +31,7 @@ data Function a = Function { funInputs :: [Expr a]
                            , funHash :: String
                            }
 
-
+-- | Get a list of names of a function's inputs
 inputNames :: (Eq a, Show a) => Function a -> [String]
 inputNames (Function {funInputs = inputs}) = map f inputs
   where
@@ -33,8 +39,9 @@ inputNames (Function {funInputs = inputs}) = map f inputs
       | isJust (symName x) = fromJust $ symName x
       | otherwise = error "non-source Function input detected in " ++ show inputs
 
--- | SLOW native call of function
--- | provided mainly for developing a function or debugging
+-- | Call a function without using C code by recursively evaluating children.
+--   This is probably much slower than 'Numeric.Dvda.Function.callC' and
+--   is intended mainly for developing a function or debugging.
 callNative :: Floating a => Function a -> [Expr a] -> [Expr a]
 callNative fun args 
   | length (funInputs fun) == length args = map (eval . subs subRules) (funOutputs fun)
@@ -42,13 +49,12 @@ callNative fun args
   where
     subRules = zip (funInputs fun) args
 
--- | fast c call of function
+-- | Call a function using generated C code
 callC :: RealFrac a => Function a -> [a] -> [a]
 callC fun = callCFunction (length (funInputs fun)) (funCFunPtr fun)
 
 
--- | turn inputs/outputs into a function 
--- | generate, compile, and load c code
+-- | Turn lists of inputs and outputs into a function
 toFunction :: RealFrac a => [Expr a] -> [Expr a] -> IO (Function a)
 toFunction inputs outputs = do
   -- TODO: make sure all inputs are accounted for - issue 19

@@ -8,8 +8,25 @@ Stability:           Experimental
 Category:            Math
 Build-type:          Simple
 Synopsis:            Automatic differentiation on symbolic expression trees.
-Description:         DVDA Verifiably Differentiates Algorithmically
 Cabal-version:       >= 1.6
+Description: {
+DVDA Verifiably Differentiates Algorithmically
+.
+This library provides a symbolic type `Numeric.Dvda.Expr.Expr` which is
+manipulated mathematically through its Num\/Fractional\/Floating instances.
+Expr can be a scalar, vector, or matrix. For ease of writing equations,
+binary operations (adding\/multiplying\/etc) on a (scalar, vector) or (scalar, matrix)
+automatically operates elementwise.
+.
+Trying to add a vector to a matrix will cause a runtime exception. Dimensions are 
+checked at runtime when adding\/multiplying\/etc vector to vector or matrix to matrix.
+.
+Automatic differentiation functions can be called on `Numeric.Dvda.Expr.Expr`s.
+.
+C-code can be automatically generated, compiled, linked, and called at runtime.
+.
+Pretty graphviz plots!
+}
 
 source-repository head
   type: git
@@ -18,21 +35,22 @@ source-repository head
 
 Library
   Exposed-modules:   Numeric.Dvda
+                     Numeric.Dvda.Symbolic
                      Numeric.Dvda.AD
-                     Numeric.Dvda.Expr
                      Numeric.Dvda.Vis
                      Numeric.Dvda.Function
                      Numeric.Dvda.Examples
-                     Numeric.Dvda.Substitute
 --                     Numeric.Dvda.Tests.Tests
 
-  Other-modules:     Numeric.Dvda.Internal.Matrix
+  Other-modules:     Numeric.Dvda.Internal.Expr
                      Numeric.Dvda.Internal.Scalar
                      Numeric.Dvda.Internal.Vector
+                     Numeric.Dvda.Internal.Matrix
                      Numeric.Dvda.Internal.Binary
                      Numeric.Dvda.Internal.Unary
                      Numeric.Dvda.Internal.GNode
                      Numeric.Dvda.Internal.ExprGraph
+                     Numeric.Dvda.Internal.ExprUtils
                      Numeric.Dvda.AD.Dual
                      Numeric.Dvda.AD.Rad
                      Numeric.Dvda.AD.Fad

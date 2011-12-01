@@ -1,4 +1,9 @@
--- Examples.hs
+{- |
+   Module      : Numeric.Dvda.Examples
+   Description : Simple examples to get you started.
+
+   Find the source for these examples if you're having trouble figuring out how to use this library.
+ -}
 
 {-# OPTIONS_GHC -Wall #-}
 
@@ -9,18 +14,16 @@ module Numeric.Dvda.Examples( simpleGraph
                             , codegenExample
                             ) where
 
+import Numeric.Dvda
 
-import Numeric.Dvda.Expr
-import Numeric.Dvda.Vis
-import Numeric.Dvda.AD
-import Numeric.Dvda.Function
-
+-- | Make a graph of a simple equation
 simpleGraph :: IO ()
 simpleGraph = do
   let x = sym "x" :: Expr Double
       y = x*2 + cos x / 5
   previewExprs [y, x*x]
 
+-- | Make a graph of a simple equation involving matrices
 tensorGraph :: IO ()
 tensorGraph = do
   let x = symMat (3,5) "x"
@@ -28,6 +31,7 @@ tensorGraph = do
       z = x*2 + cos x / 5 + y
   previewExprs [z :: Expr Double]
 
+-- | Make a graph of forward-mode AD
 fadExample :: IO ()
 fadExample = do
   let f x = [x*34 + 5, x*34 + 4/x, sin x]
@@ -40,6 +44,7 @@ fadExample = do
   previewExprs exprs
   previewExprs g
   
+-- | Make a graph of reverse-mode AD
 radExample :: IO ()
 radExample = do
   let exampleExpr :: Expr Double
@@ -59,6 +64,7 @@ radExample = do
 --  previewExprs lexprsToGraph $ zip ["f", "df/dx", "df/dy", "df/dz"] (exampleExpr:(rad exampleExpr args))
 
 
+-- | Turn expressions into a function and call it natively and through the auto-generated C code
 codegenExample :: IO ()
 codegenExample = do
 

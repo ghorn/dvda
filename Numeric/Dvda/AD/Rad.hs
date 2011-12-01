@@ -7,13 +7,14 @@ module Numeric.Dvda.AD.Rad( rad
                           ) where
 
 import Numeric.Dvda.AD.Dual
-import Numeric.Dvda.Expr
+import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Binary
 import Numeric.Dvda.Internal.Unary
 import Numeric.Dvda.Internal.Scalar
 import Numeric.Dvda.Internal.Vector
 import Numeric.Dvda.Internal.Matrix
 
+-- | Take the gradient of an expression with respect to a list of inputs
 rad :: Floating a => Expr a -> [Expr a] -> [Expr a]
 rad expr args = map getXSens args
   where
