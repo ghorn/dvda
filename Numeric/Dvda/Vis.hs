@@ -52,7 +52,7 @@ instance Show a => Labellable (NodeShow a) where
 
 instance Show a => Labellable (EdgeShow a) where
   toLabelValue (ShowExpr (_, _, expr)) = toLabelValue $ pack $ show expr
-  toLabelValue (HideExpr (_, _, _)) = toLabelValue $ pack $ ""
+  toLabelValue (HideExpr (_, _, _)) = toLabelValue $ pack ""
 
 instance (Eq a, Show a) => Ord (NodeShow a) where
   compare n1 n2 = compare (nodeShowToNode n1) (nodeShowToNode n2)
@@ -74,7 +74,7 @@ gNodesToLNodes = map f
     f (GUnary  n expr _) = (n, (n, expr))
     f (GBinary n expr _) = (n, (n, expr))
 
-exprsToGraph :: Eq a => [Expr a] -> Gr (Node, (Expr a)) (Node, Node, (Expr a))
+exprsToGraph :: Eq a => [Expr a] -> Gr (Node, Expr a) (Node, Node, Expr a)
 exprsToGraph exprs = mkGraph (gNodesToLNodes gNodes) (gNodesToLEdges gNodes)
   where
     gNodes = fst $ exprsToGNodes exprs

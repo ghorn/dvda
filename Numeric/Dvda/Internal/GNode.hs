@@ -42,14 +42,14 @@ topSort gnodes = sortBy gCompare gnodes
     gCompare (GSource _ _) _ = LT
     gCompare _ (GSource _ _) = GT
     gCompare x y 
-      | (getIdx x) `isDescendentOf` (getIdx y) = LT
-      | (getIdx y) `isDescendentOf` (getIdx x) = GT
+      | getIdx x `isDescendentOf` getIdx y = LT
+      | getIdx y `isDescendentOf` getIdx x = GT
       | otherwise       = EQ
 
     isDescendentOf x y 
       | isNothing parentOfX     = False
       | y == fromJust parentOfX = True
-      | otherwise               = (fromJust parentOfX) `isDescendentOf` y
+      | otherwise               = fromJust parentOfX `isDescendentOf` y
       where
         parentOfX = IntMap.lookup x parentMap
 

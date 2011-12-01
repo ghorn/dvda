@@ -11,6 +11,9 @@ import Numeric.Dvda.Expr
 
 data Pair a = Pair a (Expr a)
 
+--instance Arbitrary Char where
+--    arbitrary     = choose ('\0', '\128')
+    
 instance Floating a => Show (Pair a) where
   show (Pair x ex) = "Pair\nFloating:   " ++ show x ++ "\nevaluated:  " ++ show (evaluate ex) ++ "\nexpression: " ++ show ex
 
@@ -23,8 +26,8 @@ instance (Arbitrary a, Floating a) => Arbitrary (Pair a) where
     let (Pair x ex) = fx
         (Pair y ey) = fy
     
-    frequency [ (12, return $! Pair sourceNum (Source {dim = 0, sourceType = Number sourceNum}))
-              , (12, return $! Pair (fromIntegral sourceInteger) (Source {dim = 0, sourceType = I sourceInteger}))
+    frequency [ (12, return $! Pair sourceNum Source {dim = 0, sourceType = Number sourceNum})
+              , (12, return $! Pair (fromIntegral sourceInteger) Source {dim = 0, sourceType = I sourceInteger})
               , (5, return $! Pair (x * y) (ex * ey))
               , (5, return $! Pair (x + y) (ex + ey))
               , (5, return $! Pair (x - y) (ex - ey))

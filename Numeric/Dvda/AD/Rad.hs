@@ -41,22 +41,22 @@ getSensitivities (EMatrix (MUnary (Unary unType x'))) sens = getSensitivities x 
   where
     dfdx = pert $ applyUnary unType (Dual x 1)
     x = EMatrix x'
-getSensitivities (EScalar (SBinary (Binary binType x' y'))) sens = (getSensitivities x (sens*dfdx))++
-                                                                   (getSensitivities y (sens*dfdy))
+getSensitivities (EScalar (SBinary (Binary binType x' y'))) sens = getSensitivities x (sens*dfdx) ++
+                                                                   getSensitivities y (sens*dfdy)
   where
     dfdx = pert $ applyBinary binType (Dual x 1) (Dual y 0)
     dfdy = pert $ applyBinary binType (Dual x 0) (Dual y 1)
     x = EScalar x'
     y = EScalar y'
-getSensitivities (EVector (VBinary (Binary binType x' y'))) sens = (getSensitivities x (sens*dfdx))++
-                                                                   (getSensitivities y (sens*dfdy))
+getSensitivities (EVector (VBinary (Binary binType x' y'))) sens = getSensitivities x (sens*dfdx) ++
+                                                                   getSensitivities y (sens*dfdy)
   where
     dfdx = pert $ applyBinary binType (Dual x 1) (Dual y 0)
     dfdy = pert $ applyBinary binType (Dual x 0) (Dual y 1)
     x = EVector x'
     y = EVector y'
-getSensitivities (EMatrix (MBinary (Binary binType x' y'))) sens = (getSensitivities x (sens*dfdx))++
-                                                                   (getSensitivities y (sens*dfdy))
+getSensitivities (EMatrix (MBinary (Binary binType x' y'))) sens = getSensitivities x (sens*dfdx) ++
+                                                                   getSensitivities y (sens*dfdy)
   where
     dfdx = pert $ applyBinary binType (Dual x 1) (Dual y 0)
     dfdy = pert $ applyBinary binType (Dual x 0) (Dual y 1)

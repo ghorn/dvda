@@ -12,15 +12,10 @@
    Reference to 'Numeric.Dvda.Expr', why not?
  -}
 
-module Numeric.Dvda( module Numeric.Dvda.AD
-                   , module Numeric.Dvda.Expr
-                   , module Numeric.Dvda.Vis
-                   , module Numeric.Dvda.Function
-                   , module Numeric.Dvda.Substitute
-                   ) where
+module Numeric.Dvda( module X ) where
 
-import Numeric.Dvda.AD
-import Numeric.Dvda.Expr
-import Numeric.Dvda.Vis
-import Numeric.Dvda.Function
-import Numeric.Dvda.Substitute
+import Numeric.Dvda.AD as X
+import Numeric.Dvda.Expr as X
+import Numeric.Dvda.Vis as X
+import Numeric.Dvda.Function as X
+import Numeric.Dvda.Substitute as X

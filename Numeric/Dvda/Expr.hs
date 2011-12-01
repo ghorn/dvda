@@ -49,7 +49,7 @@ showType _ = ""
 
 showDim :: Show a => Expr a -> String
 showDim (EScalar _) = ""
-showDim (EVector x) = show $ [vecDim x]
+showDim (EVector x) = show [vecDim x]
 showDim (EMatrix x) = show $ matDim x
 
 -- | convert Expr gnode to c code string
@@ -77,10 +77,10 @@ symName _ = Nothing
 -- | get all the symbolic variables in an expression
 getSyms :: Expr a -> [Expr a]
 getSyms (EScalar x) = map EScalar $ sGetSyms x
-getSyms (EVector x) = (map EVector vs) ++ (map EScalar ss)
+getSyms (EVector x) = map EVector vs ++ map EScalar ss
   where
     (vs, ss) = vGetSyms x
-getSyms (EMatrix x) = (map EMatrix ms) ++ (map EScalar ss)
+getSyms (EMatrix x) = map EMatrix ms ++ map EScalar ss
   where
     (ms, ss) = mGetSyms x
 
@@ -133,8 +133,8 @@ vec xs
 -- | Create numeric matrix with specified (rows, cols). List is taken rowwise.
 mat :: (Int,Int) -> [a] -> Expr a
 mat (r,c) xs 
-  | and [length xs == r*c, r > 0, c > 0] = EMatrix $ MNum (r,c) xs
-  | otherwise        = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
+  | (length xs == r*c) && (r > 0) && (c > 0) = EMatrix $ MNum (r,c) xs
+  | otherwise                                = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
 
 
 ------------------------------------------------------------------------------
@@ -168,28 +168,28 @@ instance Fractional a => Fractional (Expr a) where
 instance (Floating a) => Floating (Expr a) where
   pi = EScalar $ SNum pi
   
-  exp x  = safeUnaryConstructFloating exp x
-  sqrt x = safeUnaryConstructFloating sqrt x
-  log x  = safeUnaryConstructFloating log x
+  exp  = safeUnaryConstructFloating exp
+  sqrt = safeUnaryConstructFloating sqrt
+  log  = safeUnaryConstructFloating log
   
-  x**y = safeBinaryConstructFloating (**) x y
-  logBase x y = safeBinaryConstructFloating logBase x y
+  (**) = safeBinaryConstructFloating (**)
+  logBase = safeBinaryConstructFloating logBase
   
-  sin x = safeUnaryConstructFloating sin x
-  cos x = safeUnaryConstructFloating cos x
-  tan x = safeUnaryConstructFloating tan x
+  sin = safeUnaryConstructFloating sin
+  cos = safeUnaryConstructFloating cos
+  tan = safeUnaryConstructFloating tan
                    
-  asin x = safeUnaryConstructFloating asin x
-  acos x = safeUnaryConstructFloating acos x
-  atan x = safeUnaryConstructFloating atan x
+  asin = safeUnaryConstructFloating asin
+  acos = safeUnaryConstructFloating acos
+  atan = safeUnaryConstructFloating atan
 
-  sinh x = safeUnaryConstructFloating sinh x
-  cosh x = safeUnaryConstructFloating cosh x
-  tanh x = safeUnaryConstructFloating tanh x
+  sinh = safeUnaryConstructFloating sinh
+  cosh = safeUnaryConstructFloating cosh
+  tanh = safeUnaryConstructFloating tanh
 
-  asinh x = safeUnaryConstructFloating asinh x
-  acosh x = safeUnaryConstructFloating acosh x
-  atanh x = safeUnaryConstructFloating atanh x
+  asinh = safeUnaryConstructFloating asinh
+  acosh = safeUnaryConstructFloating acosh
+  atanh = safeUnaryConstructFloating atanh
 
 
 

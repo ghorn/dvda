@@ -37,14 +37,14 @@ inputNames (Function {funInputs = inputs}) = map f inputs
 -- | provided mainly for developing a function or debugging
 callNative :: Floating a => Function a -> [Expr a] -> [Expr a]
 callNative fun args 
-  | length (funInputs fun) == length args = map (eval . (subs subRules)) (funOutputs fun)
+  | length (funInputs fun) == length args = map (eval . subs subRules) (funOutputs fun)
   | otherwise = error "callNative fail because num arguments /= num function inputs"
   where
     subRules = zip (funInputs fun) args
 
 -- | fast c call of function
 callC :: RealFrac a => Function a -> [a] -> [a]
-callC fun args = callCFunction (length (funInputs fun)) (funCFunPtr fun) args
+callC fun = callCFunction (length (funInputs fun)) (funCFunPtr fun)
 
 
 -- | turn inputs/outputs into a function 
@@ -57,8 +57,8 @@ toFunction inputs outputs = do
   dl <- dlopen objPath [RTLD_NOW]
   funptr <- dlsym dl $ Config.nameCFunction hash
 
-  return $ Function { funInputs  = inputs
-                    , funOutputs = outputs
-                    , funHash    = hash
-                    , funCFunPtr = funptr
-                    }
+  return Function { funInputs  = inputs
+                  , funOutputs = outputs
+                  , funHash    = hash
+                  , funCFunPtr = funptr
+                  }

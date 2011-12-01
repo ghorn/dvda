@@ -16,7 +16,7 @@ module Numeric.Dvda.Config( cType
                           ) where
 
 import System.Directory
-import Control.Monad(when)
+import Control.Monad(unless)
 
 -- | what symbolic variable names to use when generating a function
 outputNames :: [String]
@@ -42,7 +42,7 @@ dvdaDir = do
   
   -- print message if creating directory
   exist <- doesDirectoryExist dir
-  when (not exist) $ putStrLn $ "creating directory \""++dir++"\" for codegen source/objects"
+  unless exist $ putStrLn $ "creating directory \""++dir++"\" for codegen source/objects"
 
   -- make the directory if missing
   createDirectoryIfMissing True dir

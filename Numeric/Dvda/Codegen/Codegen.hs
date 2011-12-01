@@ -19,7 +19,7 @@ import Numeric.Dvda.Expr(Expr(..))
 shortName :: String -> String
 shortName full
   | length name <= maxN = name ++ extension
-  | otherwise           = (take firstN name) ++ "..." ++ (drop (length name - lastN) name) ++ extension
+  | otherwise           = take firstN name ++ "..." ++ drop (length name - lastN) name ++ extension
   where
     firstN = 20
     lastN  = 10

@@ -43,7 +43,7 @@ subs subslist expr
     
     vSubs x@(VNum _ _) = EVector x
     vSubs x@(VSym _ _) = EVector $ sub vectorSubs x
-    vSubs (VUnary (Unary unOp x)) = (applyUnary unOp) (vSubs x)
+    vSubs (VUnary (Unary unOp x)) = applyUnary unOp (vSubs x)
     vSubs (VBinary (Binary binOp x y)) = applyBinary binOp (vSubs x) (vSubs y)
     vSubs (VBroadcast _ x) = sSubs x
     

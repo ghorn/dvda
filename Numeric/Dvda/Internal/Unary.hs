@@ -37,7 +37,7 @@ data UnaryType = Abs
                | ATanh deriving Eq 
 
 
-applyUnary :: Floating a => UnaryType -> (a -> a)
+applyUnary :: Floating a => UnaryType -> a -> a
 applyUnary Abs    = abs   
 applyUnary Signum = signum
 applyUnary Neg    = \x -> -x

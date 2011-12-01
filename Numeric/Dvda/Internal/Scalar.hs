@@ -67,8 +67,8 @@ instance Num a => Num (Scalar a) where
 
   (SInt x) + (SInt y) = SInt $ x + y
   (SNum x) + (SNum y) = SNum $ x + y
-  (SNum x) + (SInt y) = SNum $ x + (fromIntegral y)
-  (SInt x) + (SNum y) = SNum $ (fromIntegral x) + y
+  (SNum x) + (SInt y) = SNum $ x + fromIntegral y
+  (SInt x) + (SNum y) = SNum $ fromIntegral x + y
   x + y
     | sIsI 0 x = y
     | sIsI 0 y = x
@@ -76,8 +76,8 @@ instance Num a => Num (Scalar a) where
 
   (SInt x) - (SInt y) = SInt $ x - y
   (SNum x) - (SNum y) = SNum $ x - y
-  (SNum x) - (SInt y) = SNum $ x - (fromIntegral y)
-  (SInt x) - (SNum y) = SNum $ (fromIntegral x) - y
+  (SNum x) - (SInt y) = SNum $ x - fromIntegral y
+  (SInt x) - (SNum y) = SNum $ fromIntegral x - y
   x - y
     | sIsI 0 x = negate y
     | sIsI 0 y = x
@@ -85,8 +85,8 @@ instance Num a => Num (Scalar a) where
 
   (SInt x) * (SInt y) = SInt $ x * y
   (SNum x) * (SNum y) = SNum $ x * y
-  (SNum x) * (SInt y) = SNum $ x * (fromIntegral y)
-  (SInt x) * (SNum y) = SNum $ (fromIntegral x) * y
+  (SNum x) * (SInt y) = SNum $ x * fromIntegral y
+  (SInt x) * (SNum y) = SNum $ fromIntegral x * y
   x * y
     | sIsI 1 x = y
     | sIsI 1 y = x
@@ -97,8 +97,8 @@ instance Num a => Num (Scalar a) where
 instance Fractional a => Fractional (Scalar a) where
   -- (SInt x) / (SInt y) = SNum $ fromRational (toInteger x % toInteger y)
   (SNum x) / (SNum y) = SNum $ x / y
-  (SNum x) / (SInt y) = SNum $ x / (fromIntegral y)
-  (SInt x) / (SNum y) = SNum $ (fromIntegral x) / y
+  (SNum x) / (SInt y) = SNum $ x / fromIntegral y
+  (SInt x) / (SNum y) = SNum $ fromIntegral x / y
   x / y 
     | sIsI 0 y  = error "Scalar divide by zero"
     | sIsI 0 x  = SInt 0

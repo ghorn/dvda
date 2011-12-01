@@ -40,11 +40,11 @@ writeCSource inputs outputs = (src, include, hash)
                   ]
 
     body = "    // input declarations:\n" ++ 
-           (unlines inputDeclarations) ++
+           unlines inputDeclarations ++
            "\n    // body:\n" ++
-           (unlines $ map (\x -> "    " ++ toCCode x) (topSort gnodes)) ++
+           unlines (map (\x -> "    " ++ toCCode x) (topSort gnodes)) ++
            "\n    // output declarations:\n" ++
-           (unlines outputDeclarations)
+           unlines outputDeclarations
       where
         inputDeclarations = zipWith (\x k -> "    double " ++ show x ++" = in["++show k++"];")
                             inputs [(0::Integer)..]

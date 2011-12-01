@@ -18,14 +18,14 @@ import Numeric.Dvda.Function
 simpleGraph :: IO ()
 simpleGraph = do
   let x = sym "x" :: Expr Double
-      y = x*2 + cos(x)/5
+      y = x*2 + cos x / 5
   previewExprs [y, x*x]
 
 tensorGraph :: IO ()
 tensorGraph = do
   let x = symMat (3,5) "x"
       y = sym "y"
-      z = x*2 + cos(x)/5 + y
+      z = x*2 + cos x / 5 + y
   previewExprs [z :: Expr Double]
 
 fadExample :: IO ()
@@ -43,7 +43,7 @@ fadExample = do
 radExample :: IO ()
 radExample = do
   let exampleExpr :: Expr Double
-      exampleExpr = (z + x*y)*log(cos(x)/(tanh(y)))**(z/exp(y))
+      exampleExpr = (z + x*y)*log(cos x / tanh y)**(z/exp y)
       
       x = sym "x"
       y = sym "y"
@@ -54,7 +54,7 @@ radExample = do
   print $ rad exampleExpr args
   
   previewExprs [exampleExpr]
-  previewExprs_ (exampleExpr:(rad exampleExpr args))
+  previewExprs_ $ exampleExpr:rad exampleExpr args
 --  previewExprs lexprToGraph ("f", exampleExpr)
 --  previewExprs lexprsToGraph $ zip ["f", "df/dx", "df/dy", "df/dz"] (exampleExpr:(rad exampleExpr args))
 
@@ -63,7 +63,7 @@ codegenExample :: IO ()
 codegenExample = do
 
   let f :: Floating a => [a] -> [a]
-      f [x',y'] = [y'/cos(x'), 23423*atan(100*x')]
+      f [x',y'] = [y'/cos x', 23423*atan(100*x')]
       f _ = error "bad testFun inputs"
 
       x = sym "x"
