@@ -1,25 +1,48 @@
-********************************************************************************
-*************** DVDA Verifiably Differentiates Algorithmically *****************
-********************************************************************************
+================================================================================
+=============== DVDA Verifiably Differentiates Algorithmically =================
+================================================================================
 
 Description
 ===========
-Library for symbolic algebra using a simple expression type Expr which instances
-Num, Fractional, and Floating. These expressions can be turned into pretty
-Graphviz plots. They can also be differentated in forward and reverse modes.
+Library for symbolic algebra a simple expression type Expr. Expr can be
+automatically differentated in forward and reverse modes. It can also be
+converted to efficient C code, which is automatically generated/compiled/linked
+at runtime.
 
-This library started so that I could better learn both Haskell and automatic
-differentiation. We'll see where it goes in the future.
+Pretty GraphViz plots of Expr can be created Numeric.Dvda.Vis.previewExprs
 
-Documentation
-=============
-See Numeric/Dvda/Examples.hs
-TODO - Hackage documentation
+
+Interface
+=========
+Expr instances Num, Fractional, and Floating. Use functions from
+Numeric.Dvda.Symbolic to construct symbolic scalars/vectors/matrices, or numeric
+vector/matrices.
+
+Expr behaves as expected with Octave-like syntax, except that all binary
+operations [+,-,*,/,**,etc] are applied elementwise. 
+
+Matrix multiplication will soon be implemented as (dot).
+
+
+Additional documentation
+=========================
+The Hackage documentation currently documents every function in the api.
+
+See Numeric.Dvda.Examples (dvda/Numeric/Dvda/Examples.hs) for examples of
+intended use.
+
 
 Build instructions
 ==================
-Cabal build system:
->> cabal configure
->> cabal build
+Cabal build:
 
-No executables yet - try running the functions in Numeric.Dvda.Examples
+    $ cabal configure
+    $ cabal build
+
+See something pretty right away:
+
+    $ ghci
+    >> :l Numeric.Dvda.Examples
+    >> radExample
+or
+    >> codegenExample
