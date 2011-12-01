@@ -4,16 +4,15 @@
 
 module Numeric.Dvda.Examples( simpleGraph
                             , tensorGraph
---                            , fadExample
---                            , radExample
+                            , fadExample
+                            , radExample
                             , codegenExample
                             ) where
 
 
 import Numeric.Dvda.Expr
 import Numeric.Dvda.Vis
---import Numeric.Dvda.AD.Fad(fad)
---import Numeric.Dvda.AD.Rad(rad)
+import Numeric.Dvda.AD
 import Numeric.Dvda.Function
 
 simpleGraph :: IO ()
@@ -29,34 +28,35 @@ tensorGraph = do
       z = x*2 + cos(x)/5 + y
   previewExprs [z :: Expr Double]
 
---fadExample :: IO ()
---fadExample = do
---  let f x = [x*34 + 5, x*34 + 4/x, sin x]
---      y = symbolic "y" :: Expr Double
---      expr = f y
---      g = map simplify $ fad f y
---
---  print expr
---  print $ expr
---  print $ g
---  previewGraph $ exprsToGraph expr
---  previewGraph $ exprsToGraph g
---  
---
---radExample :: IO ()
---radExample = do
---  let exampleExpr :: Expr Double
---      exampleExpr = (z + x*y)*log(cos(x)/(tanh(y)))**(z/exp(y))
---      x = symbolic "x"
---      y = symbolic "y"
---      z = symbolic "z"
---      args = [x,y,z]
---
---  print exampleExpr
---  print $ rad exampleExpr args
---  
---  previewGraph_ $ lexprToGraph ("f", exampleExpr)
---  previewGraph_ $ lexprsToGraph $ zip ["f", "df/dx", "df/dy", "df/dz"] (exampleExpr:(rad exampleExpr args))
+fadExample :: IO ()
+fadExample = do
+  let f x = [x*34 + 5, x*34 + 4/x, sin x]
+      y = sym "y" :: Expr Double
+      exprs = f y
+      g = fad f y
+
+  print exprs
+  print g
+  previewExprs exprs
+  previewExprs g
+  
+radExample :: IO ()
+radExample = do
+  let exampleExpr :: Expr Double
+      exampleExpr = (z + x*y)*log(cos(x)/(tanh(y)))**(z/exp(y))
+      
+      x = sym "x"
+      y = sym "y"
+      z = sym "z"
+      args = [x,y,z]
+
+  print exampleExpr
+  print $ rad exampleExpr args
+  
+  previewExprs [exampleExpr]
+  previewExprs_ (exampleExpr:(rad exampleExpr args))
+--  previewExprs lexprToGraph ("f", exampleExpr)
+--  previewExprs lexprsToGraph $ zip ["f", "df/dx", "df/dy", "df/dz"] (exampleExpr:(rad exampleExpr args))
 
 
 codegenExample :: IO ()

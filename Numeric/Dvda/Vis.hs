@@ -3,11 +3,9 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.Vis( previewExprs
---                       , exprsToGraph
---                       , lexprToGraph
+                       , previewExprs_
 --                       , lexprsToGraph
---                       , GraphOp(..)
-                             ) where
+                       ) where
 
 import Data.Graph.Inductive hiding (nodes, edges)
 import Data.GraphViz
@@ -24,11 +22,17 @@ previewExprs exprs = do
   preview $ nmap ShowOp $ emap ShowExpr (exprsToGraph exprs)
   threadDelay 10000
 
+previewExprs_ :: (Eq a, Show a) => [Expr a] -> IO ()
+previewExprs_ exprs = do
+  preview $ nmap ShowOp $ emap HideExpr (exprsToGraph exprs)
+  threadDelay 10000
+
 data NodeShow a = ShowOp (Node, Expr a)
                 | ShowOpAndDim (Node, Expr a)
                 | ShowOpAndType (Node, Expr a)
                 | ShowOpAndNode (Node, Expr a) deriving Eq
-data EdgeShow a = ShowExpr (Node, Node, Expr a) deriving Eq
+data EdgeShow a = ShowExpr (Node, Node, Expr a)
+                | HideExpr (Node, Node, Expr a) deriving Eq
 
 nodeShowToNode :: NodeShow a -> Node
 nodeShowToNode (ShowOp (n, _)) = n
@@ -38,6 +42,7 @@ nodeShowToNode (ShowOpAndNode (n, _)) = n
 
 edgeShowToNode :: EdgeShow a -> Node
 edgeShowToNode (ShowExpr (n, _, _)) = n
+edgeShowToNode (HideExpr (n, _, _)) = n
 
 instance Show a => Labellable (NodeShow a) where
   toLabelValue (ShowOp (_, expr)) = toLabelValue $ pack $ showNode expr
@@ -47,6 +52,7 @@ instance Show a => Labellable (NodeShow a) where
 
 instance Show a => Labellable (EdgeShow a) where
   toLabelValue (ShowExpr (_, _, expr)) = toLabelValue $ pack $ show expr
+  toLabelValue (HideExpr (_, _, _)) = toLabelValue $ pack $ ""
 
 instance (Eq a, Show a) => Ord (NodeShow a) where
   compare n1 n2 = compare (nodeShowToNode n1) (nodeShowToNode n2)
