@@ -8,6 +8,7 @@ module Numeric.Dvda.Expr.Vector( Vector(..)
                                , vecDim
                                , vIsI
                                , vToCCode
+                               , vEval
                                ) where
 
 import Numeric.Dvda.Expr.Binary
@@ -133,6 +134,21 @@ instance (Floating a) => Floating (Vector a) where
   acosh x = VUnary (Unary ACosh x)
   atanh x = VUnary (Unary ATanh x)
 
+-- | evaluate (Vector a) to a numeric list
+vApply :: Floating a => Vector a -> [a]
+vApply (VNum _ x) = x
+vApply (VBroadcast d x) = replicate d (sEval x)
+vApply (VSym _ _) = error "api error: vEval can't evaluate symbolic expression"
+vApply (VUnary (Unary unType x)) = map (applyUnary unType) (vApply x)
+vApply (VBinary (Binary binType x y)) = zipWith (applyBinary binType) (vApply x) (vApply y)
+
+-- | evaluate (Vector a) to a (dimension, value) tuple
+vEval :: Floating a => Vector a -> (Int, [a])
+vEval x@(VNum d _) = (d, vApply x)
+vEval x@(VBroadcast d _) = (d, vApply x)
+vEval (VSym _ _) = error "api error: vApply can't evaluate symbolic expression"
+vEval x@(VUnary _) = (vecDim x, vApply x)
+vEval x@(VBinary _) = (vecDim x, vApply x)
 
 
 -- | convert GNode (Vector a) into proper c code

@@ -17,6 +17,7 @@ module Numeric.Dvda.Expr.Expr( Expr(..)
                              , showDim
                              , symName
                              , toCCode
+                             , eval
                              ) where
 
 import Numeric.Dvda.Expr.Binary
@@ -26,6 +27,15 @@ import Numeric.Dvda.Expr.Vector
 import Numeric.Dvda.Expr.Matrix
 import Numeric.Dvda.GNode
 
+
+eval :: Floating a => Expr a -> Expr a
+eval (EScalar x) = EScalar $ SNum (sEval x)
+eval (EVector x) = EVector $ VNum d v
+  where
+    (d, v) = vEval x
+eval (EMatrix x) = EMatrix $ MNum d m
+  where
+    (d, m) = mEval x
 
 showNode :: Show a => Expr a -> String
 showNode (EScalar x) = sShowNode x

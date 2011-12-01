@@ -36,7 +36,7 @@ inputNames (Function {funInputs = inputs}) = map f inputs
 -- | provided mainly for developing a function or debugging
 callNative :: Floating a => Function a -> [Expr a] -> [Expr a]
 callNative fun args 
-  | length (funInputs fun) == length args = map (subs subRules) (funOutputs fun)
+  | length (funInputs fun) == length args = map (eval . (subs subRules)) (funOutputs fun)
   | otherwise = error "callNative fail because num arguments /= num function inputs"
   where
     subRules = zip (funInputs fun) args

@@ -8,6 +8,7 @@ module Numeric.Dvda.Expr.Matrix( Matrix(..)
                                , matDim
                                , mIsI
                                , mToCCode
+                               , mEval
                                ) where
 
 import Numeric.Dvda.Expr.Binary
@@ -127,6 +128,23 @@ instance (Floating a) => Floating (Matrix a) where
   asinh x = MUnary (Unary ASinh x)
   acosh x = MUnary (Unary ACosh x)
   atanh x = MUnary (Unary ATanh x)
+
+
+-- | evaluate (Matrix a) to a numeric list
+mApply :: Floating a => Matrix a -> [a]
+mApply (MNum _ x) = x
+mApply (MBroadcast (r,c) x) = replicate (r*c) (sEval x)
+mApply (MSym _ _) = error "api error: mEval can't evaluate symbolic expression"
+mApply (MUnary (Unary unType x)) = map (applyUnary unType) (mApply x)
+mApply (MBinary (Binary binType x y)) = zipWith (applyBinary binType) (mApply x) (mApply y)
+
+-- | evaluate (Matrix a) to a (dimension, value) tuple
+mEval :: Floating a => Matrix a -> ((Int,Int), [a])
+mEval x@(MNum d _) = (d, mApply x)
+mEval x@(MBroadcast d _) = (d, mApply x)
+mEval (MSym _ _) = error "api error: mApply can't evaluate symbolic expression"
+mEval x@(MUnary _) = (matDim x, mApply x)
+mEval x@(MBinary _) = (matDim x, mApply x)
 
 
 -- | convert GNode (Matrix a) into proper c code

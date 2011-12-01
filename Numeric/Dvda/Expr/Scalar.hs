@@ -7,6 +7,7 @@ module Numeric.Dvda.Expr.Scalar( Scalar(..)
                                , sGetSyms
                                , sIsI
                                , sToCCode
+                               , sEval
                                ) where
 
 import Numeric.Dvda.Expr.Binary
@@ -134,6 +135,14 @@ instance (Floating a) => Floating (Scalar a) where
   acosh x = SUnary (Unary ACosh x)
   atanh x = SUnary (Unary ATanh x)
 
+
+-- | evaluate (Scalar a) to a numeric type
+sEval :: Floating a => Scalar a -> a
+sEval (SNum x) = x
+sEval (SInt i) = fromIntegral i
+sEval (SSym _) = error "api error: sEval can't evaluate symbolic expression"
+sEval (SUnary (Unary unType x)) = applyUnary unType (sEval x)
+sEval (SBinary (Binary binType x y)) = applyBinary binType (sEval x) (sEval y)
 
 -- | convert GNode (Scalar a) into proper c code
 sToCCode :: (Eq a, Show a) => GNode (Scalar a) -> String
