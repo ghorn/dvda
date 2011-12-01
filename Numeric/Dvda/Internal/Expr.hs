@@ -12,12 +12,11 @@ module Numeric.Dvda.Internal.Expr( Expr(..)
                                  ) where
 
 import Numeric.Dvda.Internal.Scalar
-import Numeric.Dvda.Internal.Vector
-import Numeric.Dvda.Internal.Matrix
+import Numeric.Dvda.Internal.Tensor
 
 data Expr a = EScalar (Scalar a)
-            | EVector (Vector a)
-            | EMatrix (Matrix a) deriving Eq
+            | EVector (Tensor a)
+            | EMatrix (Tensor a) deriving Eq
 
 
 instance Show a => Show (Expr a) where
@@ -77,25 +76,25 @@ safeBinaryConstructNum :: Num a => (forall b . Num b => b -> b -> b) -> Expr a -
 -- normal combination:
 safeBinaryConstructNum f (EScalar x) (EScalar y) = EScalar $ f x y
 safeBinaryConstructNum f (EVector x) (EVector y) 
-  | vecDim x == vecDim y = EVector $ f x y
-  | otherwise            = error $ unlines [ "Dimension mismatch in EVector + EVector"
-                                           , "v1: " ++ show x
-                                           , ""
-                                           , "v2: " ++ show y
-                                           ]
+  | tDim x == tDim y = EVector $ f x y
+  | otherwise        = error $ unlines [ "Dimension mismatch in EVector + EVector"
+                                       , "v1: " ++ show x
+                                       , ""
+                                       , "v2: " ++ show y
+                                       ]
 safeBinaryConstructNum f (EMatrix x) (EMatrix y)
-  | matDim x == matDim y = EMatrix $ f x y
-  | otherwise            = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
-                                           , "m1: " ++ show x
-                                           , ""
-                                           , "m2: " ++ show y
-                                           ]
+  | tDim x == tDim y = EMatrix $ f x y
+  | otherwise        = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
+                                       , "m1: " ++ show x
+                                       , ""
+                                       , "m2: " ++ show y
+                                       ]
 -- broadcast scalar to vector:
-safeBinaryConstructNum f (EScalar x) (EVector y) = EVector $ f (VBroadcast (vecDim y) x) y
-safeBinaryConstructNum f (EVector x) (EScalar y) = EVector $ f x (VBroadcast (vecDim x) y)
+safeBinaryConstructNum f (EScalar x) (EVector y) = EVector $ f (TBroadcast (tDim y) x) y
+safeBinaryConstructNum f (EVector x) (EScalar y) = EVector $ f x (TBroadcast (tDim x) y)
 -- broadcast scalar to matrix:
-safeBinaryConstructNum f (EScalar x) (EMatrix y) = EMatrix $ f (MBroadcast (matDim y) x) y
-safeBinaryConstructNum f (EMatrix x) (EScalar y) = EMatrix $ f x (MBroadcast (matDim x) y)
+safeBinaryConstructNum f (EScalar x) (EMatrix y) = EMatrix $ f (TBroadcast (tDim y) x) y
+safeBinaryConstructNum f (EMatrix x) (EScalar y) = EMatrix $ f x (TBroadcast (tDim x) y)
 -- illegal combination:
 safeBinaryConstructNum _ (EVector _) (EMatrix _) = error "safeBinaryConstructNum: Can't combine vector with matrix"
 safeBinaryConstructNum _ (EMatrix _) (EVector _) = error "safeBinaryConstructNum: Can't combine vector with matrix"
@@ -114,25 +113,25 @@ safeBinaryConstructFrac :: Fractional a => (forall b . Fractional b => b -> b ->
 -- normal combination:
 safeBinaryConstructFrac f (EScalar x) (EScalar y) = EScalar $ f x y
 safeBinaryConstructFrac f (EVector x) (EVector y) 
-  | vecDim x == vecDim y = EVector $ f x y
-  | otherwise            = error $ unlines [ "Dimension mismatch in EVector + EVector"
-                                           , "v1: " ++ show x
-                                           , ""
-                                           , "v2: " ++ show y
-                                           ]
+  | tDim x == tDim y = EVector $ f x y
+  | otherwise        = error $ unlines [ "Dimension mismatch in EVector + EVector"
+                                       , "v1: " ++ show x
+                                       , ""
+                                       , "v2: " ++ show y
+                                       ]
 safeBinaryConstructFrac f (EMatrix x) (EMatrix y)
-  | matDim x == matDim y = EMatrix $ f x y
-  | otherwise            = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
-                                           , "m1: " ++ show x
-                                           , ""
-                                           , "m2: " ++ show y
-                                           ]
+  | tDim x == tDim y = EMatrix $ f x y
+  | otherwise        = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
+                                       , "m1: " ++ show x
+                                       , ""
+                                       , "m2: " ++ show y
+                                       ]
 -- broadcast scalar to vector:
-safeBinaryConstructFrac f (EScalar x) (EVector y) = EVector $ f (VBroadcast (vecDim y) x) y
-safeBinaryConstructFrac f (EVector x) (EScalar y) = EVector $ f x (VBroadcast (vecDim x) y)
+safeBinaryConstructFrac f (EScalar x) (EVector y) = EVector $ f (TBroadcast (tDim y) x) y
+safeBinaryConstructFrac f (EVector x) (EScalar y) = EVector $ f x (TBroadcast (tDim x) y)
 -- broadcast scalar to matrix:
-safeBinaryConstructFrac f (EScalar x) (EMatrix y) = EMatrix $ f (MBroadcast (matDim y) x) y
-safeBinaryConstructFrac f (EMatrix x) (EScalar y) = EMatrix $ f x (MBroadcast (matDim x) y)
+safeBinaryConstructFrac f (EScalar x) (EMatrix y) = EMatrix $ f (TBroadcast (tDim y) x) y
+safeBinaryConstructFrac f (EMatrix x) (EScalar y) = EMatrix $ f x (TBroadcast (tDim x) y)
 -- illegal combination:
 safeBinaryConstructFrac _ (EVector _) (EMatrix _) = error "safeBinaryConstructFrac: Can't combine vector with matrix"
 safeBinaryConstructFrac _ (EMatrix _) (EVector _) = error "safeBinaryConstructFrac: Can't combine vector with matrix"
@@ -144,25 +143,25 @@ safeBinaryConstructFloating :: Floating a => (forall b . Floating b => b -> b ->
 -- normal combination:
 safeBinaryConstructFloating f (EScalar x) (EScalar y) = EScalar $ f x y
 safeBinaryConstructFloating f (EVector x) (EVector y) 
-  | vecDim x == vecDim y = EVector $ f x y
-  | otherwise            = error $ unlines [ "Dimension mismatch in EVector + EVector"
-                                           , "v1: " ++ show x
-                                           , ""
-                                           , "v2: " ++ show y
-                                           ]
+  | tDim x == tDim y = EVector $ f x y
+  | otherwise        = error $ unlines [ "Dimension mismatch in EVector + EVector"
+                                       , "v1: " ++ show x
+                                       , ""
+                                       , "v2: " ++ show y
+                                       ]
 safeBinaryConstructFloating f (EMatrix x) (EMatrix y)
-  | matDim x == matDim y = EMatrix $ f x y
-  | otherwise            = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
-                                           , "m1: " ++ show x
-                                           , ""
-                                           , "m2: " ++ show y
-                                           ]
+  | tDim x == tDim y = EMatrix $ f x y
+  | otherwise        = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
+                                       , "m1: " ++ show x
+                                       , ""
+                                       , "m2: " ++ show y
+                                       ]
 -- broadcast scalar to vector:
-safeBinaryConstructFloating f (EScalar x) (EVector y) = EVector $ f (VBroadcast (vecDim y) x) y
-safeBinaryConstructFloating f (EVector x) (EScalar y) = EVector $ f x (VBroadcast (vecDim x) y)
+safeBinaryConstructFloating f (EScalar x) (EVector y) = EVector $ f (TBroadcast (tDim y) x) y
+safeBinaryConstructFloating f (EVector x) (EScalar y) = EVector $ f x (TBroadcast (tDim x) y)
 -- broadcast scalar to matrix:
-safeBinaryConstructFloating f (EScalar x) (EMatrix y) = EMatrix $ f (MBroadcast (matDim y) x) y
-safeBinaryConstructFloating f (EMatrix x) (EScalar y) = EMatrix $ f x (MBroadcast (matDim x) y)
+safeBinaryConstructFloating f (EScalar x) (EMatrix y) = EMatrix $ f (TBroadcast (tDim y) x) y
+safeBinaryConstructFloating f (EMatrix x) (EScalar y) = EMatrix $ f x (TBroadcast (tDim x) y)
 -- illegal combination:
 safeBinaryConstructFloating _ (EVector _) (EMatrix _) = error "safeBinaryConstructFloating: Can't combine vector with matrix"
 safeBinaryConstructFloating _ (EMatrix _) (EVector _) = error "safeBinaryConstructFloating: Can't combine vector with matrix"

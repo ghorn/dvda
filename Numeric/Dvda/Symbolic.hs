@@ -23,20 +23,19 @@ import Data.Maybe(isNothing, fromJust)
 
 import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Scalar
-import Numeric.Dvda.Internal.Vector
-import Numeric.Dvda.Internal.Matrix
+import Numeric.Dvda.Internal.Tensor
 import Numeric.Dvda.Internal.Binary
 import Numeric.Dvda.Internal.Unary
 
 -- | evalute expression down to numeric values
 eval :: Floating a => Expr a -> Expr a
 eval (EScalar x) = EScalar $ SNum (sEval x)
-eval (EVector x) = EVector $ VNum d v
+eval (EVector x) = EVector $ TNum d v
   where
-    (d, v) = vEval x
-eval (EMatrix x) = EMatrix $ MNum d m
+    (d, v) = tEval x
+eval (EMatrix x) = EMatrix $ TNum d m
   where
-    (d, m) = mEval x
+    (d, m) = tEval x
 
 -- | create symbolic scalar
 sym :: String -> Expr a
@@ -45,25 +44,25 @@ sym name = EScalar $ SSym name
 -- | create symbolic vector with length
 symVec :: Int -> String -> Expr a
 symVec d name 
-  | d > 0     = EVector $ VSym d name
+  | d > 0     = EVector $ TSym [d] name
   | otherwise = error $ "symVec can't make vector with length: " ++ show d
 
 -- | create symbolic matrix with specified (rows, columns)
 symMat :: (Int,Int) -> String -> Expr a
 symMat (r,c) name
-  | r > 0 && c > 0 = EMatrix $ MSym (r,c) name
+  | r > 0 && c > 0 = EMatrix $ TSym [r,c] name
   | otherwise      = error $ "symMat can't make matrix with dimensions: " ++ show (r,c)
 
 -- | create numeric vector
 vec :: [a] -> Expr a
 vec xs 
-  | length xs > 0 = EVector $ VNum (length xs) xs
+  | length xs > 0 = EVector $ TNum [length xs] xs
   | otherwise     = error "Improper dimensions in vec :: [a] -> Expr a"
 
 -- | Create numeric matrix with specified (rows, cols). List is taken rowwise.
 mat :: (Int,Int) -> [a] -> Expr a
 mat (r,c) xs 
-  | (length xs == r*c) && (r > 0) && (c > 0) = EMatrix $ MNum (r,c) xs
+  | (length xs == r*c) && (r > 0) && (c > 0) = EMatrix $ TNum [r,c] xs
   | otherwise                                = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
 
 
@@ -92,17 +91,17 @@ subs subslist expr
     sSubs (SUnary (Unary unOp x)) = applyUnary unOp $ sSubs x
     sSubs (SBinary (Binary binOp x y)) = applyBinary binOp (sSubs x) (sSubs y)
     
-    vSubs x@(VNum _ _) = EVector x
-    vSubs x@(VSym _ _) = EVector $ sub vectorSubs x
-    vSubs (VUnary (Unary unOp x)) = applyUnary unOp (vSubs x)
-    vSubs (VBinary (Binary binOp x y)) = applyBinary binOp (vSubs x) (vSubs y)
-    vSubs (VBroadcast _ x) = sSubs x
+    vSubs x@(TNum _ _) = EVector x
+    vSubs x@(TSym _ _) = EVector $ sub vectorSubs x
+    vSubs (TUnary (Unary unOp x)) = applyUnary unOp (vSubs x)
+    vSubs (TBinary (Binary binOp x y)) = applyBinary binOp (vSubs x) (vSubs y)
+    vSubs (TBroadcast _ x) = sSubs x
     
-    mSubs x@(MNum _ _) = EMatrix x
-    mSubs x@(MSym _ _) = EMatrix $ sub matrixSubs x
-    mSubs (MUnary (Unary unOp x)) = applyUnary unOp $ mSubs x
-    mSubs (MBinary (Binary binOp x y)) = applyBinary binOp (mSubs x) (mSubs y)
-    mSubs (MBroadcast _ x) = sSubs x
+    mSubs x@(TNum _ _) = EMatrix x
+    mSubs x@(TSym _ _) = EMatrix $ sub matrixSubs x
+    mSubs (TUnary (Unary unOp x)) = applyUnary unOp $ mSubs x
+    mSubs (TBinary (Binary binOp x y)) = applyBinary binOp (mSubs x) (mSubs y)
+    mSubs (TBroadcast _ x) = sSubs x
 
     sub :: Eq a => [(a,a)] -> a -> a
     sub sublist arg 
