@@ -10,7 +10,7 @@ module Numeric.Dvda.Internal.Unary( Unary(..)
 data Unary a = Unary UnaryType a deriving Eq
 
 instance Show a => Show (Unary a) where
-  show (Unary unaryType x) = show unaryType ++ "( " ++ show x ++ " )"
+  show (Unary unaryType x) = show unaryType ++ "(" ++ show x ++ ")"
 
 data UnaryType = Abs
                | Signum

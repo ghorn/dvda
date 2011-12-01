@@ -10,7 +10,7 @@ module Numeric.Dvda.Internal.Binary( Binary(..)
 data Binary a = Binary BinaryType a a deriving Eq
 
 instance Show a => Show (Binary a) where
-  show (Binary binaryType x y) = "( " ++ show x ++ " " ++ show binaryType ++ " " ++ show y ++ " )"
+  show (Binary binaryType x y) = "(" ++ show x ++ " " ++ show binaryType ++ " " ++ show y ++ ")"
 
 data BinaryType = Mul
                 | Add
