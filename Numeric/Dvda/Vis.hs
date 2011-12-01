@@ -15,6 +15,7 @@ import Data.Text.Lazy(pack)
 import Control.Concurrent(threadDelay)
 import Data.List(foldl')
 
+import Numeric.Dvda.GNode
 import Numeric.Dvda.ExprGraph
 import Numeric.Dvda.Expr
 
@@ -52,7 +53,7 @@ instance (Eq a, Show a) => Ord (NodeShow a) where
 instance (Eq a, Show a) => Ord (EdgeShow a) where
   compare e1 e2 = compare (edgeShowToNode e1) (edgeShowToNode e2)
 
-gNodesToLEdges :: [GNode a] -> [(Node, Node, (Node, Node, Expr a))]
+gNodesToLEdges :: [GNode a] -> [(Node, Node, (Node, Node, a))]
 gNodesToLEdges gnodes = foldl' f [] gnodes
   where
     f lEdges (GSource _ _) = lEdges
@@ -60,7 +61,7 @@ gNodesToLEdges gnodes = foldl' f [] gnodes
     f lEdges (GBinary n _ (cx,cy)) = lEdges++[ (cx, n, (cx, n, exprOfGNode (gnodes !! cx)))
                                              , (cy, n, (cy, n, exprOfGNode (gnodes !! cy)))]
 
-gNodesToLNodes :: [GNode a] -> [(Node, (Node, Expr a))]
+gNodesToLNodes :: [GNode a] -> [(Node, (Node, a))]
 gNodesToLNodes = map f
   where
     f (GSource n expr  ) = (n, (n, expr))

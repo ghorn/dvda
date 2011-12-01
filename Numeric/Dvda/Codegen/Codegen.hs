@@ -2,22 +2,20 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Codegen.Codegen( toFunction
+module Numeric.Dvda.Codegen.Codegen( buildCFunction
                                    ) where
 
 import System.Directory
-import System.Posix.DynamicLinker
 import System.Process(runCommand, waitForProcess)
 import System.Exit(ExitCode(ExitSuccess))
 import Control.Monad(when)
 
-import qualified Numeric.Dvda.Codegen.Config as Config
-import Numeric.Dvda.Function
-import Numeric.Dvda.Codegen.GenerateC(generateCSource)
+import qualified Numeric.Dvda.Config as Config
+import Numeric.Dvda.Codegen.WriteC(writeCSource)
 import Numeric.Dvda.Expr(Expr(..))
 
 
--- shorten path name for display purposes
+-- | shorten path name for display purposes
 shortName :: String -> String
 shortName full
   | length name <= maxN = name ++ extension
@@ -30,7 +28,7 @@ shortName full
     (name, extension) = break (== '.') $ reverse $ takeWhile (/= '/') (reverse full)
 
 
--- take in name of source and future object, compile object
+-- | take in name of source and future object, compile object
 callGcc :: FilePath -> FilePath -> IO ()
 callGcc srcname objname = do
   -- compile new object
@@ -48,11 +46,11 @@ callGcc srcname objname = do
   when (exitCode /= ExitSuccess) $ error $ "failed compiling " ++ srcname
 
 
--- make source functions
+-- | make source functions
 buildCFunction :: (Eq a, Show a) => [Expr a] -> [Expr a] -> IO (String, FilePath)
 buildCFunction inputs outputs = do
   -- C source and hash
-  let (cSource, cInclude, srcHash) = generateCSource inputs outputs
+  let (cSource, cInclude, srcHash) = writeCSource inputs outputs
       
   -- function directory
   dir <- Config.functionDir srcHash
@@ -72,7 +70,12 @@ buildCFunction inputs outputs = do
   srcExists <- doesFileExist cSourceFile
   when srcExists $ do
     oldSrc <- readFile cSourceFile
-    when (cSource /= oldSrc) $ error "md5 sum not unique error, please let me know this actually happens at gregmainland@gmail.com"
+    when (cSource /= oldSrc) $ putStrLn $
+      "====================================================\n" ++ 
+      "WARNING: Md5 sum not unique or source code has been edited\n"++ 
+      "If you have not edited the auto-generated C code, please let me\n" ++
+      "know that Md5 clashes happen IRL at gregmainland@gmail.com\n" ++
+      "====================================================\n\n"
   
   -- write c source
   writeFile cSourceFile cSource
@@ -87,16 +90,3 @@ buildCFunction inputs outputs = do
   return (srcHash, cObjectFile)
   
 
-toFunction :: RealFrac a => [Expr a] -> [Expr a] -> IO (Function a)
-toFunction inputs outputs = do
-  -- TODO: make sure all inputs are accounted for - issue 19
-  (hash, objPath) <- buildCFunction inputs outputs
-
-  dl <- dlopen objPath []
-  funptr <- dlsym dl $ Config.nameCFunction hash
-
-  return $ Function { funInputs  = inputs
-                    , funOutputs = outputs
-                    , funHash    = hash
-                    , funCFunPtr = funptr
-                    }

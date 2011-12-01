@@ -16,6 +16,7 @@ module Numeric.Dvda.Expr.Expr( Expr(..)
                              , showType
                              , showDim
                              , symName
+                             , toCCode
                              ) where
 
 import Numeric.Dvda.Expr.Binary
@@ -23,6 +24,7 @@ import Numeric.Dvda.Expr.Unary
 import Numeric.Dvda.Expr.Scalar
 import Numeric.Dvda.Expr.Vector
 import Numeric.Dvda.Expr.Matrix
+import Numeric.Dvda.GNode
 
 
 showNode :: Show a => Expr a -> String
@@ -40,6 +42,19 @@ showDim (EScalar _) = ""
 showDim (EVector x) = show $ [vecDim x]
 showDim (EMatrix x) = show $ matDim x
 
+-- | convert Expr gnode to c code string
+toCCode :: (Eq a, Show a) => GNode (Expr a) -> String
+toCCode (GSource i (EScalar x)) = sToCCode $ GSource i x
+toCCode (GSource i (EVector x)) = vToCCode $ GSource i x
+toCCode (GSource i (EMatrix x)) = mToCCode $ GSource i x
+
+toCCode (GUnary i (EScalar x) ix) = sToCCode $ GUnary i x ix
+toCCode (GUnary i (EVector x) ix) = vToCCode $ GUnary i x ix
+toCCode (GUnary i (EMatrix x) ix) = mToCCode $ GUnary i x ix
+
+toCCode (GBinary i (EScalar x) (ix, iy)) = sToCCode $ GBinary i x (ix, iy)
+toCCode (GBinary i (EVector x) (ix, iy)) = vToCCode $ GBinary i x (ix, iy)
+toCCode (GBinary i (EMatrix x) (ix, iy)) = mToCCode $ GBinary i x (ix, iy)
 
 -- | get name if variable is symbolic
 symName :: Expr a -> Maybe String

@@ -6,10 +6,13 @@ module Numeric.Dvda.Expr.Scalar( Scalar(..)
                                , sShowNode
                                , sGetSyms
                                , sIsI
+                               , sToCCode
                                ) where
 
 import Numeric.Dvda.Expr.Binary
 import Numeric.Dvda.Expr.Unary
+import Numeric.Dvda.Config(cType, cName)
+import Numeric.Dvda.GNode
 
 data Scalar a = SNum a
               | SSym String
@@ -127,3 +130,21 @@ instance (Floating a) => Floating (Scalar a) where
   asinh x = SUnary (Unary ASinh x)
   acosh x = SUnary (Unary ACosh x)
   atanh x = SUnary (Unary ATanh x)
+
+
+-- | convert GNode (Scalar a) into proper c code
+sToCCode :: (Eq a, Show a) => GNode (Scalar a) -> String
+sToCCode (GSource idx (SNum x)) = assign idx ++ show x ++ ";"
+sToCCode (GSource idx (SInt x)) = assign idx ++ show x ++ ";"
+sToCCode (GSource idx (SSym n)) = assign idx ++ n ++ ";"
+sToCCode (GUnary idx (SUnary (Unary unType _)) ic) = assign idx ++ show unType ++ "(" ++ cName ic ++ ");"
+sToCCode (GBinary idx (SBinary (Binary binType _ _)) (icx, icy)) = assign idx ++ 
+                                                               cName icx ++ 
+                                                               " " ++ show binType ++ " " ++
+                                                               cName icy ++";"
+sToCCode (GSource _ _) = "sToCCode api fail in GSource _ _)"
+sToCCode (GUnary _ _ _) = "sToCCode api fail in GUnary _ _)"
+sToCCode (GBinary _ _ _) = "sToCCode api fail in GBinary _ _)"
+
+assign :: Int -> String
+assign idx = cType ++ " " ++ cName idx ++ " = "

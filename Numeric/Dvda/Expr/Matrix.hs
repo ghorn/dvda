@@ -7,11 +7,13 @@ module Numeric.Dvda.Expr.Matrix( Matrix(..)
                                , mGetSyms
                                , matDim
                                , mIsI
+                               , mToCCode
                                ) where
 
 import Numeric.Dvda.Expr.Binary
 import Numeric.Dvda.Expr.Unary
 import Numeric.Dvda.Expr.Scalar
+import Numeric.Dvda.GNode
 
 data Matrix a = MNum (Int,Int) [a]
               | MSym (Int,Int) String
@@ -122,3 +124,19 @@ instance (Floating a) => Floating (Matrix a) where
   asinh x = MUnary (Unary ASinh x)
   acosh x = MUnary (Unary ACosh x)
   atanh x = MUnary (Unary ATanh x)
+
+
+-- | convert GNode (Matrix a) into proper c code
+mToCCode :: (Eq a, Show a) => GNode (Matrix a) -> String
+mToCCode _ = "#ERROR matrix c code gen not yet supported"
+--mToCCode (GSource idx (SNum x)) = assign idx ++ show x ++ ";"
+--mToCCode (GSource idx (SInt x)) = assign idx ++ show x ++ ";"
+--mToCCode (GSource idx (SSym n)) = assign idx ++ n ++ ";"
+--mToCCode (GUnary idx (SUnary (Unary unType _)) ic) = assign idx ++ show unType ++ "(" ++ cName ic ++ ");"
+--mToCCode (GBinary idx (SBinary (Binary binType _ _)) (icx, icy)) = assign idx ++ 
+--                                                               cName icx ++ 
+--                                                               " " ++ show binType ++ " " ++
+--                                                               cName icy ++";"
+--mToCCode (GSource _ _) = "mToCCode api fail in GSource _ _)"
+--mToCCode (GUnary _ _ _) = "mToCCode api fail in GUnary _ _)"
+--mToCCode (GBinary _ _ _) = "mToCCode api fail in GBinary _ _)"

@@ -7,11 +7,13 @@ module Numeric.Dvda.Expr.Vector( Vector(..)
                                , vGetSyms
                                , vecDim
                                , vIsI
+                               , vToCCode
                                ) where
 
 import Numeric.Dvda.Expr.Binary
 import Numeric.Dvda.Expr.Unary
 import Numeric.Dvda.Expr.Scalar
+import Numeric.Dvda.GNode
 
 data Vector a = VNum Int [a]
               | VSym Int String
@@ -129,3 +131,17 @@ instance (Floating a) => Floating (Vector a) where
 
 
 
+-- | convert GNode (Vector a) into proper c code
+vToCCode :: (Eq a, Show a) => GNode (Vector a) -> String
+vToCCode _ = "#ERROR vector c code gen not yet supported"
+--vToCCode (GSource idx (SNum x)) = assign idx ++ show x ++ ";"
+--vToCCode (GSource idx (SInt x)) = assign idx ++ show x ++ ";"
+--vToCCode (GSource idx (SSym n)) = assign idx ++ n ++ ";"
+--vToCCode (GUnary idx (SUnary (Unary unType _)) ic) = assign idx ++ show unType ++ "(" ++ cName ic ++ ");"
+--vToCCode (GBinary idx (SBinary (Binary binType _ _)) (icx, icy)) = assign idx ++ 
+--                                                               cName icx ++ 
+--                                                               " " ++ show binType ++ " " ++
+--                                                               cName icy ++";"
+--vToCCode (GSource _ _) = "vToCCode api fail in GSource _ _)"
+--vToCCode (GUnary _ _ _) = "vToCCode api fail in GUnary _ _)"
+--vToCCode (GBinary _ _ _) = "vToCCode api fail in GBinary _ _)"

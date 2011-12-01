@@ -6,8 +6,7 @@ module Numeric.Dvda.Examples( simpleGraph
                             , tensorGraph
 --                            , fadExample
 --                            , radExample
---                            , substituteExample
---                            , codegenExample
+                            , codegenExample
                             ) where
 
 
@@ -15,8 +14,7 @@ import Numeric.Dvda.Expr
 import Numeric.Dvda.Vis
 --import Numeric.Dvda.AD.Fad(fad)
 --import Numeric.Dvda.AD.Rad(rad)
---import Numeric.Dvda.Codegen.Codegen(toFunction)
---import Numeric.Dvda.Function
+import Numeric.Dvda.Function
 
 simpleGraph :: IO ()
 simpleGraph = do
@@ -59,48 +57,27 @@ tensorGraph = do
 --  
 --  previewGraph_ $ lexprToGraph ("f", exampleExpr)
 --  previewGraph_ $ lexprsToGraph $ zip ["f", "df/dx", "df/dy", "df/dz"] (exampleExpr:(rad exampleExpr args))
---
---substituteExample :: IO ()
---substituteExample = do
---  let e0 :: Expr Double
---      e0 = (z + x*y)*cos(x) + log(y)/z
---      x = symbolic "x"
---      y = symbolic "y"
---      z = symbolic "z"
---      e1 = substitutes e0 [(x,4), (y,2), (z,-3)]
---      e2 = removeIdentities e1
---
---  print e0
---  print e1
---  print $ evaluate e1
---  print $ evaluate e2
---  previewGraph_ $ lexprToGraph ("f", e0)
---  previewGraph_ $ lexprToGraph ("f", e1)
---  previewGraph_ $ lexprToGraph ("f", e2)
---
---
---
---codegenExample :: IO ()
---codegenExample = do
---
---  let testFun :: Floating a => [a] -> [a]
---      testFun [x',y'] = [y'/cos(x'), 23423*atan(100*x')]
---      testFun _ = error "bad testFun inputs"
---
---      x = symbolic "x"
---      y = symbolic "y"
---  
---      outputs = testFun [x,y]
---      
---  -- make function
---  fun <- toFunction [x,y] outputs
---  
---  -- call different ways
---  putStr "call testFun directly: "
---  print $ testFun [12,13::Double]
---  
---  putStr "callNative Function:   "
---  print $ callNative fun [12,13]
---  
---  putStr "callC Function:        "
---  print $ callC fun [12,13::Double]
+
+
+codegenExample :: IO ()
+codegenExample = do
+
+  let f :: Floating a => [a] -> [a]
+      f [x',y'] = [y'/cos(x'), 23423*atan(100*x')]
+      f _ = error "bad testFun inputs"
+
+      x = sym "x"
+      y = sym "y"
+      
+  -- make function
+  fun <- toFunction [x,y] (f [x,y])
+  
+  -- call different ways
+  putStr "call f directly:              "
+  print $ f [12,13::Double]
+  
+  putStr "callC Function:               "
+  print $ callC fun [12,13::Double]
+  
+  putStr "callNative Function:          "
+  print $ callNative fun [12,13 :: Expr Double]

@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.Config( cType
+                          , cName
                           , dvdaDir
                           , functionDir
                           , nameCSource
@@ -25,9 +26,13 @@ outputNames = map (\x -> "out"++show x) [(0::Integer)..]
 cType :: String
 cType = "double"
 
+-- | name convention for c variables
+cName :: Int -> String
+cName idx = 't':show idx
+
 -- | whether to print the gcc call when generating code
 spewGccCall :: Bool
-spewGccCall = False
+spewGccCall = True
 
 -- | return directory to use for temp files
 -- | create this directory and print message if it doesn't exist

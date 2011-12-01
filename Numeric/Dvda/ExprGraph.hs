@@ -3,38 +3,17 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.ExprGraph( exprsToGNodes
-                             , exprOfGNode
-                             , GNode(..)
                              ) where
 
 import Data.Graph.Inductive hiding (nodes, edges)
 import Data.Maybe
 import Data.List(foldl')
 
-import Numeric.Dvda.Expr.Expr
+import Numeric.Dvda.Expr
+import Numeric.Dvda.GNode
 --import Numeric.Dvda.Config(outputNames)
 
-data GNode a = GSource Node (Expr a)
-             | GUnary  Node (Expr a) Node
-             | GBinary Node (Expr a) (Node, Node) deriving Eq
-
-exprOfGNode :: GNode a -> Expr a
-exprOfGNode (GSource _ x) = x
-exprOfGNode (GUnary _ x _) = x
-exprOfGNode (GBinary _ x _) = x
-
-getIdx :: GNode a -> Node
-getIdx (GSource n _) = n
-getIdx (GUnary n _ _) = n
-getIdx (GBinary n _ _) = n
-
-gmatch :: Eq a => Expr a -> [GNode a] -> Maybe (GNode a)
-gmatch expr gnodes = case dropWhile (\x -> exprOfGNode x /= expr) gnodes
-                      of [] -> Nothing
-                         x:_ -> Just x
-
-
-exprsToGNodes :: Eq a => [Expr a] -> ([GNode a], [Node])
+exprsToGNodes :: Eq a => [Expr a] -> ([GNode (Expr a)], [Node])
 exprsToGNodes exprs = (gnodesOut, topNodesOut)
   where
     (topNodesOut, _, gnodesOut) = foldl' f ([],0,[]) exprs
@@ -45,7 +24,7 @@ exprsToGNodes exprs = (gnodesOut, topNodesOut)
 -- | take all the GNodes already in the graph
 -- | take an assignment node and an expression
 -- | return the assignment or existing node, the next free node, and any added Gnodes
-exprGobbler :: Eq a => [GNode a] -> Node -> Expr a -> (Node, Node, [GNode a])
+exprGobbler :: Eq a => [GNode (Expr a)] -> Node -> Expr a -> (Node, Node, [GNode (Expr a)])
 exprGobbler oldGNodes thisIdx expr
   -- node already exists
   | isJust existingGNode = (existingNode, thisIdx, [])
@@ -75,13 +54,8 @@ exprGobbler oldGNodes thisIdx expr
 --  where
 --    newIdx = head $ newNodes 1 graph
 --    newGraph = insNode (newIdx, GOutput name (dim expr)) graph
---
---
+
 --getGraphOp :: Expr a -> GraphOp a
 --getGraphOp src@(Source {}) = GSource (sourceType src) (dim src)
 --getGraphOp ew@(Unary {}) = GUnary (unaryType ew) (dim ew)
 --getGraphOp binary@(Binary {}) = GBinary (binaryType binary) (dim binary)
---
---
---
---
