@@ -15,7 +15,7 @@ instance Num a => Num (Dual a) where
   (Dual x x') - (Dual y y') = Dual (x - y) (x' - y')
   negate (Dual x x') = Dual (-x) (-x')
   abs (Dual x _) = Dual (abs x) (signum x)
-  signum (Dual x _) = Dual (signum x) 0
+  signum (Dual x _) = Dual (signum x) 0 -- technically this should be a dirac delta
   fromInteger x = Dual (fromInteger x) 0
   
 instance Fractional a => Fractional (Dual a) where
