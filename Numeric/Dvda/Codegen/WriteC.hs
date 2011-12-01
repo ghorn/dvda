@@ -3,15 +3,26 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.Codegen.WriteC( writeCSource
+                                  , showCSource
+                                  , showCInclude
                                   ) where
 
 import Data.Hash.MD5(md5s, Str(..))
+import Data.Tuple.Utils(fst3,snd3)
 
 import qualified Numeric.Dvda.Config as Config
 import Numeric.Dvda.Internal.ExprUtils
 import Numeric.Dvda.Internal.ExprGraph
 import Numeric.Dvda.Internal.GNode(topSort)
 import Numeric.Dvda.Internal.Expr
+
+-- | show c source utility function
+showCSource :: (Eq a, Show a) => [Expr a] -> [Expr a] -> String
+showCSource inputs outputs = fst3 $ writeCSource inputs outputs
+      
+-- | show c include utility function
+showCInclude :: (Eq a, Show a) => [Expr a] -> [Expr a] -> String
+showCInclude inputs outputs = snd3 $ writeCSource inputs outputs
 
 writeCSource :: (Eq a, Show a) => [Expr a] -> [Expr a] -> (String, String, String)
 writeCSource inputs outputs = (src, include, hash)

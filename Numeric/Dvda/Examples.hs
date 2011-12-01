@@ -12,6 +12,7 @@ module Numeric.Dvda.Examples( simpleGraph
                             , fadExample
                             , radExample
                             , codegenExample
+                            , showCCodeExample
                             ) where
 
 import Numeric.Dvda
@@ -87,3 +88,19 @@ codegenExample = do
   
   putStr "callNative Function:          "
   print $ callNative fun [12,13 :: Expr Double]
+
+
+-- | show some c code
+showCCodeExample :: IO ()
+showCCodeExample = do
+  let x = sym "x" :: Expr Double
+      y = sym "y"
+      z = sym "z"
+      f = (z + x*y)*log(cos x / tanh y)
+      df = rad f [x,y,z]
+  putStrLn "function:"
+  print f
+  putStrLn "\ngradients:"
+  mapM_ print df
+  putStrLn "\nC source:"
+  putStrLn $ showCSource [x,y,z] (f:df)

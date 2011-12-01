@@ -53,7 +53,13 @@ Get started right away
     >> previewExprs dz
     >> previewExprs $ z:dz
 
-See a huge gradient:
+See some example c code:
+
+    $ ghci
+    >> :l Numeric.Dvda.Examples
+    >> showCCodeExample
+
+See a graph of a huge gradient:
 
     $ ghci
     >> :l Numeric.Dvda.Examples
