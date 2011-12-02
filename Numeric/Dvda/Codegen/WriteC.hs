@@ -15,6 +15,7 @@ import Numeric.Dvda.Internal.ExprUtils
 import Numeric.Dvda.Internal.ExprGraph
 import Numeric.Dvda.Internal.GNode(topSort)
 import Numeric.Dvda.Internal.Expr
+import Numeric.Dvda.Internal.Tensor
 
 -- | show c source utility function
 showCSource :: (Eq a, Show a) => [Expr a] -> [Expr a] -> String
@@ -29,7 +30,7 @@ writeCSource inputs outputs = (src, include, hash)
   where
     hash = md5s (Str body)
     
-    prototype = "void " ++ Config.nameCFunction hash ++ "(const double in[], double out[])"
+    prototype = "void " ++ Config.nameCFunction hash ++ "(const double * const in[], double * const out[])"
     
     include = unlines [ "// " ++ Config.nameCInclude hash
                       , ""
@@ -44,6 +45,7 @@ writeCSource inputs outputs = (src, include, hash)
     src = unlines [ "// " ++ Config.nameCSource hash
                   , ""
                   , "#include \"math.h\""
+                  , "#include \"string.h\""
                   , "#include \"" ++ Config.nameCInclude hash ++ "\""
                   , ""
                   , prototype 
@@ -54,12 +56,13 @@ writeCSource inputs outputs = (src, include, hash)
     body = "    // input declarations:\n" ++ 
            unlines inputDeclarations ++
            "\n    // body:\n" ++
-           unlines (map (\x -> "    " ++ toCCode x) (topSort gnodes)) ++
-           "\n    // output declarations:\n" ++
-           unlines outputDeclarations
+           unlines (map (\x -> "    " ++ toCCode x) (topSort gnodes))
       where
-        inputDeclarations = zipWith (\x k -> "    double " ++ show x ++" = in["++show k++"];")
-                            inputs [(0::Integer)..]
-        outputDeclarations = zipWith (\oi k -> "    out[" ++ show k ++ "] = " ++ Config.cName oi ++ ";")
-                             outputIndices [(0::Integer)..]
-        (gnodes, outputIndices) = exprsToGNodes outputs
+        inputDeclarations = zipWith inputDec inputs [0..]
+        gnodes = exprsToGNodes outputs
+        
+inputDec :: Expr a -> Int -> String
+inputDec (EScalar (TSym _ n)) k = "    const double " ++ n ++ " = *(in[" ++ show k ++ "]);"
+inputDec (EVector (TSym _ n)) k = "    const double * const " ++ n ++ " = in[" ++ show k ++ "];"
+inputDec (EMatrix (TSym _ n)) k = "    const double * const " ++ n ++ " = in[" ++ show k ++ "];"
+inputDec _ _ = error "api fail in inputDec"

@@ -78,15 +78,19 @@ safeBinaryConstruct f (EScalar x) (EScalar y) = EScalar $ f x y
 safeBinaryConstruct f (EVector x) (EVector y) 
   | tDim x == tDim y = EVector $ f x y
   | otherwise        = error $ unlines [ "Dimension mismatch in EVector + EVector"
+                                       , "dim1: " ++ show (tDim x)
                                        , "v1: " ++ show x
                                        , ""
+                                       , "dim2: " ++ show (tDim y)
                                        , "v2: " ++ show y
                                        ]
 safeBinaryConstruct f (EMatrix x) (EMatrix y)
   | tDim x == tDim y = EMatrix $ f x y
   | otherwise        = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
+                                       , "dim1: " ++ show (tDim x)
                                        , "m1: " ++ show x
                                        , ""
+                                       , "dim2: " ++ show (tDim y)
                                        , "m2: " ++ show y
                                        ]
 -- broadcast scalar to vector:

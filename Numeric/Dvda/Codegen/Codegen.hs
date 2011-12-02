@@ -88,5 +88,3 @@ buildCFunction inputs outputs = do
   
   -- return info
   return (srcHash, cObjectFile)
-  
-

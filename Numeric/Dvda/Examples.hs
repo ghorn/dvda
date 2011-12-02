@@ -11,7 +11,8 @@ module Numeric.Dvda.Examples( simpleGraph
                             , tensorGraph
                             , fadExample
                             , radExample
-                            , codegenExample
+                            , codegenExampleS
+                            , codegenExampleV
                             , showCCodeExample
                             ) where
 
@@ -65,38 +66,63 @@ radExample = do
 --  previewExprs lexprsToGraph $ zip ["f", "df/dx", "df/dy", "df/dz"] (exampleExpr:(rad exampleExpr args))
 
 
--- | Turn expressions into a function and call it natively and through the auto-generated C code
-codegenExample :: IO ()
-codegenExample = do
+-- | Turn vector expressions into a function and call it natively and through the auto-generated C code
+codegenExampleV :: IO ()
+codegenExampleV = do
 
   let f :: Floating a => [a] -> [a]
-      f [x',y'] = [y'/cos x', 23423*atan(100*x')]
+      f [x,y] = [y/cos x, 23423*atan(100*x)]
       f _ = error "bad testFun inputs"
 
-      x = sym "x"
-      y = sym "y"
+      xs = sym "x"
+      ys = symVec 5 "y"
       
+      x' = 2.52 :: Double
+      y' = [1,5,8,5,3] :: [Double]
+      
+  print $ eval $ vec y' / cos( sca x' )
   -- make function
-  fun <- toFunction [x,y] (f [x,y])
+  fun <- toFunction [xs,ys] $ f [xs,ys]
   
-  -- call different ways
-  putStr "call f directly:              "
-  print $ f [12,13::Double]
+  putStr "callC Function:      "
+  print $ callC fun [[x'], y']
+
+  putStr "callNative Function: "
+  print $ callNative fun [sca x',vec y']
+
+
+-- | Turn scalar expressions into a function and call it natively and through the auto-generated C code
+codegenExampleS :: IO ()
+codegenExampleS = do
+
+  let f :: Floating a => [a] -> [a]
+      f [x,y] = [y/cos x, 23423*atan(100*x)]
+      f _ = error "bad testFun inputs"
+
+      xs = sym "x"
+      ys = sym "y"
+      
+      x' = 2.52 :: Double
+      y' = 21.0 :: Double
+      
+  print $ eval $ sca y' / cos( sca x' )
+  -- make function
+  fun <- toFunction [xs,ys] $ f [xs,ys]
   
-  putStr "callC Function:               "
-  print $ callC fun [12,13::Double]
-  
-  putStr "callNative Function:          "
-  print $ callNative fun [12,13 :: Expr Double]
+  putStr "callC Function:      "
+  print $ callC fun [[x'], [y']]
+
+  putStr "callNative Function: "
+  print $ callNative fun [sca x',sca y']
 
 
 -- | show some c code
 showCCodeExample :: IO ()
 showCCodeExample = do
   let x = sym "x" :: Expr Double
-      y = sym "y"
+      y = symVec 3 "y"
       z = sym "z"
-      f = (z + x*y)*log(cos x / tanh y)
+      f = cos $ ((vec [1,2,1]) + z + x*y)*log(cos x / tanh y)
       df = rad f [x,y,z]
   putStrLn "function:"
   print f

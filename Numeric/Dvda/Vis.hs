@@ -18,6 +18,7 @@ import Data.Text.Lazy(pack)
 import Control.Concurrent(threadDelay)
 import Data.List(foldl')
 
+import Numeric.Dvda.Symbolic(sym)
 import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.ExprUtils
 import Numeric.Dvda.Internal.GNode
@@ -67,22 +68,26 @@ instance (Eq a, Show a) => Ord (NodeShow a) where
 instance (Eq a, Show a) => Ord (EdgeShow a) where
   compare e1 e2 = compare (edgeShowToNode e1) (edgeShowToNode e2)
 
-gNodesToLEdges :: [GNode a] -> [(Node, Node, (Node, Node, a))]
+gNodesToLEdges :: [GNode (Expr a)] -> [(Node, Node, (Node, Node, (Expr a)))]
 gNodesToLEdges gnodes = foldl' f [] gnodes
   where
     f lEdges (GSource _ _) = lEdges
+    f lEdges (GOutput n _ c _) = lEdges++[(c, n, (c, n, exprOfGNode (gnodes !! c)))]
+    f lEdges (GBroadcast n _ c) = lEdges++[(c, n, (c, n, exprOfGNode (gnodes !! c)))]
     f lEdges (GUnary n _ c) = lEdges++[(c, n, (c, n, exprOfGNode (gnodes !! c)))]
     f lEdges (GBinary n _ (cx,cy)) = lEdges++[ (cx, n, (cx, n, exprOfGNode (gnodes !! cx)))
                                              , (cy, n, (cy, n, exprOfGNode (gnodes !! cy)))]
 
-gNodesToLNodes :: [GNode a] -> [(Node, (Node, a))]
+gNodesToLNodes :: [GNode (Expr a)] -> [(Node, (Node, Expr a))]
 gNodesToLNodes = map f
   where
     f (GSource n expr  ) = (n, (n, expr))
+    f (GBroadcast n expr _) = (n, (n, expr))
+    f (GOutput n _ _ _) = (n, (n, sym "(out)"))
     f (GUnary  n expr _) = (n, (n, expr))
     f (GBinary n expr _) = (n, (n, expr))
 
 exprsToGraph :: Eq a => [Expr a] -> Gr (Node, Expr a) (Node, Node, Expr a)
 exprsToGraph exprs = mkGraph (gNodesToLNodes gNodes) (gNodesToLEdges gNodes)
   where
-    gNodes = fst $ exprsToGNodes exprs
+    gNodes = exprsToGNodes exprs

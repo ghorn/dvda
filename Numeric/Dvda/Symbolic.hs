@@ -12,10 +12,12 @@
 module Numeric.Dvda.Symbolic( sym
                             , symVec
                             , symMat
+                            , sca
                             , vec
                             , mat
                             , eval
                             , subs
+                            , dim
                             ) where
 
 import Data.List(nubBy)
@@ -25,6 +27,12 @@ import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Tensor
 import Numeric.Dvda.Internal.Binary
 import Numeric.Dvda.Internal.Unary
+
+-- | Get the dimensions of an expression. Scalar: [], vector [r], matrix: [r,c]
+dim :: Expr a -> [Int]
+dim (EScalar x) = tDim x
+dim (EVector x) = tDim x
+dim (EMatrix x) = tDim x
 
 -- | evalute expression down to numeric values
 eval :: Floating a => Expr a -> Expr a
@@ -51,6 +59,10 @@ symMat :: (Int,Int) -> String -> Expr a
 symMat (r,c) name
   | r > 0 && c > 0 = EMatrix $ TSym [r,c] name
   | otherwise      = error $ "symMat can't make matrix with dimensions: " ++ show (r,c)
+
+-- | explicitely convert a numeric value to an expression
+sca :: a -> Expr a
+sca x = EScalar $ TNum [] [x]
 
 -- | create numeric vector
 vec :: [a] -> Expr a

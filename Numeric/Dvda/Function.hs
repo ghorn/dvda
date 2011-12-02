@@ -50,8 +50,16 @@ callNative fun args
     subRules = zip (funInputs fun) args
 
 -- | Call a function using generated C code
-callC :: RealFrac a => Function a -> [a] -> [a]
-callC fun = callCFunction (length (funInputs fun)) (funCFunPtr fun)
+callC :: RealFrac a => Function a -> [[a]] -> [[a]]
+callC fun inputs
+  | and (zipWith (==) trueInputLengths userInputLengths) = callCFunction trueOutputLengths (funCFunPtr fun) inputs
+  | otherwise = error $ "callC detected improper number of inputs\n"++
+                "expected input lengths: " ++ show trueInputLengths ++ "\n" ++
+                "user input lengths:     " ++ show userInputLengths
+  where
+    trueOutputLengths = map (product . dim) (funOutputs fun)
+    trueInputLengths = map (product . dim) (funInputs fun)    
+    userInputLengths = map length inputs
 
 
 -- | Turn lists of inputs and outputs into a function

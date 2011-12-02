@@ -171,32 +171,65 @@ tEval x@(TBinary _) = (tDim x, tApply x)
 
 
 -- | convert GNode (Tensor a) into proper c code
-tToCCode :: (Eq a, Show a) => GNode (Tensor a) -> String
-tToCCode (GSource idx (TNum [] [x])) = assign idx ++ show x ++ ";"
-tToCCode (GSource idx (TInt [] [x])) = assign idx ++ show x ++ ";"
-tToCCode (GSource idx (TSym [] n)) = assign idx ++ n ++ ";"
-tToCCode (GUnary idx (TUnary (Unary unType _)) ic) = assign idx ++ show unType ++ "(" ++ cName ic ++ ");"
-tToCCode (GBinary idx (TBinary (Binary binType _ _)) (icx, icy)) = assign idx ++ 
+tToCCode :: Show a => GNode (Tensor a) -> String
+tToCCode x = case length (tDim (exprOfGNode x)) of
+  0 -> sToCCode x
+  _ -> arrayToCCode x
+
+
+-- scalar code
+sAssign :: Int -> String
+sAssign idx = cType ++ " " ++ cName idx ++ " = "
+-- input
+sToCCode :: Show a => GNode (Tensor a) -> String
+sToCCode (GOutput idx _ cx k) = "out["++ show k ++ "][0] = "++cName cx ++ "; // output node: " ++ show idx
+sToCCode (GSource idx (TNum [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
+sToCCode (GSource idx (TInt [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
+sToCCode (GSource idx (TSym [] n)) = "const " ++ sAssign idx ++ n ++ ";"
+sToCCode (GUnary idx (TUnary (Unary unType _)) ic) = "const " ++ sAssign idx ++ show unType ++ "(" ++ cName ic ++ ");"
+sToCCode (GBinary idx (TBinary (Binary binType _ _)) (icx, icy)) = "const " ++ sAssign idx ++ 
                                                                    cName icx ++ 
                                                                    " " ++ show binType ++ " " ++
                                                                    cName icy ++";"
-tToCCode _ = "#ERROR tensor c code gen not yet supported"
---tToCCode (GSource _ _) = "tToCCode api fail in GSource _ _)"
---tToCCode (GUnary _ _ _) = "tToCCode api fail in GUnary _ _)"
---tToCCode (GBinary _ _ _) = "tToCCode api fail in GBinary _ _)"
-
-assign :: Int -> String
-assign idx = cType ++ " " ++ cName idx ++ " = "
+sToCCode x@(GSource _ _) = error $ "sToCCode api fail in GSource _ _)" ++ show x
+sToCCode x@(GUnary _ _ _) = error $ "sToCCode api fail in GUnary _ _)" ++ show x
+sToCCode x@(GBinary _ _ _) = error $ "sToCCode api fail in GBinary _ _)" ++ show x
+sToCCode x@(GBroadcast _ _ _) = error $ "sToCCode api fail in GBroadcast _ _)" ++ show x
 
 
---tToCCode (GSource idx (SNum x)) = assign idx ++ show x ++ ";"
---tToCCode (GSource idx (SInt x)) = assign idx ++ show x ++ ";"
---tToCCode (GSource idx (SSym n)) = assign idx ++ n ++ ";"
---tToCCode (GUnary idx (SUnary (Unary unType _)) ic) = assign idx ++ show unType ++ "(" ++ cName ic ++ ");"
---tToCCode (GBinary idx (SBinary (Binary binType _ _)) (icx, icy)) = assign idx ++ 
---                                                               cName icx ++ 
---                                                               " " ++ show binType ++ " " ++
---                                                               cName icy ++";"
---tToCCode (GSource _ _) = "mToCCode api fail in GSource _ _)"
---tToCCode (GUnary _ _ _) = "mToCCode api fail in GUnary _ _)"
---tToCCode (GBinary _ _ _) = "mToCCode api fail in GBinary _ _)"
+-- vector code
+vAssign :: [Int] -> Int -> String
+vAssign d idx = cType ++ " " ++ cName idx ++ "[" ++ show (product d) ++ "] = "
+
+l2a :: Show a => [a] -> String
+l2a xs = "{" ++ drop 1 (init (show xs)) ++ "}"
+
+cMap :: [Int] -> String -> Int -> Int -> String
+cMap d f self child = cType ++ " " ++ cName self ++ "[" ++ show (product d) ++ "]; "++
+                      "    for (int k=0; k<"++show (product d)++"; k++){ "++
+                      cName self ++ "[k] = " ++ f ++ "( " ++ cName child ++ "[k] ); }"
+
+cBroadcast :: [Int] -> Int -> Int -> String
+cBroadcast d self child = cType ++ " " ++ cName self ++ "[" ++ show (product d) ++ "]; "++
+                          "    for (int k=0; k<"++show (product d)++"; k++){ "++
+                          cName self ++ "[k] = " ++ cName child ++ "; }"
+
+cZip :: [Int] -> String -> Int -> Int -> Int -> String
+cZip d f self cx cy = cType ++ " " ++ cName self ++ "[" ++ show (product d) ++ "]; "++
+                      "    for (int k=0; k<"++show (product d)++"; k++){ "++
+                      cName self ++ "[k] = " ++ cName cx ++ "[k] " ++ f ++ " "++cName cy++"[k]; }"
+
+
+arrayToCCode :: Show a => GNode (Tensor a) -> String
+arrayToCCode (GOutput idx x cx k) = "memcpy( out["++ show k ++ "], "++cName cx ++ ", "++show (product (tDim x))++"*sizeof(double) ); // output node: " ++ show idx
+arrayToCCode (GSource idx (TNum d xs)) = "const " ++ vAssign d idx ++ l2a xs ++ ";"
+arrayToCCode (GSource idx (TInt d xs)) = "const " ++ vAssign d idx ++ l2a xs ++ ";"
+arrayToCCode (GSource idx (TSym _ n)) = "const " ++ cType ++ " * const " ++ cName idx ++ " = " ++ n ++ ";"
+arrayToCCode (GBroadcast idx (TBroadcast d _) ic) = cBroadcast d idx ic
+arrayToCCode (GUnary idx x@(TUnary (Unary unType _)) ic) = cMap (tDim x) (show unType) idx ic
+arrayToCCode (GBinary idx x@(TBinary (Binary binType _ _)) (icx, icy)) = cZip (tDim x) (show binType) idx icx icy
+
+arrayToCCode x@(GSource _ _) = error $ "arrayToCCode api fail in GSource _ _)" ++ show x
+arrayToCCode x@(GUnary _ _ _) = error $ "arrayToCCode api fail in GUnary _ _)" ++ show x
+arrayToCCode x@(GBinary _ _ _) = error $ "arrayToCCode api fail in GBinary _ _)" ++ show x
+arrayToCCode x@(GBroadcast _ _ _) = error $ "arrayToCCode api fail in GBroadcast _ _)" ++ show x

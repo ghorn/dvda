@@ -48,6 +48,10 @@ toCCode (GSource i (EScalar x)) = tToCCode $ GSource i x
 toCCode (GSource i (EVector x)) = tToCCode $ GSource i x
 toCCode (GSource i (EMatrix x)) = tToCCode $ GSource i x
 
+toCCode (GOutput i (EScalar x) cx ox) = tToCCode $ GOutput i x cx ox
+toCCode (GOutput i (EVector x) cx ox) = tToCCode $ GOutput i x cx ox
+toCCode (GOutput i (EMatrix x) cx ox) = tToCCode $ GOutput i x cx ox
+
 toCCode (GUnary i (EScalar x) ix) = tToCCode $ GUnary i x ix
 toCCode (GUnary i (EVector x) ix) = tToCCode $ GUnary i x ix
 toCCode (GUnary i (EMatrix x) ix) = tToCCode $ GUnary i x ix
@@ -55,6 +59,10 @@ toCCode (GUnary i (EMatrix x) ix) = tToCCode $ GUnary i x ix
 toCCode (GBinary i (EScalar x) (ix, iy)) = tToCCode $ GBinary i x (ix, iy)
 toCCode (GBinary i (EVector x) (ix, iy)) = tToCCode $ GBinary i x (ix, iy)
 toCCode (GBinary i (EMatrix x) (ix, iy)) = tToCCode $ GBinary i x (ix, iy)
+
+toCCode (GBroadcast i (EScalar x) ix) = tToCCode $ GBroadcast i x ix
+toCCode (GBroadcast i (EVector x) ix) = tToCCode $ GBroadcast i x ix
+toCCode (GBroadcast i (EMatrix x) ix) = tToCCode $ GBroadcast i x ix
 
 -- | get name if variable is symbolic
 symName :: Expr a -> Maybe String
@@ -82,6 +90,7 @@ getSyms (EMatrix x) = map tensorToExpr $ tGetSyms x
 
 -- | data type containing children of an expression
 data Children a = CSource
+                | CBroadcast a
                 | CUnary a
                 | CBinary a a
 
@@ -89,16 +98,17 @@ data Children a = CSource
 getChildren :: Expr a -> Children (Expr a)
 getChildren (EScalar (TUnary (Unary _ x))) = CUnary (EScalar x)
 getChildren (EScalar (TBinary (Binary _ x y))) = CBinary (EScalar x) (EScalar y)
+getChildren (EScalar (TBroadcast _ _)) = error "api fail in getChildren"
 getChildren (EScalar _) = CSource
 
 getChildren (EVector (TUnary (Unary _ x))) = CUnary (EVector x)
 getChildren (EVector (TBinary (Binary _ x y))) = CBinary (EVector x) (EVector y)
-getChildren (EVector (TBroadcast _ x)) = CUnary (EScalar x)
+getChildren (EVector (TBroadcast _ x)) = CBroadcast (EScalar x)
 getChildren (EVector _) = CSource
 
 getChildren (EMatrix (TUnary (Unary _ x))) = CUnary (EMatrix x)
 getChildren (EMatrix (TBinary (Binary _ x y))) = CBinary (EMatrix x) (EMatrix y)
-getChildren (EMatrix (TBroadcast _ x)) = CUnary (EScalar x)
+getChildren (EMatrix (TBroadcast _ x)) = CBroadcast (EScalar x)
 getChildren (EMatrix _) = CSource
 
 
