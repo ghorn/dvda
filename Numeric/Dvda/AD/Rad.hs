@@ -10,7 +10,6 @@ import Numeric.Dvda.AD.Dual
 import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Binary
 import Numeric.Dvda.Internal.Unary
-import Numeric.Dvda.Internal.Scalar
 import Numeric.Dvda.Internal.Tensor
 
 -- | Take the gradient of an expression with respect to a list of inputs
@@ -26,10 +25,10 @@ pert (Dual _ b) = b
 
 
 getSensitivities :: Floating a => Expr a -> Expr a -> [(Expr a, Expr a)]
-getSensitivities primal@(EScalar (SSym _)) sens = [(primal, sens)]
+getSensitivities primal@(EScalar (TSym _ _)) sens = [(primal, sens)]
 getSensitivities primal@(EVector (TSym _ _)) sens = [(primal, sens)]
 getSensitivities primal@(EMatrix (TSym _ _)) sens = [(primal, sens)]
-getSensitivities (EScalar (SUnary (Unary unType x'))) sens = getSensitivities x (sens*dfdx)
+getSensitivities (EScalar (TUnary (Unary unType x'))) sens = getSensitivities x (sens*dfdx)
   where
     dfdx = pert $ applyUnary unType (Dual x 1)
     x = EScalar x'
@@ -41,7 +40,7 @@ getSensitivities (EMatrix (TUnary (Unary unType x'))) sens = getSensitivities x 
   where
     dfdx = pert $ applyUnary unType (Dual x 1)
     x = EMatrix x'
-getSensitivities (EScalar (SBinary (Binary binType x' y'))) sens = getSensitivities x (sens*dfdx) ++
+getSensitivities (EScalar (TBinary (Binary binType x' y'))) sens = getSensitivities x (sens*dfdx) ++
                                                                    getSensitivities y (sens*dfdy)
   where
     dfdx = pert $ applyBinary binType (Dual x 1) (Dual y 0)

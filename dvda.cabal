@@ -43,9 +43,7 @@ Library
 --                     Numeric.Dvda.Tests.Tests
 
   Other-modules:     Numeric.Dvda.Internal.Expr
-                     Numeric.Dvda.Internal.Scalar
-                     Numeric.Dvda.Internal.Vector
-                     Numeric.Dvda.Internal.Matrix
+                     Numeric.Dvda.Internal.Tensor
                      Numeric.Dvda.Internal.Binary
                      Numeric.Dvda.Internal.Unary
                      Numeric.Dvda.Internal.GNode

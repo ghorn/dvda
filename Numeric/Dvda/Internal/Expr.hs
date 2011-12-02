@@ -11,10 +11,9 @@
 module Numeric.Dvda.Internal.Expr( Expr(..)
                                  ) where
 
-import Numeric.Dvda.Internal.Scalar
 import Numeric.Dvda.Internal.Tensor
 
-data Expr a = EScalar (Scalar a)
+data Expr a = EScalar (Tensor a)
             | EVector (Tensor a)
             | EMatrix (Tensor a) deriving Eq
 
@@ -31,16 +30,16 @@ instance Num a => Num (Expr a) where
   x - y = safeBinaryConstructNum (-) x y
   abs = safeUnaryConstructNum abs
   signum = safeUnaryConstructNum abs
-  fromInteger i = EScalar (SInt (fromInteger i))
+  fromInteger i = EScalar (TInt [] [fromInteger i])
 
 
 instance Fractional a => Fractional (Expr a) where
   x / y = safeBinaryConstructFrac (/) x y
-  fromRational r = EScalar $ SNum (fromRational r)
+  fromRational r = EScalar $ TNum [] [fromRational r]
 
 
 instance (Floating a) => Floating (Expr a) where
-  pi = EScalar $ SNum pi
+  pi = EScalar $ TNum [] [pi]
   
   exp  = safeUnaryConstructFloating exp
   sqrt = safeUnaryConstructFloating sqrt
@@ -104,7 +103,6 @@ safeUnaryConstructNum :: Num a => (forall b . Num b => b -> b) -> Expr a -> Expr
 safeUnaryConstructNum f (EScalar x) = EScalar $ f x
 safeUnaryConstructNum f (EVector x) = EVector $ f x
 safeUnaryConstructNum f (EMatrix x) = EMatrix $ f x
-
 
 
 -- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instanecs of Vector/Matrix

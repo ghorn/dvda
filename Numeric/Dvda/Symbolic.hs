@@ -22,14 +22,13 @@ import Data.List(nubBy)
 import Data.Maybe(isNothing, fromJust)
 
 import Numeric.Dvda.Internal.Expr
-import Numeric.Dvda.Internal.Scalar
 import Numeric.Dvda.Internal.Tensor
 import Numeric.Dvda.Internal.Binary
 import Numeric.Dvda.Internal.Unary
 
 -- | evalute expression down to numeric values
 eval :: Floating a => Expr a -> Expr a
-eval (EScalar x) = EScalar $ SNum (sEval x)
+eval (EScalar x) = EScalar $ TNum [] (snd $ tEval x)
 eval (EVector x) = EVector $ TNum d v
   where
     (d, v) = tEval x
@@ -39,7 +38,7 @@ eval (EMatrix x) = EMatrix $ TNum d m
 
 -- | create symbolic scalar
 sym :: String -> Expr a
-sym name = EScalar $ SSym name
+sym name = EScalar $ TSym [] name
 
 -- | create symbolic vector with length
 symVec :: Int -> String -> Expr a
@@ -85,19 +84,22 @@ subs subslist expr
     sortSubs (EMatrix x, EMatrix y) (ss,vs,ms) = ( ss           , vs           , ms ++ [(x,y)] )
     sortSubs xy _ = error $ "Can't substitute two unlike quantities, must be scalar -> scalar, vector -> vector, or matrix -> matrix)\noffending pair: " ++ show xy
 
-    sSubs x@(SNum _) = EScalar x
-    sSubs x@(SInt _) = EScalar x
-    sSubs x@(SSym _) = EScalar $ sub scalarSubs x
-    sSubs (SUnary (Unary unOp x)) = applyUnary unOp $ sSubs x
-    sSubs (SBinary (Binary binOp x y)) = applyBinary binOp (sSubs x) (sSubs y)
+    sSubs x@(TNum _ _) = EScalar x
+    sSubs x@(TInt _ _) = EScalar x
+    sSubs x@(TSym _ _) = EScalar $ sub scalarSubs x
+    sSubs (TUnary (Unary unOp x)) = applyUnary unOp $ sSubs x
+    sSubs (TBinary (Binary binOp x y)) = applyBinary binOp (sSubs x) (sSubs y)
+    sSubs (TBroadcast _ _) = error "api fail in sSubs in subs"
     
     vSubs x@(TNum _ _) = EVector x
+    vSubs x@(TInt _ _) = EVector x
     vSubs x@(TSym _ _) = EVector $ sub vectorSubs x
     vSubs (TUnary (Unary unOp x)) = applyUnary unOp (vSubs x)
     vSubs (TBinary (Binary binOp x y)) = applyBinary binOp (vSubs x) (vSubs y)
     vSubs (TBroadcast _ x) = sSubs x
     
     mSubs x@(TNum _ _) = EMatrix x
+    mSubs x@(TInt _ _) = EMatrix x
     mSubs x@(TSym _ _) = EMatrix $ sub matrixSubs x
     mSubs (TUnary (Unary unOp x)) = applyUnary unOp $ mSubs x
     mSubs (TBinary (Binary binOp x y)) = applyBinary binOp (mSubs x) (mSubs y)
