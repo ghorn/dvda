@@ -6,7 +6,6 @@
  -}
 
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE Rank2Types #-}
 
 module Numeric.Dvda.Internal.Expr( Expr(..)
                                  ) where
@@ -25,63 +24,65 @@ instance Show a => Show (Expr a) where
 
 
 instance Num a => Num (Expr a) where
-  x + y = safeBinaryConstructNum (+) x y
-  x * y = safeBinaryConstructNum (*) x y
-  x - y = safeBinaryConstructNum (-) x y
-  abs = safeUnaryConstructNum abs
-  signum = safeUnaryConstructNum abs
+  x + y = safeBinaryConstruct (+) x y
+  x * y = safeBinaryConstruct (*) x y
+  x - y = safeBinaryConstruct (-) x y
+  abs = safeUnaryConstruct abs
+  signum = safeUnaryConstruct signum
   fromInteger i = EScalar (TInt [] [fromInteger i])
 
 
 instance Fractional a => Fractional (Expr a) where
-  x / y = safeBinaryConstructFrac (/) x y
+  x / y = safeBinaryConstruct (/) x y
   fromRational r = EScalar $ TNum [] [fromRational r]
 
 
 instance (Floating a) => Floating (Expr a) where
   pi = EScalar $ TNum [] [pi]
   
-  exp  = safeUnaryConstructFloating exp
-  sqrt = safeUnaryConstructFloating sqrt
-  log  = safeUnaryConstructFloating log
+  exp  = safeUnaryConstruct exp
+  sqrt = safeUnaryConstruct sqrt
+  log  = safeUnaryConstruct log
   
-  (**) = safeBinaryConstructFloating (**)
-  logBase = safeBinaryConstructFloating logBase
+  (**) = safeBinaryConstruct (**)
+  logBase = safeBinaryConstruct logBase
   
-  sin = safeUnaryConstructFloating sin
-  cos = safeUnaryConstructFloating cos
-  tan = safeUnaryConstructFloating tan
+  sin = safeUnaryConstruct sin
+  cos = safeUnaryConstruct cos
+  tan = safeUnaryConstruct tan
                    
-  asin = safeUnaryConstructFloating asin
-  acos = safeUnaryConstructFloating acos
-  atan = safeUnaryConstructFloating atan
+  asin = safeUnaryConstruct asin
+  acos = safeUnaryConstruct acos
+  atan = safeUnaryConstruct atan
 
-  sinh = safeUnaryConstructFloating sinh
-  cosh = safeUnaryConstructFloating cosh
-  tanh = safeUnaryConstructFloating tanh
+  sinh = safeUnaryConstruct sinh
+  cosh = safeUnaryConstruct cosh
+  tanh = safeUnaryConstruct tanh
 
-  asinh = safeUnaryConstructFloating asinh
-  acosh = safeUnaryConstructFloating acosh
-  atanh = safeUnaryConstructFloating atanh
+  asinh = safeUnaryConstruct asinh
+  acosh = safeUnaryConstruct acosh
+  atanh = safeUnaryConstruct atanh
 
 
 
---------------------------------------------------------------------
---------- please eliminate the following code duplication: ---------
---------------------------------------------------------------------
--- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instanecs of Vector/Matrix
--- this is because those Num instances aren't exported and are only called through safeBinaryConstructNum
-safeBinaryConstructNum :: Num a => (forall b . Num b => b -> b -> b) -> Expr a -> Expr a -> Expr a
+safeUnaryConstruct :: Num a => (Tensor a -> Tensor a) -> Expr a -> Expr a
+safeUnaryConstruct f (EScalar x) = EScalar $ f x
+safeUnaryConstruct f (EVector x) = EVector $ f x
+safeUnaryConstruct f (EMatrix x) = EMatrix $ f x
+
+-- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instanecs of Tensor
+--   this is because those Num instances aren't exported and are only called through the Expr api
+safeBinaryConstruct :: Num a => (Tensor a -> Tensor a -> Tensor a) -> Expr a -> Expr a -> Expr a
 -- normal combination:
-safeBinaryConstructNum f (EScalar x) (EScalar y) = EScalar $ f x y
-safeBinaryConstructNum f (EVector x) (EVector y) 
+safeBinaryConstruct f (EScalar x) (EScalar y) = EScalar $ f x y
+safeBinaryConstruct f (EVector x) (EVector y) 
   | tDim x == tDim y = EVector $ f x y
   | otherwise        = error $ unlines [ "Dimension mismatch in EVector + EVector"
                                        , "v1: " ++ show x
                                        , ""
                                        , "v2: " ++ show y
                                        ]
-safeBinaryConstructNum f (EMatrix x) (EMatrix y)
+safeBinaryConstruct f (EMatrix x) (EMatrix y)
   | tDim x == tDim y = EMatrix $ f x y
   | otherwise        = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
                                        , "m1: " ++ show x
@@ -89,87 +90,11 @@ safeBinaryConstructNum f (EMatrix x) (EMatrix y)
                                        , "m2: " ++ show y
                                        ]
 -- broadcast scalar to vector:
-safeBinaryConstructNum f (EScalar x) (EVector y) = EVector $ f (TBroadcast (tDim y) x) y
-safeBinaryConstructNum f (EVector x) (EScalar y) = EVector $ f x (TBroadcast (tDim x) y)
+safeBinaryConstruct f (EScalar x) (EVector y) = EVector $ f (TBroadcast (tDim y) x) y
+safeBinaryConstruct f (EVector x) (EScalar y) = EVector $ f x (TBroadcast (tDim x) y)
 -- broadcast scalar to matrix:
-safeBinaryConstructNum f (EScalar x) (EMatrix y) = EMatrix $ f (TBroadcast (tDim y) x) y
-safeBinaryConstructNum f (EMatrix x) (EScalar y) = EMatrix $ f x (TBroadcast (tDim x) y)
+safeBinaryConstruct f (EScalar x) (EMatrix y) = EMatrix $ f (TBroadcast (tDim y) x) y
+safeBinaryConstruct f (EMatrix x) (EScalar y) = EMatrix $ f x (TBroadcast (tDim x) y)
 -- illegal combination:
-safeBinaryConstructNum _ (EVector _) (EMatrix _) = error "safeBinaryConstructNum: Can't combine vector with matrix"
-safeBinaryConstructNum _ (EMatrix _) (EVector _) = error "safeBinaryConstructNum: Can't combine vector with matrix"
-
-
-safeUnaryConstructNum :: Num a => (forall b . Num b => b -> b) -> Expr a -> Expr a
-safeUnaryConstructNum f (EScalar x) = EScalar $ f x
-safeUnaryConstructNum f (EVector x) = EVector $ f x
-safeUnaryConstructNum f (EMatrix x) = EMatrix $ f x
-
-
--- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instanecs of Vector/Matrix
--- this is because those Num instances aren't exported and are only called through safeBinaryConstructFrac
-safeBinaryConstructFrac :: Fractional a => (forall b . Fractional b => b -> b -> b) -> Expr a -> Expr a -> Expr a
--- normal combination:
-safeBinaryConstructFrac f (EScalar x) (EScalar y) = EScalar $ f x y
-safeBinaryConstructFrac f (EVector x) (EVector y) 
-  | tDim x == tDim y = EVector $ f x y
-  | otherwise        = error $ unlines [ "Dimension mismatch in EVector + EVector"
-                                       , "v1: " ++ show x
-                                       , ""
-                                       , "v2: " ++ show y
-                                       ]
-safeBinaryConstructFrac f (EMatrix x) (EMatrix y)
-  | tDim x == tDim y = EMatrix $ f x y
-  | otherwise        = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
-                                       , "m1: " ++ show x
-                                       , ""
-                                       , "m2: " ++ show y
-                                       ]
--- broadcast scalar to vector:
-safeBinaryConstructFrac f (EScalar x) (EVector y) = EVector $ f (TBroadcast (tDim y) x) y
-safeBinaryConstructFrac f (EVector x) (EScalar y) = EVector $ f x (TBroadcast (tDim x) y)
--- broadcast scalar to matrix:
-safeBinaryConstructFrac f (EScalar x) (EMatrix y) = EMatrix $ f (TBroadcast (tDim y) x) y
-safeBinaryConstructFrac f (EMatrix x) (EScalar y) = EMatrix $ f x (TBroadcast (tDim x) y)
--- illegal combination:
-safeBinaryConstructFrac _ (EVector _) (EMatrix _) = error "safeBinaryConstructFrac: Can't combine vector with matrix"
-safeBinaryConstructFrac _ (EMatrix _) (EVector _) = error "safeBinaryConstructFrac: Can't combine vector with matrix"
-
-
--- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instanecs of Vector/Matrix
--- this is because those Num instances aren't exported and are only called through safeBinaryConstructFloating
-safeBinaryConstructFloating :: Floating a => (forall b . Floating b => b -> b -> b) -> Expr a -> Expr a -> Expr a
--- normal combination:
-safeBinaryConstructFloating f (EScalar x) (EScalar y) = EScalar $ f x y
-safeBinaryConstructFloating f (EVector x) (EVector y) 
-  | tDim x == tDim y = EVector $ f x y
-  | otherwise        = error $ unlines [ "Dimension mismatch in EVector + EVector"
-                                       , "v1: " ++ show x
-                                       , ""
-                                       , "v2: " ++ show y
-                                       ]
-safeBinaryConstructFloating f (EMatrix x) (EMatrix y)
-  | tDim x == tDim y = EMatrix $ f x y
-  | otherwise        = error $ unlines [ "Dimension mismatch in EMatrix + EMatrix"
-                                       , "m1: " ++ show x
-                                       , ""
-                                       , "m2: " ++ show y
-                                       ]
--- broadcast scalar to vector:
-safeBinaryConstructFloating f (EScalar x) (EVector y) = EVector $ f (TBroadcast (tDim y) x) y
-safeBinaryConstructFloating f (EVector x) (EScalar y) = EVector $ f x (TBroadcast (tDim x) y)
--- broadcast scalar to matrix:
-safeBinaryConstructFloating f (EScalar x) (EMatrix y) = EMatrix $ f (TBroadcast (tDim y) x) y
-safeBinaryConstructFloating f (EMatrix x) (EScalar y) = EMatrix $ f x (TBroadcast (tDim x) y)
--- illegal combination:
-safeBinaryConstructFloating _ (EVector _) (EMatrix _) = error "safeBinaryConstructFloating: Can't combine vector with matrix"
-safeBinaryConstructFloating _ (EMatrix _) (EVector _) = error "safeBinaryConstructFloating: Can't combine vector with matrix"
-
-
-safeUnaryConstructFloating :: Floating a => (forall b . Floating b => b -> b) -> Expr a -> Expr a
-safeUnaryConstructFloating f (EScalar x) = EScalar $ f x
-safeUnaryConstructFloating f (EVector x) = EVector $ f x
-safeUnaryConstructFloating f (EMatrix x) = EMatrix $ f x
-
---------------------------------------------------------------------------
---------------- (end of horrible hacky code duplication) -----------------
---------------------------------------------------------------------------
+safeBinaryConstruct _ (EVector _) (EMatrix _) = error "safeBinaryConstruct: Can't combine vector with matrix"
+safeBinaryConstruct _ (EMatrix _) (EVector _) = error "safeBinaryConstruct: Can't combine vector with matrix"
