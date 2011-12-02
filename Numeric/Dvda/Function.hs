@@ -10,7 +10,7 @@
 module Numeric.Dvda.Function( toFunction
                             , Function(..)
                             , callC
-                            , callCL
+--                            , callCL
                             , callNative
                             , inputNames
                             ) where
@@ -53,17 +53,17 @@ callNative fun args
     subRules = zip (funInputs fun) args
 
 
--- | Call a function using generated C code with list inputs/outputs
-callCL :: RealFrac a => Function a -> [[a]] -> [[a]]
-callCL fun inputs
-  | and (zipWith (==) trueInputLengths userInputLengths) = callCFunction trueOutputLengths (funCFunPtr fun) inputs
-  | otherwise = error $ "callCL detected improper number of inputs\n"++
-                "expected input lengths: " ++ show trueInputLengths ++ "\n" ++
-                "user input lengths:     " ++ show userInputLengths
-  where
-    trueOutputLengths = map (product . dim) (funOutputs fun)
-    trueInputLengths = map (product . dim) (funInputs fun)    
-    userInputLengths = map length inputs
+---- | Call a function using generated C code with list inputs/outputs
+--callCL :: RealFrac a => Function a -> [[a]] -> [[a]]
+--callCL fun inputs
+--  | and (zipWith (==) trueInputLengths userInputLengths) = callCFunction trueOutputLengths (funCFunPtr fun) inputs
+--  | otherwise = error $ "callCL detected improper number of inputs\n"++
+--                "expected input lengths: " ++ show trueInputLengths ++ "\n" ++
+--                "user input lengths:     " ++ show userInputLengths
+--  where
+--    trueOutputLengths = map (product . dim) (funOutputs fun)
+--    trueInputLengths = map (product . dim) (funInputs fun)    
+--    userInputLengths = map length inputs
 
 -- | Call a function using generated C code with `Numeric.Dvda.Expr.Expr` inputs and outputs
 callC :: (Floating a, Real a) => Function a -> [Expr a] -> [Expr a]

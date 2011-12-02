@@ -11,7 +11,7 @@ module Numeric.Dvda.Examples( simpleGraph
                             , tensorGraph
                             , fadExample
                             , radExample
-                            , codegenExampleS
+                            , codegenExample
                             , codegenExampleV
                             , showCCodeExample
                             ) where
@@ -84,9 +84,6 @@ codegenExampleV = do
   -- make function
   fun <- toFunction [xs,ys] $ f [xs,ys]
   
-  putStr "callCL Function:     "
-  print $ callCL fun [[x'], y']
-
   putStr "callC Function:      "
   print $ callC fun [sca x',vec y']
 
@@ -95,8 +92,8 @@ codegenExampleV = do
 
 
 -- | Turn scalar expressions into a function and call it natively and through the auto-generated C code
-codegenExampleS :: IO ()
-codegenExampleS = do
+codegenExample :: IO ()
+codegenExample = do
 
   let f :: Floating a => [a] -> [a]
       f [x,y] = [y/cos x, 23423*atan(100*x)]
@@ -105,18 +102,17 @@ codegenExampleS = do
       xs = sym "x"
       ys = sym "y"
       
-      x' = 2.52 :: Double
-      y' = 21.0 :: Double
+      x' = 2.52 :: Expr Double
+      y' = 21.0
       
-  print $ eval $ sca y' / cos( sca x' )
   -- make function
   fun <- toFunction [xs,ys] $ f [xs,ys]
   
-  putStr "callCL Function:      "
-  print $ callCL fun [[x'], [y']]
+  putStr "callC Function:      "
+  print $ callC fun [x', y']
 
   putStr "callNative Function: "
-  print $ callNative fun [sca x',sca y']
+  print $ callNative fun [x',y']
 
 
 -- | show some c code
