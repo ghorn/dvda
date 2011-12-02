@@ -75,17 +75,20 @@ codegenExampleV = do
       f _ = error "bad testFun inputs"
 
       xs = sym "x"
-      ys = symVec 5 "y"
+      ys = symVec 3 "y"
       
       x' = 2.52 :: Double
-      y' = [1,5,8,5,3] :: [Double]
+      y' = [1,5,pi] :: [Double]
       
   print $ eval $ vec y' / cos( sca x' )
   -- make function
   fun <- toFunction [xs,ys] $ f [xs,ys]
   
+  putStr "callCL Function:     "
+  print $ callCL fun [[x'], y']
+
   putStr "callC Function:      "
-  print $ callC fun [[x'], y']
+  print $ callC fun [sca x',vec y']
 
   putStr "callNative Function: "
   print $ callNative fun [sca x',vec y']
@@ -109,8 +112,8 @@ codegenExampleS = do
   -- make function
   fun <- toFunction [xs,ys] $ f [xs,ys]
   
-  putStr "callC Function:      "
-  print $ callC fun [[x'], [y']]
+  putStr "callCL Function:      "
+  print $ callCL fun [[x'], [y']]
 
   putStr "callNative Function: "
   print $ callNative fun [sca x',sca y']

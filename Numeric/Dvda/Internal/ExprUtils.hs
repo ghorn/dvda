@@ -15,6 +15,7 @@ module Numeric.Dvda.Internal.ExprUtils( getSyms
                                       , showDim
                                       , symName
                                       , toCCode
+                                      , tensorToExpr
                                       ) where
 
 import Numeric.Dvda.Internal.Expr

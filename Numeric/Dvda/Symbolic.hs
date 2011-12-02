@@ -7,7 +7,6 @@
  -}
 
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE Rank2Types #-}
 
 module Numeric.Dvda.Symbolic( sym
                             , symVec
@@ -16,6 +15,7 @@ module Numeric.Dvda.Symbolic( sym
                             , vec
                             , mat
                             , eval
+                            , evalE
                             , subs
                             , dim
                             ) where
@@ -34,15 +34,22 @@ dim (EScalar x) = tDim x
 dim (EVector x) = tDim x
 dim (EMatrix x) = tDim x
 
--- | evalute expression down to numeric values
-eval :: Floating a => Expr a -> Expr a
-eval (EScalar x) = EScalar $ TNum [] (snd $ tEval x)
-eval (EVector x) = EVector $ TNum d v
-  where
-    (d, v) = tEval x
-eval (EMatrix x) = EMatrix $ TNum d m
-  where
-    (d, m) = tEval x
+-- | Evalute numeric operations in expression returning numereric `Numeric.Dvda.Expr.Expr` form
+--   .
+--   Causes exception if Expression has any symbolic variables
+evalE :: Floating a => Expr a -> Expr a
+evalE (EScalar x) = EScalar $ TNum (tDim x) (tEval x)
+evalE (EVector x) = EVector $ TNum (tDim x) (tEval x)
+evalE (EMatrix x) = EMatrix $ TNum (tDim x) (tEval x)
+
+-- | Evalute numeric operations in expression returning dimensions and "array"
+--   .
+--   Causes exception if Expression has any symbolic variables
+eval :: Floating a => Expr a -> ([Int],[a])
+eval (EScalar x) = (tDim x, tEval x)
+eval (EVector x) = (tDim x, tEval x)
+eval (EMatrix x) = (tDim x, tEval x)
+
 
 -- | create symbolic scalar
 sym :: String -> Expr a

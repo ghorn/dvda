@@ -10,6 +10,7 @@
 module Numeric.Dvda.Function( toFunction
                             , Function(..)
                             , callC
+                            , callCL
                             , callNative
                             , inputNames
                             ) where
@@ -23,6 +24,7 @@ import Numeric.Dvda.Codegen.CallWrapper(callCFunction)
 import Numeric.Dvda.Codegen.Codegen(buildCFunction)
 import Numeric.Dvda.Symbolic
 import Numeric.Dvda.Internal.Expr
+import Numeric.Dvda.Internal.Tensor
 import Numeric.Dvda.Internal.ExprUtils
 
 data Function a = Function { funInputs :: [Expr a]
@@ -39,27 +41,44 @@ inputNames (Function {funInputs = inputs}) = map f inputs
       | isJust (symName x) = fromJust $ symName x
       | otherwise = error "non-source Function input detected in " ++ show inputs
 
+
 -- | Call a function without using C code by recursively evaluating children.
 --   This is probably much slower than 'Numeric.Dvda.Function.callC' and
 --   is intended mainly for developing a function or debugging.
 callNative :: Floating a => Function a -> [Expr a] -> [Expr a]
 callNative fun args 
-  | length (funInputs fun) == length args = map (eval . subs subRules) (funOutputs fun)
+  | length (funInputs fun) == length args = map (evalE . subs subRules) (funOutputs fun)
   | otherwise = error "callNative fail because num arguments /= num function inputs"
   where
     subRules = zip (funInputs fun) args
 
--- | Call a function using generated C code
-callC :: RealFrac a => Function a -> [[a]] -> [[a]]
-callC fun inputs
+
+-- | Call a function using generated C code with list inputs/outputs
+callCL :: RealFrac a => Function a -> [[a]] -> [[a]]
+callCL fun inputs
   | and (zipWith (==) trueInputLengths userInputLengths) = callCFunction trueOutputLengths (funCFunPtr fun) inputs
-  | otherwise = error $ "callC detected improper number of inputs\n"++
+  | otherwise = error $ "callCL detected improper number of inputs\n"++
                 "expected input lengths: " ++ show trueInputLengths ++ "\n" ++
                 "user input lengths:     " ++ show userInputLengths
   where
     trueOutputLengths = map (product . dim) (funOutputs fun)
     trueInputLengths = map (product . dim) (funInputs fun)    
     userInputLengths = map length inputs
+
+-- | Call a function using generated C code with `Numeric.Dvda.Expr.Expr` inputs and outputs
+callC :: (Floating a, Real a) => Function a -> [Expr a] -> [Expr a]
+callC fun inputs
+  | and (zipWith (==) trueInputLengths userInputLengths) = map tensorToExpr $ zipWith TNum outputDims listOutputs
+  | otherwise = error $ "callC detected improper number of inputs\n"++
+                "expected input lengths: " ++ show trueInputLengths ++ "\n" ++
+                "user input lengths:     " ++ show userInputLengths
+  where
+    outputLengths = map product outputDims
+    outputDims = map dim (funOutputs fun)
+    trueInputLengths = map (product . dim) (funInputs fun)    
+    userInputLengths = map (product . dim) inputs
+    
+    listOutputs = callCFunction outputLengths (funCFunPtr fun) (map (snd . eval) inputs)
 
 
 -- | Turn lists of inputs and outputs into a function

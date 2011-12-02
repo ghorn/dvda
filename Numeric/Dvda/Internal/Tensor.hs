@@ -152,22 +152,13 @@ instance (Floating a) => Floating (Tensor a) where
 
 
 -- | evaluate (Tensor a) to a numeric list
-tApply :: Floating a => Tensor a -> [a]
-tApply (TNum _ x) = x
-tApply (TInt _ x) = map fromIntegral x
-tApply (TBroadcast d x) = replicate (product d) (head $ snd $ tEval x)
-tApply (TSym _ _) = error "api error: mEval can't evaluate symbolic expression"
-tApply (TUnary (Unary unType x)) = map (applyUnary unType) (tApply x)
-tApply (TBinary (Binary binType x y)) = zipWith (applyBinary binType) (tApply x) (tApply y)
-
--- | evaluate (Tensor a) to a (dimension, value) tuple
-tEval :: Floating a => Tensor a -> ([Int], [a])
-tEval x@(TNum d _) = (d, tApply x)
-tEval x@(TInt d _) = (d, tApply x)
-tEval x@(TBroadcast d _) = (d, tApply x)
-tEval (TSym _ _) = error "api error: tApply can't evaluate symbolic expression"
-tEval x@(TUnary _) = (tDim x, tApply x)
-tEval x@(TBinary _) = (tDim x, tApply x)
+tEval :: Floating a => Tensor a -> [a]
+tEval (TNum _ x) = x
+tEval (TInt _ x) = map fromIntegral x
+tEval (TBroadcast d x) = replicate (product d) (head $ tEval x)
+tEval (TSym _ _) = error "api error: tEval can't evaluate symbolic expression"
+tEval (TUnary (Unary unType x)) = map (applyUnary unType) (tEval x)
+tEval (TBinary (Binary binType x y)) = zipWith (applyBinary binType) (tEval x) (tEval y)
 
 
 -- | convert GNode (Tensor a) into proper c code
