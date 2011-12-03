@@ -13,7 +13,6 @@ module Numeric.Dvda( module Numeric.Dvda.AD
                    , module Numeric.Dvda.Function
                    , Expr
                    , showCSource
-                   , showCInclude
                    ) where
 
 import Numeric.Dvda.AD
@@ -21,4 +20,4 @@ import Numeric.Dvda.Symbolic
 import Numeric.Dvda.Vis
 import Numeric.Dvda.Function
 import Numeric.Dvda.Internal.Expr(Expr)
-import Numeric.Dvda.Codegen.WriteC(showCSource, showCInclude)
+import Numeric.Dvda.Codegen.WriteC(showCSource)
