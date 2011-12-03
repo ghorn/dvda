@@ -7,11 +7,14 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Function( toFunction
+module Numeric.Dvda.Function( -- * Creation
+                              toFunction
                             , Function(..)
+                              -- * Calling
                             , callC
 --                            , callCL
                             , callNative
+                              -- * Input names
                             , inputNames
                             ) where
 

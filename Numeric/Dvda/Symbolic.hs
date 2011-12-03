@@ -8,15 +8,20 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Symbolic( sym
+module Numeric.Dvda.Symbolic( -- * Symbolic expressions
+                              sym
                             , symVec
                             , symMat
+                              -- * Numeric expressions
                             , sca
                             , vec
                             , mat
+                              -- * Evaluation
                             , eval
                             , evalE
+                              -- * Substitution
                             , subs
+                              -- * Dimensions
                             , dim
                             ) where
 

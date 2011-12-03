@@ -7,11 +7,16 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda( module Numeric.Dvda.AD
-                   , module Numeric.Dvda.Symbolic
-                   , module Numeric.Dvda.Vis
-                   , module Numeric.Dvda.Function
+module Numeric.Dvda( -- * Core API
+                     module Numeric.Dvda.Symbolic
                    , Expr
+                     -- * Automatic differentiation
+                   , module Numeric.Dvda.AD
+                     -- * Visualization
+                   , module Numeric.Dvda.Vis
+                     -- * Turn expressions into callable functions
+                   , module Numeric.Dvda.Function
+                     -- * Utility functions
                    , showCSource
                    ) where
 
