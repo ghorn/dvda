@@ -39,6 +39,10 @@ Cabal build:
     $ cabal configure
     $ cabal build
 
+for documentation:
+
+    $ cabal haddock
+
 Get started right away
 
     $ ghci
