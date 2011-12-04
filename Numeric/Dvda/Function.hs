@@ -9,18 +9,17 @@
 
 module Numeric.Dvda.Function( -- * Creation
                               toFunction
-                            , Function(..)
+                            , Function
                               -- * Calling
                             , callC
 --                            , callCL
                             , callNative
-                              -- * Input names
-                            , inputNames
                             ) where
 
-import Data.Maybe
+import Data.List(nub)
 import System.Posix.DynamicLinker
 import Foreign.Ptr(FunPtr)
+import Control.Monad(when)
 
 import qualified Numeric.Dvda.Config as Config
 import Numeric.Dvda.Codegen.CallWrapper(callCFunction)
@@ -35,15 +34,6 @@ data Function a = Function { funInputs :: [Expr a]
                            , funCFunPtr :: FunPtr a
                            , funHash :: String
                            }
-
--- | Get a list of names of a function's inputs
-inputNames :: (Eq a, Show a) => Function a -> [String]
-inputNames (Function {funInputs = inputs}) = map f inputs
-  where
-    f x
-      | isJust (symName x) = fromJust $ symName x
-      | otherwise = error "non-source Function input detected in " ++ show inputs
-
 
 -- | Call a function without using C code by recursively evaluating children.
 --   This is probably much slower than 'Numeric.Dvda.Function.callC' and
@@ -87,9 +77,14 @@ callC fun inputs
 -- | Turn lists of inputs and outputs into a function
 toFunction :: RealFrac a => [Expr a] -> [Expr a] -> IO (Function a)
 toFunction inputs outputs = do
-  -- TODO: make sure all inputs are accounted for - issue 19
-  (hash, objPath) <- buildCFunction inputs outputs
+  let symsInOutputs = nub $ concatMap getSyms outputs
+      missingInputs = filter (`notElem` inputs) symsInOutputs
 
+  when (length missingInputs > 0) $
+    error $ "in outputs: "++show outputs++"\ntoFunction detected missing inputs: " ++ show missingInputs
+  
+  (hash, objPath) <- buildCFunction inputs outputs
+  
   dl <- dlopen objPath [RTLD_NOW]
   funptr <- dlsym dl $ Config.nameCFunction hash
 
