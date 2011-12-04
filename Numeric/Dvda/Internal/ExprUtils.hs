@@ -8,6 +8,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.Internal.ExprUtils( getSyms
+                                      , isSymbolic
                                       , Children(..)
                                       , getChildren
                                       , showNode
@@ -72,6 +73,12 @@ symName (EVector (TSym _ n)) = Just n
 symName (EMatrix (TSym _ n)) = Just n
 symName _ = Nothing
 
+-- | is the expression symbolic or not
+isSymbolic :: Expr a -> Bool
+isSymbolic (EScalar (TSym _ _)) = True
+isSymbolic (EVector (TSym _ _)) = True
+isSymbolic (EMatrix (TSym _ _)) = True
+isSymbolic _ = False
 
 -- | call the correct Expr constructor based on the dimensions of a tensor
 tensorToExpr :: Tensor a -> Expr a

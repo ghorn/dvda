@@ -80,6 +80,8 @@ toFunction inputs outputs = do
   let symsInOutputs = nub $ concatMap getSyms outputs
       missingInputs = filter (`notElem` inputs) symsInOutputs
 
+  when (any (not . isSymbolic) inputs) $
+    error $ "toFunction detected non-symbolic inputs: " ++ show (filter (not . isSymbolic) inputs) ++ "\nHave you accidentally switched inputs and outputs?"
   when (length missingInputs > 0) $
     error $ "in outputs: "++show outputs++"\ntoFunction detected missing inputs: " ++ show missingInputs
   
