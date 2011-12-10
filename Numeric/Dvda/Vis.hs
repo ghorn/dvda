@@ -9,7 +9,6 @@
 
 module Numeric.Dvda.Vis( previewExprs
                        , previewExprs_
---                       , lexprsToGraph
                        ) where
 
 import Data.Graph.Inductive hiding (nodes, edges)
@@ -25,15 +24,15 @@ import Numeric.Dvda.Internal.GNode
 import Numeric.Dvda.Internal.ExprGraph
 
 -- | Plot a graph visualizing a list of `Numeric.Dvda.Expr.Expr`s. The edges of the graph will be labeled with the local expression's value.
-previewExprs :: (Eq a, Show a) => [Expr a] -> IO ()
-previewExprs exprs = do
-  preview $ nmap ShowOp $ emap ShowExpr (exprsToGraph exprs)
+previewExprs :: (Eq a, Show a) => [Expr a] -> [String] -> IO ()
+previewExprs exprs names = do
+  preview $ nmap ShowOp $ emap ShowExpr (lexprsToGraph exprs names)
   threadDelay 10000
 
 -- | Plot a graph visualizing a list of `Numeric.Dvda.Expr.Expr`s. The edges of the graph will be unlabeled.
-previewExprs_ :: (Eq a, Show a) => [Expr a] -> IO ()
-previewExprs_ exprs = do
-  preview $ nmap ShowOp $ emap HideExpr (exprsToGraph exprs)
+previewExprs_ :: (Eq a, Show a) => [Expr a] -> [String] -> IO ()
+previewExprs_ exprs names = do
+  preview $ nmap ShowOp $ emap HideExpr (lexprsToGraph exprs names)
   threadDelay 10000
 
 data NodeShow a = ShowOp (Node, Expr a)
@@ -72,7 +71,7 @@ gNodesToLEdges :: [GNode (Expr a)] -> [(Node, Node, (Node, Node, (Expr a)))]
 gNodesToLEdges gnodes = foldl' f [] gnodes
   where
     f lEdges (GSource _ _) = lEdges
-    f lEdges (GOutput n _ c _) = lEdges++[(c, n, (c, n, exprOfGNode (gnodes !! c)))]
+    f lEdges (GOutput n _ c _ _) = lEdges++[(c, n, (c, n, exprOfGNode (gnodes !! c)))]
     f lEdges (GBroadcast n _ c) = lEdges++[(c, n, (c, n, exprOfGNode (gnodes !! c)))]
     f lEdges (GUnary n _ c) = lEdges++[(c, n, (c, n, exprOfGNode (gnodes !! c)))]
     f lEdges (GBinary n _ (cx,cy)) = lEdges++[ (cx, n, (cx, n, exprOfGNode (gnodes !! cx)))
@@ -83,11 +82,11 @@ gNodesToLNodes = map f
   where
     f (GSource n expr  ) = (n, (n, expr))
     f (GBroadcast n expr _) = (n, (n, expr))
-    f (GOutput n _ _ _) = (n, (n, sym "(out)"))
+    f (GOutput n _ _ _ name) = (n, (n, sym name))
     f (GUnary  n expr _) = (n, (n, expr))
     f (GBinary n expr _) = (n, (n, expr))
 
-exprsToGraph :: Eq a => [Expr a] -> Gr (Node, Expr a) (Node, Node, Expr a)
-exprsToGraph exprs = mkGraph (gNodesToLNodes gNodes) (gNodesToLEdges gNodes)
+lexprsToGraph :: Eq a => [Expr a] -> [String] -> Gr (Node, Expr a) (Node, Node, Expr a)
+lexprsToGraph exprs names = mkGraph (gNodesToLNodes gNodes) (gNodesToLEdges gNodes)
   where
-    gNodes = exprsToGNodes exprs
+    gNodes = exprsToGNodes exprs names

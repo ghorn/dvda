@@ -173,7 +173,7 @@ sAssign :: Int -> String
 sAssign idx = cType ++ " " ++ cName idx ++ " = "
 -- input
 sToCCode :: Show a => GNode (Tensor a) -> String
-sToCCode (GOutput idx _ cx k) = "out["++ show k ++ "][0] = "++cName cx ++ "; // output node: " ++ show idx
+sToCCode (GOutput idx _ cx k name) = "out["++ show k ++ "][0] = "++cName cx ++ "; // "++name++", output node: " ++ show idx
 sToCCode (GSource idx (TNum [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
 sToCCode (GSource idx (TInt [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
 sToCCode (GSource idx (TSym [] n)) = "const " ++ sAssign idx ++ n ++ ";"
@@ -212,7 +212,7 @@ cZip d f self cx cy = cType ++ " " ++ cName self ++ "[" ++ show (product d) ++ "
 
 
 arrayToCCode :: Show a => GNode (Tensor a) -> String
-arrayToCCode (GOutput idx x cx k) = "memcpy( out["++ show k ++ "], "++cName cx ++ ", "++show (product (tDim x))++"*sizeof(double) ); // output node: " ++ show idx
+arrayToCCode (GOutput idx x cx k name) = "memcpy( out["++ show k ++ "], "++cName cx ++ ", "++show (product (tDim x))++"*sizeof(double) ); // "++name++", output node: " ++ show idx
 arrayToCCode (GSource idx (TNum d xs)) = "const " ++ vAssign d idx ++ l2a xs ++ ";"
 arrayToCCode (GSource idx (TInt d xs)) = "const " ++ vAssign d idx ++ l2a xs ++ ";"
 arrayToCCode (GSource idx (TSym _ n)) = "const " ++ cType ++ " * const " ++ cName idx ++ " = " ++ n ++ ";"

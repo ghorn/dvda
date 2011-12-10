@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Numeric.Dvda.Internal.ExprGraph( exprsToGNodes
+                                      , exprsToGNodes_
                                       ) where
 
 import Data.Graph.Inductive hiding (nodes, edges)
@@ -13,15 +14,18 @@ import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.ExprUtils
 import Numeric.Dvda.Internal.GNode
 
-exprsToGNodes :: Eq a => [Expr a] -> [GNode (Expr a)]
-exprsToGNodes exprs = gnodesOut
+exprsToGNodes_ :: Eq a => [Expr a] -> [GNode (Expr a)]
+exprsToGNodes_ exprs = exprsToGNodes exprs $ map (\k -> "out"++show k) [(0::Integer)..]
+
+exprsToGNodes :: Eq a => [Expr a] -> [String] -> [GNode (Expr a)]
+exprsToGNodes exprs names = gnodesOut
   where
-    (_, gnodesOut, _) = foldl' f (0,[],0) exprs
-    f (nextFreeNode0, gnodes0, outputIdx) expr =
+    (_, gnodesOut, _) = foldl' f (0,[],0) (zip exprs names)
+    f (nextFreeNode0, gnodes0, outputIdx) (expr,name) =
       (nextFreeNode + 1, gnodes0 ++ gnodes' ++ [outGNode], outputIdx + 1)
       where
         (topNode, nextFreeNode, gnodes') = exprGobbler gnodes0 nextFreeNode0 expr
-        outGNode = GOutput nextFreeNode expr topNode outputIdx
+        outGNode = GOutput nextFreeNode expr topNode outputIdx name
 
 -- | take all the GNodes already in the graph
 -- | take an assignment node and an expression

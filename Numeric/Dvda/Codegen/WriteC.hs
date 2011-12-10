@@ -59,7 +59,7 @@ writeCSource inputs outputs = (src, include, hash)
            unlines (map (\x -> "    " ++ toCCode x) (topSort gnodes))
       where
         inputDeclarations = zipWith inputDec inputs [0..]
-        gnodes = exprsToGNodes outputs
+        gnodes = exprsToGNodes_ outputs
         
 inputDec :: Expr a -> Int -> String
 inputDec (EScalar (TSym _ n)) k = "    const double " ++ n ++ " = *(in[" ++ show k ++ "]);"

@@ -50,9 +50,9 @@ toCCode (GSource i (EScalar x)) = tToCCode $ GSource i x
 toCCode (GSource i (EVector x)) = tToCCode $ GSource i x
 toCCode (GSource i (EMatrix x)) = tToCCode $ GSource i x
 
-toCCode (GOutput i (EScalar x) cx ox) = tToCCode $ GOutput i x cx ox
-toCCode (GOutput i (EVector x) cx ox) = tToCCode $ GOutput i x cx ox
-toCCode (GOutput i (EMatrix x) cx ox) = tToCCode $ GOutput i x cx ox
+toCCode (GOutput i (EScalar x) cx ox n) = tToCCode $ GOutput i x cx ox n
+toCCode (GOutput i (EVector x) cx ox n) = tToCCode $ GOutput i x cx ox n
+toCCode (GOutput i (EMatrix x) cx ox n) = tToCCode $ GOutput i x cx ox n
 
 toCCode (GUnary i (EScalar x) ix) = tToCCode $ GUnary i x ix
 toCCode (GUnary i (EVector x) ix) = tToCCode $ GUnary i x ix

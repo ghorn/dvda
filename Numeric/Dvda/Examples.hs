@@ -23,7 +23,7 @@ simpleGraph :: IO ()
 simpleGraph = do
   let x = sym "x" :: Expr Double
       y = x*2 + cos x / 5
-  previewExprs [y, x*x]
+  previewExprs [y, x*x] ["f0", "f1"]
 
 -- | Make a graph of a simple equation involving matrices
 tensorGraph :: IO ()
@@ -31,7 +31,7 @@ tensorGraph = do
   let x = symMat (3,5) "x"
       y = sym "y"
       z = x*2 + cos x / 5 + y
-  previewExprs [z :: Expr Double]
+  previewExprs [z :: Expr Double] ["z"]
 
 -- | Make a graph of forward-mode AD
 fadExample :: IO ()
@@ -43,8 +43,8 @@ fadExample = do
 
   print exprs
   print g
-  previewExprs exprs
-  previewExprs g
+  previewExprs exprs ["f0","f1","f2"]
+  previewExprs g ["g0","g1","g2"]
   
 -- | Make a graph of reverse-mode AD
 radExample :: IO ()
@@ -60,11 +60,8 @@ radExample = do
   print exampleExpr
   print $ rad exampleExpr args
   
-  previewExprs [exampleExpr]
-  previewExprs_ $ exampleExpr:rad exampleExpr args
---  previewExprs lexprToGraph ("f", exampleExpr)
---  previewExprs lexprsToGraph $ zip ["f", "df/dx", "df/dy", "df/dz"] (exampleExpr:(rad exampleExpr args))
-
+  previewExprs [exampleExpr] ["f"]
+  previewExprs_ (exampleExpr:(rad exampleExpr args)) ["f","df/dx","df/dy","df/dz"]
 
 -- | Turn vector expressions into a function and call it natively and through the auto-generated C code
 codegenExampleV :: IO ()
