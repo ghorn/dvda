@@ -44,8 +44,8 @@ Library
 
   Other-modules:     Numeric.Dvda.Internal.Expr
                      Numeric.Dvda.Internal.Tensor
-                     Numeric.Dvda.Internal.Binary
-                     Numeric.Dvda.Internal.Unary
+                     Numeric.Dvda.Internal.BinaryType
+                     Numeric.Dvda.Internal.UnaryType
                      Numeric.Dvda.Internal.GNode
                      Numeric.Dvda.Internal.ExprGraph
                      Numeric.Dvda.Internal.ExprUtils

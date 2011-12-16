@@ -30,8 +30,8 @@ import Data.Maybe(isNothing, fromJust)
 
 import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Tensor
-import Numeric.Dvda.Internal.Binary
-import Numeric.Dvda.Internal.Unary
+import Numeric.Dvda.Internal.BinaryType
+import Numeric.Dvda.Internal.UnaryType
 
 -- | Get the dimensions of an expression. Scalar: [], vector [r], matrix: [r,c]
 dim :: Expr a -> [Int]
@@ -95,8 +95,8 @@ subs subslist (Expr tensor)
     subs' x@(TNum _ _) = Expr x
     subs' x@(TInt _ _) = Expr x
     subs' x@(TSym _ _) = Expr $ sub tSubslist x
-    subs' (TUnary (Unary unOp x)) = applyUnary unOp $ subs' x
-    subs' (TBinary (Binary binOp x y)) = applyBinary binOp (subs' x) (subs' y)
+    subs' (TUnary unOp x) = applyUnary unOp $ subs' x
+    subs' (TBinary binOp x y) = applyBinary binOp (subs' x) (subs' y)
     subs' (TBroadcast [] _) = error "api fail in subs' in subs"
     subs' (TBroadcast _ x) = subs' x
 

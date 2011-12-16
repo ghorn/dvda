@@ -19,8 +19,6 @@ module Numeric.Dvda.Internal.ExprUtils( getSyms
                                       ) where
 
 import Numeric.Dvda.Internal.Expr
-import Numeric.Dvda.Internal.Binary
-import Numeric.Dvda.Internal.Unary
 import Numeric.Dvda.Internal.Tensor
 import Numeric.Dvda.Internal.GNode
 
@@ -67,8 +65,8 @@ data Children a = CSource
 
 -- | get all the children of an Expr
 getChildren :: Expr a -> Children (Expr a)
-getChildren (Expr (TUnary (Unary _ x))) = CUnary (Expr x)
-getChildren (Expr (TBinary (Binary _ x y))) = CBinary (Expr x) (Expr y)
+getChildren (Expr (TUnary _ x)) = CUnary (Expr x)
+getChildren (Expr (TBinary _ x y)) = CBinary (Expr x) (Expr y)
 getChildren (Expr (TBroadcast [] _)) = error "api fail in getChildren"
 getChildren (Expr (TBroadcast _ x)) = CBroadcast (Expr x)
 getChildren (Expr _) = CSource

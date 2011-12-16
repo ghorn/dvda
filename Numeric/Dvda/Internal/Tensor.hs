@@ -12,15 +12,15 @@ module Numeric.Dvda.Internal.Tensor( Tensor(..)
                                    ) where
 
 import Numeric.Dvda.Internal.GNode
-import Numeric.Dvda.Internal.Binary
-import Numeric.Dvda.Internal.Unary
+import Numeric.Dvda.Internal.BinaryType
+import Numeric.Dvda.Internal.UnaryType
 import Numeric.Dvda.Config(cType, cName)
 
 data Tensor a = TNum [Int] [a]
               | TInt [Int] [Int]
               | TSym [Int] String
-              | TUnary (Unary (Tensor a))
-              | TBinary (Binary (Tensor a))
+              | TUnary UnaryType (Tensor a)
+              | TBinary BinaryType (Tensor a) (Tensor a)
               | TBroadcast [Int] (Tensor a) deriving Eq
 
 instance Show a => Show (Tensor a) where
@@ -31,8 +31,8 @@ instance Show a => Show (Tensor a) where
   show (TSym d x) = replicate n '{' ++ x ++ (replicate n '}')
     where
       n = length d
-  show (TUnary x) = show x
-  show (TBinary x) = show x
+  show (TUnary unaryType x) = show unaryType ++ "(" ++ show x ++ ")"
+  show (TBinary binaryType x y) = "(" ++ show x ++ " " ++ show binaryType ++ " " ++ show y ++ ")"
   show (TBroadcast d x) = "BC(" ++ show d ++ " <- " ++ show x ++ ")"
 
 
@@ -42,15 +42,15 @@ tShowNode x@(TNum _ _) = show x
 tShowNode x@(TInt _ _) = show x
 tShowNode x@(TSym _ _) = show x
 tShowNode (TBroadcast d _) = "BC"++ show d
-tShowNode (TUnary (Unary unOp _)) = show unOp
-tShowNode (TBinary (Binary binOp _ _)) = show binOp
+tShowNode (TUnary unOp _) = show unOp
+tShowNode (TBinary binOp _ _) = show binOp
 
 tGetSyms :: Tensor a -> [Tensor a]
 tGetSyms (TNum _ _) = []
 tGetSyms (TInt _ _) = []
 tGetSyms x@(TSym _ _) = [x]
-tGetSyms (TUnary (Unary _ x)) = tGetSyms x
-tGetSyms (TBinary (Binary _ x y)) = tGetSyms x ++ (tGetSyms y)
+tGetSyms (TUnary _ x) = tGetSyms x
+tGetSyms (TBinary _ x y) = tGetSyms x ++ (tGetSyms y)
 tGetSyms (TBroadcast _ x) = tGetSyms x
 
 -- | get dimensions of tensor
@@ -59,8 +59,8 @@ tDim (TNum d _) = d
 tDim (TInt d _) = d
 tDim (TSym d _) = d
 tDim (TBroadcast d _) = d
-tDim (TUnary (Unary _ m)) = tDim m
-tDim (TBinary (Binary _ tx ty)) 
+tDim (TUnary _ m) = tDim m
+tDim (TBinary _ tx ty)
   | tDim tx == tDim ty = tDim tx
   | otherwise          = error "api error - tDim found mismatched dimensions in TBinary"
 
@@ -83,32 +83,32 @@ instance Num a => Num (Tensor a) where
   fromInteger = error "API error: fromInteger (in Num a => Num (Tensor a)) should not be accessible by the user"
   abs x 
     | tIsI 0 x = broadcast (tDim x) (TInt [] [0])
-    | otherwise = TUnary (Unary Abs x)
+    | otherwise = TUnary Abs x
   signum x 
     | tIsI 0 x = broadcast (tDim x) (TInt [] [0])
-    | otherwise = TUnary (Unary Signum x)
+    | otherwise = TUnary Signum x
   negate x 
     | tIsI 0 x = broadcast (tDim x) (TInt [] [0])
-    | otherwise = TUnary (Unary Neg x)
+    | otherwise = TUnary Neg x
   (TNum dx xs) + (TNum _ ys) = TNum dx $ zipWith (+) xs ys
   (TInt dx xs) + (TInt _ ys) = TInt dx $ zipWith (+) xs ys
   x + y
     | tIsI 0 x = y
     | tIsI 0 y = x
-    | otherwise = TBinary (Binary Add x y)
+    | otherwise = TBinary Add x y
   (TNum dx xs) - (TNum _ ys) = TNum dx $ zipWith (-) xs ys
   (TInt dx xs) - (TInt _ ys) = TInt dx $ zipWith (-) xs ys
   x - y
     | tIsI 0 x = negate y
     | tIsI 0 y = x
-    | otherwise = TBinary (Binary Sub x y)
+    | otherwise = TBinary Sub x y
   (TNum dx xs) * (TNum _ ys) = TNum dx $ zipWith (*) xs ys
   (TInt dx xs) * (TInt _ ys) = TInt dx $ zipWith (*) xs ys
   x * y
     | tIsI 1 x = y
     | tIsI 1 y = x
     | tIsI 0 x || tIsI 0 y = broadcast (tDim x) (TInt [] [0])
-    | otherwise = TBinary (Binary Mul x y)
+    | otherwise = TBinary Mul x y
 
 -- Fractional instance
 instance Fractional a => Fractional (Tensor a) where
@@ -116,39 +116,39 @@ instance Fractional a => Fractional (Tensor a) where
   x / y 
     | tIsI 0 y  = error "Tensor divide by zero"
     | tIsI 0 x  = broadcast (tDim x) (TInt [] [0])
-    | otherwise = TBinary $ Binary Div x y
+    | otherwise = TBinary Div x y
   fromRational = error "API error: fromRational (in Fractional a => Fractional (Tensor a)) should not be accessible by the user"
 
 -- Floating instance
 instance (Floating a) => Floating (Tensor a) where
   pi = error "API error: pi (in Floating a => Floating (Tensor a)) should not be accessible by the user"  
   
-  exp x  = TUnary (Unary Exp x)
-  sqrt x = TUnary (Unary Sqrt x)
-  log x  = TUnary (Unary Log x)
+  exp x  = TUnary Exp x
+  sqrt x = TUnary Sqrt x
+  log x  = TUnary Log x
   
   x ** y
     | tIsI 0 x && tIsI 0 y = error "indeterminate expression 0**0 encountered"
     | tIsI 0 y             = broadcast (tDim x) (TInt [] [1])
     | tIsI 1 y             = x
-    | otherwise = TBinary (Binary Pow x y)
-  logBase x y = TBinary (Binary LogBase x y)
+    | otherwise = TBinary Pow x y
+  logBase x y = TBinary LogBase x y
   
-  sin x = TUnary (Unary Sin x)
-  cos x = TUnary (Unary Cos x)
-  tan x = TUnary (Unary Tan x)
+  sin x = TUnary Sin x
+  cos x = TUnary Cos x
+  tan x = TUnary Tan x
                    
-  asin x = TUnary (Unary ASin x)
-  acos x = TUnary (Unary ACos x)
-  atan x = TUnary (Unary ATan x)
+  asin x = TUnary ASin x
+  acos x = TUnary ACos x
+  atan x = TUnary ATan x
 
-  sinh x = TUnary (Unary Sinh x)
-  cosh x = TUnary (Unary Cosh x)
-  tanh x = TUnary (Unary Tanh x)
+  sinh x = TUnary Sinh x
+  cosh x = TUnary Cosh x
+  tanh x = TUnary Tanh x
 
-  asinh x = TUnary (Unary ASinh x)
-  acosh x = TUnary (Unary ACosh x)
-  atanh x = TUnary (Unary ATanh x)
+  asinh x = TUnary ASinh x
+  acosh x = TUnary ACosh x
+  atanh x = TUnary ATanh x
 
 
 -- | evaluate (Tensor a) to a numeric list
@@ -157,8 +157,8 @@ tEval (TNum _ x) = x
 tEval (TInt _ x) = map fromIntegral x
 tEval (TBroadcast d x) = replicate (product d) (head $ tEval x)
 tEval (TSym _ _) = error "api error: tEval can't evaluate symbolic expression"
-tEval (TUnary (Unary unType x)) = map (applyUnary unType) (tEval x)
-tEval (TBinary (Binary binType x y)) = zipWith (applyBinary binType) (tEval x) (tEval y)
+tEval (TUnary unType x) = map (applyUnary unType) (tEval x)
+tEval (TBinary binType x y) = zipWith (applyBinary binType) (tEval x) (tEval y)
 
 
 -- | convert GNode (Tensor a) into proper c code
@@ -177,11 +177,11 @@ sToCCode (GOutput idx _ cx k name) = "out["++ show k ++ "][0] = "++cName cx ++ "
 sToCCode (GSource idx (TNum [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
 sToCCode (GSource idx (TInt [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
 sToCCode (GSource idx (TSym [] n)) = "const " ++ sAssign idx ++ n ++ ";"
-sToCCode (GUnary idx (TUnary (Unary unType _)) ic) = "const " ++ sAssign idx ++ show unType ++ "(" ++ cName ic ++ ");"
-sToCCode (GBinary idx (TBinary (Binary binType _ _)) (icx, icy)) = "const " ++ sAssign idx ++ 
-                                                                   cName icx ++ 
-                                                                   " " ++ show binType ++ " " ++
-                                                                   cName icy ++";"
+sToCCode (GUnary idx (TUnary unType _) ic) = "const " ++ sAssign idx ++ show unType ++ "(" ++ cName ic ++ ");"
+sToCCode (GBinary idx (TBinary binType _ _) (icx, icy)) = "const " ++ sAssign idx ++ 
+                                                          cName icx ++ 
+                                                          " " ++ show binType ++ " " ++
+                                                          cName icy ++";"
 sToCCode x@(GSource _ _) = error $ "sToCCode api fail in GSource _ _)" ++ show x
 sToCCode x@(GUnary _ _ _) = error $ "sToCCode api fail in GUnary _ _)" ++ show x
 sToCCode x@(GBinary _ _ _) = error $ "sToCCode api fail in GBinary _ _)" ++ show x
@@ -217,8 +217,8 @@ arrayToCCode (GSource idx (TNum d xs)) = "const " ++ vAssign d idx ++ l2a xs ++ 
 arrayToCCode (GSource idx (TInt d xs)) = "const " ++ vAssign d idx ++ l2a xs ++ ";"
 arrayToCCode (GSource idx (TSym _ n)) = "const " ++ cType ++ " * const " ++ cName idx ++ " = " ++ n ++ ";"
 arrayToCCode (GBroadcast idx (TBroadcast d _) ic) = cBroadcast d idx ic
-arrayToCCode (GUnary idx x@(TUnary (Unary unType _)) ic) = cMap (tDim x) (show unType) idx ic
-arrayToCCode (GBinary idx x@(TBinary (Binary binType _ _)) (icx, icy)) = cZip (tDim x) (show binType) idx icx icy
+arrayToCCode (GUnary idx x@(TUnary unType _) ic) = cMap (tDim x) (show unType) idx ic
+arrayToCCode (GBinary idx x@(TBinary binType _ _) (icx, icy)) = cZip (tDim x) (show binType) idx icx icy
 
 arrayToCCode x@(GSource _ _) = error $ "arrayToCCode api fail in GSource _ _)" ++ show x
 arrayToCCode x@(GUnary _ _ _) = error $ "arrayToCCode api fail in GUnary _ _)" ++ show x
