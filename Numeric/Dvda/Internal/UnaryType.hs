@@ -4,6 +4,7 @@
 
 module Numeric.Dvda.Internal.UnaryType( UnaryType(..)
                                       , applyUnary
+                                      , cshow
                                       ) where
 
 data UnaryType = Abs
@@ -76,3 +77,7 @@ instance Show UnaryType where
   show ASinh = "asinh"
   show ACosh = "acosh"
   show ATanh = "atanh"
+
+cshow :: UnaryType -> String
+cshow Abs = "fabs"
+cshow x = show x

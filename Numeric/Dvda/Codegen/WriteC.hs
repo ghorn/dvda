@@ -30,7 +30,7 @@ writeCSource inputs outputs = (src, include, hash)
   where
     hash = md5s (Str body)
     
-    prototype = "void " ++ Config.nameCFunction hash ++ "(const double * const in[], double * const out[])"
+    prototype = "void " ++ Config.nameCFunction hash ++ "(const double * const in[] __attribute__ ((__unused__)), double * const out[])"
     
     include = unlines [ "// " ++ Config.nameCInclude hash
                       , ""

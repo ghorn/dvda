@@ -8,10 +8,7 @@ module Numeric.Dvda.Tests.Tests( runTests
 import Test.QuickCheck
 import System.IO.Unsafe
 
-import Numeric.Dvda.Function
-import Numeric.Dvda.Codegen.Codegen
-import Numeric.Dvda.Simplify
-import Numeric.Dvda.Expr
+import Numeric.Dvda
 import Numeric.Dvda.Tests.ArbitraryExpr
 
 
@@ -19,22 +16,17 @@ import Numeric.Dvda.Tests.ArbitraryExpr
 (~=) x y = (x == y) || isNaN x && isNaN y
 
 buildAndEvaluate :: RealFloat a => Pair a -> Bool
-buildAndEvaluate (Pair x ex) = (x == evaluate ex) || isNaN x && isNaN (evaluate ex)
+buildAndEvaluate (Pair x ex) = (x == evalScalar ex) || isNaN x && isNaN (evalScalar ex)
 
-evaluateEqSimplifyEvaluate :: RealFloat a => Pair a -> Bool
-evaluateEqSimplifyEvaluate (Pair _ ex) = ex0 == exSimp || isNaN ex0
-  where
-    ex0 = evaluate ex
-    exSimp = evaluate $ simplify ex
 evaluateEqualsCallNative :: RealFloat a => Expr a -> Bool
 evaluateEqualsCallNative expr = unsafePerformIO $ do
   fun <- toFunction [] [expr]
-  return $ and $ zipWith (~=) [evaluate expr] (callNative fun [])
+  return $ and $ zipWith (~=) [evalScalar expr] (map evalScalar (callNative fun []))
 
 callNativeEqualsCallC :: RealFloat a => Expr a -> Bool
 callNativeEqualsCallC expr = unsafePerformIO $ do
   fun <- toFunction [] [expr]
-  return $ and $ zipWith (~=) (callNative fun []) (callC fun [])
+  return $ and $ zipWith (~=) (map evalScalar (callNative fun [])) (map evalScalar (callC fun []))
 
 runTests :: IO ()
 runTests = do
@@ -46,9 +38,6 @@ runTests = do
   
   putStrLn "\nbuilding arbitrary expressions and evaluating them"
   quickCheck (buildAndEvaluate :: Pair Double -> Bool)
-
-  putStrLn "\nsimplify doesn't change result"
-  quickCheck (evaluateEqSimplifyEvaluate :: Pair Double -> Bool)
 
   putStrLn "\nevaluate fun [] ~= callNative fun [] ..."
   quickCheck (evaluateEqualsCallNative :: Expr Double -> Bool)

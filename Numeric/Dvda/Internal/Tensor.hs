@@ -31,6 +31,7 @@ instance Show a => Show (Tensor a) where
   show (TSym d x) = replicate n '{' ++ x ++ (replicate n '}')
     where
       n = length d
+  show (TUnary Neg x) = "(" ++ show Neg ++ "(" ++ show x ++ "))"
   show (TUnary unaryType x) = show unaryType ++ "(" ++ show x ++ ")"
   show (TBinary binaryType x y) = "(" ++ show x ++ " " ++ show binaryType ++ " " ++ show y ++ ")"
   show (TBroadcast d x) = "BC(" ++ show d ++ " <- " ++ show x ++ ")"
@@ -177,7 +178,7 @@ sToCCode (GOutput idx _ cx k name) = "out["++ show k ++ "][0] = "++cName cx ++ "
 sToCCode (GSource idx (TNum [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
 sToCCode (GSource idx (TInt [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
 sToCCode (GSource idx (TSym [] n)) = "const " ++ sAssign idx ++ n ++ ";"
-sToCCode (GUnary idx (TUnary unType _) ic) = "const " ++ sAssign idx ++ show unType ++ "(" ++ cName ic ++ ");"
+sToCCode (GUnary idx (TUnary unType _) ic) = "const " ++ sAssign idx ++ cshow unType ++ "(" ++ cName ic ++ ");"
 sToCCode (GBinary idx (TBinary binType _ _) (icx, icy)) = "const " ++ sAssign idx ++ 
                                                           cName icx ++ 
                                                           " " ++ show binType ++ " " ++
