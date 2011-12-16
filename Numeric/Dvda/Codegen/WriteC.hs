@@ -62,7 +62,6 @@ writeCSource inputs outputs = (src, include, hash)
         gnodes = exprsToGNodes_ outputs
         
 inputDec :: Expr a -> Int -> String
-inputDec (EScalar (TSym _ n)) k = "    const double " ++ n ++ " = *(in[" ++ show k ++ "]);"
-inputDec (EVector (TSym _ n)) k = "    const double * const " ++ n ++ " = in[" ++ show k ++ "];"
-inputDec (EMatrix (TSym _ n)) k = "    const double * const " ++ n ++ " = in[" ++ show k ++ "];"
+inputDec (Expr (TSym [] n)) k = "    const double " ++ n ++ " = *(in[" ++ show k ++ "]);"
+inputDec (Expr (TSym _ n)) k  = "    const double * const " ++ n ++ " = in[" ++ show k ++ "];"
 inputDec _ _ = error "api fail in inputDec"

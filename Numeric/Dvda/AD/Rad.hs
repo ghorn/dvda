@@ -25,40 +25,16 @@ pert (Dual _ b) = b
 
 
 getSensitivities :: Floating a => Expr a -> Expr a -> [(Expr a, Expr a)]
-getSensitivities primal@(EScalar (TSym _ _)) sens = [(primal, sens)]
-getSensitivities primal@(EVector (TSym _ _)) sens = [(primal, sens)]
-getSensitivities primal@(EMatrix (TSym _ _)) sens = [(primal, sens)]
-getSensitivities (EScalar (TUnary (Unary unType x'))) sens = getSensitivities x (sens*dfdx)
+getSensitivities primal@(Expr (TSym _ _)) sens = [(primal, sens)]
+getSensitivities (Expr (TUnary (Unary unType g'))) sens = getSensitivities g (sens*dfdg)
   where
-    dfdx = pert $ applyUnary unType (Dual x 1)
-    x = EScalar x'
-getSensitivities (EVector (TUnary (Unary unType x'))) sens = getSensitivities x (sens*dfdx)
+    dfdg = pert $ applyUnary unType (Dual g 1)
+    g = Expr g'
+getSensitivities (Expr (TBinary (Binary binType g' h'))) sens = getSensitivities g (sens*dfdg) ++
+                                                                   getSensitivities h (sens*dfdh)
   where
-    dfdx = pert $ applyUnary unType (Dual x 1)
-    x = EVector x'
-getSensitivities (EMatrix (TUnary (Unary unType x'))) sens = getSensitivities x (sens*dfdx)
-  where
-    dfdx = pert $ applyUnary unType (Dual x 1)
-    x = EMatrix x'
-getSensitivities (EScalar (TBinary (Binary binType x' y'))) sens = getSensitivities x (sens*dfdx) ++
-                                                                   getSensitivities y (sens*dfdy)
-  where
-    dfdx = pert $ applyBinary binType (Dual x 1) (Dual y 0)
-    dfdy = pert $ applyBinary binType (Dual x 0) (Dual y 1)
-    x = EScalar x'
-    y = EScalar y'
-getSensitivities (EVector (TBinary (Binary binType x' y'))) sens = getSensitivities x (sens*dfdx) ++
-                                                                   getSensitivities y (sens*dfdy)
-  where
-    dfdx = pert $ applyBinary binType (Dual x 1) (Dual y 0)
-    dfdy = pert $ applyBinary binType (Dual x 0) (Dual y 1)
-    x = EVector x'
-    y = EVector y'
-getSensitivities (EMatrix (TBinary (Binary binType x' y'))) sens = getSensitivities x (sens*dfdx) ++
-                                                                   getSensitivities y (sens*dfdy)
-  where
-    dfdx = pert $ applyBinary binType (Dual x 1) (Dual y 0)
-    dfdy = pert $ applyBinary binType (Dual x 0) (Dual y 1)
-    x = EMatrix x'
-    y = EMatrix y'
+    dfdg = pert $ applyBinary binType (Dual g 1) (Dual h 0)
+    dfdh = pert $ applyBinary binType (Dual g 0) (Dual h 1)
+    g = Expr g'
+    h = Expr h'
 getSensitivities _ _ = []

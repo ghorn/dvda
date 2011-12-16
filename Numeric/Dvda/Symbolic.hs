@@ -35,99 +35,70 @@ import Numeric.Dvda.Internal.Unary
 
 -- | Get the dimensions of an expression. Scalar: [], vector [r], matrix: [r,c]
 dim :: Expr a -> [Int]
-dim (EScalar x) = tDim x
-dim (EVector x) = tDim x
-dim (EMatrix x) = tDim x
+dim (Expr x) = tDim x
 
 -- | Evalute numeric operations in expression returning numereric `Numeric.Dvda.Expr.Expr` form
 --   .
 --   Causes exception if Expression has any symbolic variables
 evalE :: Floating a => Expr a -> Expr a
-evalE (EScalar x) = EScalar $ TNum (tDim x) (tEval x)
-evalE (EVector x) = EVector $ TNum (tDim x) (tEval x)
-evalE (EMatrix x) = EMatrix $ TNum (tDim x) (tEval x)
+evalE (Expr x) = Expr $ TNum (tDim x) (tEval x)
 
 -- | Evalute numeric operations in expression returning dimensions and "array"
 --   .
 --   Causes exception if Expression has any symbolic variables
 eval :: Floating a => Expr a -> ([Int],[a])
-eval (EScalar x) = (tDim x, tEval x)
-eval (EVector x) = (tDim x, tEval x)
-eval (EMatrix x) = (tDim x, tEval x)
-
+eval (Expr x) = (tDim x, tEval x)
 
 -- | create symbolic scalar
 sym :: String -> Expr a
-sym name = EScalar $ TSym [] name
+sym name = Expr $ TSym [] name
 
 -- | create symbolic vector with length
 symVec :: Int -> String -> Expr a
 symVec d name 
-  | d > 0     = EVector $ TSym [d] name
+  | d > 0     = Expr $ TSym [d] name
   | otherwise = error $ "symVec can't make vector with length: " ++ show d
 
 -- | create symbolic matrix with specified (rows, columns)
 symMat :: (Int,Int) -> String -> Expr a
 symMat (r,c) name
-  | r > 0 && c > 0 = EMatrix $ TSym [r,c] name
+  | r > 0 && c > 0 = Expr $ TSym [r,c] name
   | otherwise      = error $ "symMat can't make matrix with dimensions: " ++ show (r,c)
 
--- | explicitely convert a numeric value to an expression
+-- | explicitly convert a numeric value to an expression
 sca :: a -> Expr a
-sca x = EScalar $ TNum [] [x]
+sca x = Expr $ TNum [] [x]
 
 -- | create numeric vector
 vec :: [a] -> Expr a
 vec xs 
-  | length xs > 0 = EVector $ TNum [length xs] xs
+  | length xs > 0 = Expr $ TNum [length xs] xs
   | otherwise     = error "Improper dimensions in vec :: [a] -> Expr a"
 
 -- | Create numeric matrix with specified (rows, cols). List is taken rowwise.
 mat :: (Int,Int) -> [a] -> Expr a
 mat (r,c) xs 
-  | (length xs == r*c) && (r > 0) && (c > 0) = EMatrix $ TNum [r,c] xs
+  | (length xs == r*c) && (r > 0) && (c > 0) = Expr $ TNum [r,c] xs
   | otherwise                                = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
 
 
 -- | substitute a list of pairs [(matchThis, replaceWithThis)] in an expression
 subs :: Floating a => [(Expr a, Expr a)] -> Expr a -> Expr a
-subs subslist expr
-  | length subslist == length (nubBy contradictingSub subslist) = callCorrectSub expr
+subs subslist (Expr tensor)
+  | length subslist == length (nubBy contradictingSub subslist) = subs' tensor
   | otherwise = error "Error in subs: same input in substitute pairs list twice with different outputs"
   where
     contradictingSub (x0,x1) (y0,y1) = (x0 == y0) && (x1 /= y1)
     
-    callCorrectSub (EScalar s) = sSubs s
-    callCorrectSub (EVector v) = vSubs v
-    callCorrectSub (EMatrix m) = mSubs m
-    
-    (scalarSubs, vectorSubs, matrixSubs) = foldr sortSubs ([],[],[]) subslist
-    
-    sortSubs (EScalar x, EScalar y) (ss,vs,ms) = ( ss ++ [(x,y)], vs           , ms            )
-    sortSubs (EVector x, EVector y) (ss,vs,ms) = ( ss           , vs ++ [(x,y)], ms            )
-    sortSubs (EMatrix x, EMatrix y) (ss,vs,ms) = ( ss           , vs           , ms ++ [(x,y)] )
-    sortSubs xy _ = error $ "Can't substitute two unlike quantities, must be scalar -> scalar, vector -> vector, or matrix -> matrix)\noffending pair: " ++ show xy
+    tSubslist = map (\(Expr x, Expr y) -> (x, y)) subslist
 
-    sSubs x@(TNum _ _) = EScalar x
-    sSubs x@(TInt _ _) = EScalar x
-    sSubs x@(TSym _ _) = EScalar $ sub scalarSubs x
-    sSubs (TUnary (Unary unOp x)) = applyUnary unOp $ sSubs x
-    sSubs (TBinary (Binary binOp x y)) = applyBinary binOp (sSubs x) (sSubs y)
-    sSubs (TBroadcast _ _) = error "api fail in sSubs in subs"
-    
-    vSubs x@(TNum _ _) = EVector x
-    vSubs x@(TInt _ _) = EVector x
-    vSubs x@(TSym _ _) = EVector $ sub vectorSubs x
-    vSubs (TUnary (Unary unOp x)) = applyUnary unOp (vSubs x)
-    vSubs (TBinary (Binary binOp x y)) = applyBinary binOp (vSubs x) (vSubs y)
-    vSubs (TBroadcast _ x) = sSubs x
-    
-    mSubs x@(TNum _ _) = EMatrix x
-    mSubs x@(TInt _ _) = EMatrix x
-    mSubs x@(TSym _ _) = EMatrix $ sub matrixSubs x
-    mSubs (TUnary (Unary unOp x)) = applyUnary unOp $ mSubs x
-    mSubs (TBinary (Binary binOp x y)) = applyBinary binOp (mSubs x) (mSubs y)
-    mSubs (TBroadcast _ x) = sSubs x
+    subs' x@(TNum _ _) = Expr x
+    subs' x@(TInt _ _) = Expr x
+    subs' x@(TSym _ _) = Expr $ sub tSubslist x
+    subs' (TUnary (Unary unOp x)) = applyUnary unOp $ subs' x
+    subs' (TBinary (Binary binOp x y)) = applyBinary binOp (subs' x) (subs' y)
+    subs' (TBroadcast [] _) = error "api fail in subs' in subs"
+    subs' (TBroadcast _ x) = subs' x
 
     sub :: Eq a => [(a,a)] -> a -> a
     sub sublist arg 

@@ -61,7 +61,7 @@ callNative fun args
 -- | Call a function using generated C code with `Numeric.Dvda.Expr.Expr` inputs and outputs
 callC :: (Floating a, Real a) => Function a -> [Expr a] -> [Expr a]
 callC fun inputs
-  | and (zipWith (==) trueInputLengths userInputLengths) = map tensorToExpr $ zipWith TNum outputDims listOutputs
+  | and (zipWith (==) trueInputLengths userInputLengths) = map Expr $ zipWith TNum outputDims listOutputs
   | otherwise = error $ "callC detected improper number of inputs\n"++
                 "expected input lengths: " ++ show trueInputLengths ++ "\n" ++
                 "user input lengths:     " ++ show userInputLengths
