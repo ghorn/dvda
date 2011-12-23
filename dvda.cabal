@@ -36,6 +36,7 @@ source-repository head
 Library
   Exposed-modules:   Numeric.Dvda
                      Numeric.Dvda.Symbolic
+                     Numeric.Dvda.Dim
                      Numeric.Dvda.AD
                      Numeric.Dvda.Vis
                      Numeric.Dvda.Function

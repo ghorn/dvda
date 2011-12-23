@@ -21,6 +21,7 @@ module Numeric.Dvda.Internal.ExprUtils( getSyms
 import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Tensor
 import Numeric.Dvda.Internal.GNode
+import Numeric.Dvda.Dim
 
 showNode :: Show a => Expr a -> String
 showNode (Expr x) = tShowNode x
@@ -32,7 +33,7 @@ showType _ = ""
 
 showDim :: Show a => Expr a -> String
 showDim (Expr x)
-  | tDim x == [] = ""
+  | tDim x == D0 = ""
   | otherwise    = show $ tDim x
 
 -- | convert Expr gnode to c code string
@@ -67,6 +68,6 @@ data Children a = CSource
 getChildren :: Expr a -> Children (Expr a)
 getChildren (Expr (TUnary _ x)) = CUnary (Expr x)
 getChildren (Expr (TBinary _ x y)) = CBinary (Expr x) (Expr y)
-getChildren (Expr (TBroadcast [] _)) = error "api fail in getChildren"
+getChildren (Expr (TBroadcast D0 _)) = error "api fail in getChildren"
 getChildren (Expr (TBroadcast _ x)) = CBroadcast (Expr x)
 getChildren (Expr _) = CSource

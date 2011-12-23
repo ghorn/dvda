@@ -11,6 +11,7 @@ module Numeric.Dvda.Internal.Expr( Expr(..)
                                  ) where
 
 import Numeric.Dvda.Internal.Tensor
+import Numeric.Dvda.Dim
 
 data Expr a = Expr (Tensor a) deriving Eq
 
@@ -23,16 +24,14 @@ instance Num a => Num (Expr a) where
   x - y = safeBinaryConstruct (-) x y
   abs = safeUnaryConstruct abs
   signum = safeUnaryConstruct signum
-  fromInteger i = Expr (TInt [] [fromInteger i])
-
+  fromInteger i = Expr (TInt D0 [fromInteger i])
 
 instance Fractional a => Fractional (Expr a) where
   x / y = safeBinaryConstruct (/) x y
-  fromRational r = Expr $ TNum [] [fromRational r]
-
+  fromRational r = Expr $ TNum D0 [fromRational r]
 
 instance (Floating a) => Floating (Expr a) where
-  pi = Expr $ TNum [] [pi]
+  pi = Expr $ TNum D0 [pi]
   
   exp  = safeUnaryConstruct exp
   sqrt = safeUnaryConstruct sqrt
@@ -67,8 +66,8 @@ safeBinaryConstruct f (Expr x) (Expr y)
   -- normal combination
   | tDim x == tDim y = Expr $ f x y
   -- broadcast scalar:
-  | tDim x == []     = Expr $ f (TBroadcast (tDim y) x) y
-  | tDim y == []     = Expr $ f x (TBroadcast (tDim x) y)
+  | tDim x == D0     = Expr $ f (TBroadcast (tDim y) x) y
+  | tDim y == D0     = Expr $ f x (TBroadcast (tDim x) y)
   -- dimension mismatch:
   | otherwise        = error $ unlines [ "Dimension mismatch in Expr + Expr"
                                        , "dim1: " ++ show (tDim x)

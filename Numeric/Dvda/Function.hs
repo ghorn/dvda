@@ -28,6 +28,7 @@ import Numeric.Dvda.Symbolic
 import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Tensor
 import Numeric.Dvda.Internal.ExprUtils
+import Numeric.Dvda.Dim
 
 data Function a = Function { funInputs :: [Expr a]
                            , funOutputs :: [Expr a]
@@ -66,10 +67,10 @@ callC fun inputs
                 "expected input lengths: " ++ show trueInputLengths ++ "\n" ++
                 "user input lengths:     " ++ show userInputLengths
   where
-    outputLengths = map product outputDims
+    outputLengths = map dsize outputDims
     outputDims = map dim (funOutputs fun)
-    trueInputLengths = map (product . dim) (funInputs fun)    
-    userInputLengths = map (product . dim) inputs
+    trueInputLengths = map (dsize . dim) (funInputs fun)    
+    userInputLengths = map (dsize . dim) inputs
     
     listOutputs = callCFunction outputLengths (funCFunPtr fun) (map (snd . eval) inputs)
 

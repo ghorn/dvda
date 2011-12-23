@@ -16,6 +16,7 @@ import Numeric.Dvda.Internal.ExprGraph
 import Numeric.Dvda.Internal.GNode(topSort)
 import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Tensor
+import Numeric.Dvda.Dim
 
 -- | show c source utility function
 showCSource :: (Eq a, Show a) => [Expr a] -> [Expr a] -> String
@@ -62,6 +63,6 @@ writeCSource inputs outputs = (src, include, hash)
         gnodes = exprsToGNodes_ outputs
         
 inputDec :: Expr a -> Int -> String
-inputDec (Expr (TSym [] n)) k = "    const double " ++ n ++ " = *(in[" ++ show k ++ "]);"
+inputDec (Expr (TSym D0 n)) k = "    const double " ++ n ++ " = *(in[" ++ show k ++ "]);"
 inputDec (Expr (TSym _ n)) k  = "    const double * const " ++ n ++ " = in[" ++ show k ++ "];"
 inputDec _ _ = error "api fail in inputDec"
