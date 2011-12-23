@@ -33,6 +33,10 @@ source-repository head
   location: git://github.com/ghorn/dvda.git
 --  tag: 
 
+Flag stressTest
+  Description: Build a profilable hard executable
+  Default: False
+
 Library
   Exposed-modules:   Numeric.Dvda
                      Numeric.Dvda.Symbolic
@@ -69,3 +73,16 @@ Library
                      QuickCheck,
                      containers
   Ghc-options:       -O2 -Wall
+
+
+Executable stressTest
+  if flag(stressTest)
+     Buildable: True
+  else
+     Buildable: False
+
+  Main-Is:           StressTest.hs
+
+  Ghc-Options: -O2
+
+  GHC-Prof-Options: -auto-all -caf-all -rtsopts
