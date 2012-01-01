@@ -33,7 +33,7 @@ exprsToGNodes exprs names = gnodesOut
 exprGobbler :: Eq a => [GNode (Expr a)] -> Node -> Expr a -> (Node, Node, [GNode (Expr a)])
 exprGobbler oldGNodes thisIdx expr
   -- node already exists
-  | isJust existingGNode = (existingNode, thisIdx, [])
+  | isJust existingNode = (fromJust existingNode, thisIdx, [])
   -- insert new node
   | otherwise = case getChildren expr
                 of CSource -> (thisIdx, thisIdx + 1, [GSource thisIdx expr])
@@ -55,6 +55,10 @@ exprGobbler oldGNodes thisIdx expr
                        oldGNodes'' = oldGNodes' ++ childXGNodes
                        (childYIdx, nextFreeIdx', childYGNodes) = exprGobbler oldGNodes'' nextFreeIdx childY
   where
-    existingGNode = gmatch expr oldGNodes
-    -- existingNode = fmap getIdx $ gmatch expr oldGNodes
-    existingNode = getIdx $ fromJust existingGNode
+    existingNode = fmap getIdx $ gmatch expr oldGNodes
+
+
+gmatch :: Eq a => a -> [GNode a] -> Maybe (GNode a)
+gmatch expr gnodes = case dropWhile (\x -> exprOfGNode x /= expr) gnodes
+                      of [] -> Nothing
+                         x:_ -> Just x

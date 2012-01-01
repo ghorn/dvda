@@ -5,7 +5,6 @@
 module Numeric.Dvda.Internal.GNode( getIdx
                                   , exprOfGNode
                                   , GNode(..)
-                                  , gmatch
                                   , topSort
                                   ) where
 
@@ -33,12 +32,6 @@ getIdx (GOutput n _ _ _ _) = n
 getIdx (GBroadcast n _ _) = n
 getIdx (GUnary n _ _) = n
 getIdx (GBinary n _ _) = n
-
-gmatch :: Eq a => a -> [GNode a] -> Maybe (GNode a)
-gmatch expr gnodes = case dropWhile (\x -> exprOfGNode x /= expr) gnodes
-                      of [] -> Nothing
-                         x:_ -> Just x
-
 
 -- | sort a list of gnodes by whether they are descendents of each other
 topSort :: [GNode a] -> [GNode a]
