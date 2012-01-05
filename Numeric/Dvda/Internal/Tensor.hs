@@ -15,22 +15,23 @@ import Numeric.Dvda.Internal.GNode
 import Numeric.Dvda.Internal.BinaryType
 import Numeric.Dvda.Internal.UnaryType
 import Numeric.Dvda.Config(cType, cName)
+import Numeric.Dvda.Dim
 
-data Tensor a = TNum [Int] [a]
-              | TInt [Int] [Int]
-              | TSym [Int] String
+data Tensor a = TNum Dim [a]
+              | TInt Dim [Int]
+              | TSym Dim String
               | TUnary UnaryType (Tensor a)
               | TBinary BinaryType (Tensor a) (Tensor a)
-              | TBroadcast [Int] (Tensor a) deriving Eq
+              | TBroadcast Dim (Tensor a) deriving Eq
 
 instance Show a => Show (Tensor a) where
-  show (TNum [] [x]) = show x
+  show (TNum D0 [x]) = show x
   show (TNum _ x) = show x
-  show (TInt [] [x]) = show x
+  show (TInt D0 [x]) = show x
   show (TInt _ x) = show x
   show (TSym d x) = replicate n '{' ++ x ++ (replicate n '}')
     where
-      n = length d
+      n = dorder d
   show (TUnary Neg x) = "(" ++ show Neg ++ "(" ++ show x ++ "))"
   show (TUnary unaryType x) = show unaryType ++ "(" ++ show x ++ ")"
   show (TBinary binaryType x y) = "(" ++ show x ++ " " ++ show binaryType ++ " " ++ show y ++ ")"
@@ -55,7 +56,7 @@ tGetSyms (TBinary _ x y) = tGetSyms x ++ (tGetSyms y)
 tGetSyms (TBroadcast _ x) = tGetSyms x
 
 -- | get dimensions of tensor
-tDim :: Tensor a -> [Int]
+tDim :: Tensor a -> Dim
 tDim (TNum d _) = d
 tDim (TInt d _) = d
 tDim (TSym d _) = d
@@ -68,28 +69,28 @@ tDim (TBinary _ tx ty)
 
 -- | test if tensor is broadcast from (SInt x)
 tIsI :: Int -> Tensor a -> Bool
-tIsI i (TInt [] [s]) = s == i
+tIsI i (TInt D0 [s]) = s == i
 tIsI i (TBroadcast _ s) = tIsI i s
 tIsI _ _ = False
 
-broadcast :: [Int] -> Tensor a -> Tensor a
-broadcast [] x@(TNum [] [_]) = x
-broadcast [] x@(TInt [] [_]) = x
-broadcast [] x@(TSym [] _) = x
-broadcast [] _ = error "api error in broadcast"
+broadcast :: Dim -> Tensor a -> Tensor a
+broadcast D0 x@(TNum D0 [_]) = x -- take out these three lines
+broadcast D0 x@(TInt D0 [_]) = x
+broadcast D0 x@(TSym D0 _) = x
+broadcast D0 _ = error "api error in broadcast"
 broadcast dim x = TBroadcast dim x
 
 -- Num instance
 instance Num a => Num (Tensor a) where
   fromInteger = error "API error: fromInteger (in Num a => Num (Tensor a)) should not be accessible by the user"
   abs x 
-    | tIsI 0 x = broadcast (tDim x) (TInt [] [0])
+    | tIsI 0 x = broadcast (tDim x) (TInt D0 [0])
     | otherwise = TUnary Abs x
   signum x 
-    | tIsI 0 x = broadcast (tDim x) (TInt [] [0])
+    | tIsI 0 x = broadcast (tDim x) (TInt D0 [0])
     | otherwise = TUnary Signum x
   negate x 
-    | tIsI 0 x = broadcast (tDim x) (TInt [] [0])
+    | tIsI 0 x = broadcast (tDim x) (TInt D0 [0])
     | otherwise = TUnary Neg x
   (TNum dx xs) + (TNum _ ys) = TNum dx $ zipWith (+) xs ys
   (TInt dx xs) + (TInt _ ys) = TInt dx $ zipWith (+) xs ys
@@ -108,7 +109,7 @@ instance Num a => Num (Tensor a) where
   x * y
     | tIsI 1 x = y
     | tIsI 1 y = x
-    | tIsI 0 x || tIsI 0 y = broadcast (tDim x) (TInt [] [0])
+    | tIsI 0 x || tIsI 0 y = broadcast (tDim x) (TInt D0 [0])
     | otherwise = TBinary Mul x y
 
 -- Fractional instance
@@ -116,7 +117,7 @@ instance Fractional a => Fractional (Tensor a) where
   (TNum d x) / (TNum _ y) = TNum d $ zipWith (/) x y
   x / y 
     | tIsI 0 y  = error "Tensor divide by zero"
-    | tIsI 0 x  = broadcast (tDim x) (TInt [] [0])
+    | tIsI 0 x  = broadcast (tDim x) (TInt D0 [0])
     | otherwise = TBinary Div x y
   fromRational = error "API error: fromRational (in Fractional a => Fractional (Tensor a)) should not be accessible by the user"
 
@@ -130,7 +131,7 @@ instance (Floating a) => Floating (Tensor a) where
   
   x ** y
     | tIsI 0 x && tIsI 0 y = error "indeterminate expression 0**0 encountered"
-    | tIsI 0 y             = broadcast (tDim x) (TInt [] [1])
+    | tIsI 0 y             = broadcast (tDim x) (TInt D0 [1])
     | tIsI 1 y             = x
     | otherwise = TBinary Pow x y
   logBase x y = TBinary LogBase x y
@@ -156,7 +157,7 @@ instance (Floating a) => Floating (Tensor a) where
 tEval :: Floating a => Tensor a -> [a]
 tEval (TNum _ x) = x
 tEval (TInt _ x) = map fromIntegral x
-tEval (TBroadcast d x) = replicate (product d) (head $ tEval x)
+tEval (TBroadcast d x) = replicate (dsize d) (head $ tEval x)
 tEval (TSym _ _) = error "api error: tEval can't evaluate symbolic expression"
 tEval (TUnary unType x) = map (applyUnary unType) (tEval x)
 tEval (TBinary binType x y) = zipWith (applyBinary binType) (tEval x) (tEval y)
@@ -164,9 +165,8 @@ tEval (TBinary binType x y) = zipWith (applyBinary binType) (tEval x) (tEval y)
 
 -- | convert GNode (Tensor a) into proper c code
 tToCCode :: Show a => GNode (Tensor a) -> String
-tToCCode x = case length (tDim (exprOfGNode x)) of
-  0 -> sToCCode x
-  _ -> arrayToCCode x
+tToCCode x = case tDim (exprOfGNode x) of D0 -> sToCCode x
+                                          _  -> arrayToCCode x
 
 
 -- scalar code
@@ -175,9 +175,9 @@ sAssign idx = cType ++ " " ++ cName idx ++ " = "
 -- input
 sToCCode :: Show a => GNode (Tensor a) -> String
 sToCCode (GOutput idx _ cx k name) = "out["++ show k ++ "][0] = "++cName cx ++ "; // "++name++", output node: " ++ show idx
-sToCCode (GSource idx (TNum [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
-sToCCode (GSource idx (TInt [] [x])) = "const " ++ sAssign idx ++ show x ++ ";"
-sToCCode (GSource idx (TSym [] n)) = "const " ++ sAssign idx ++ n ++ ";"
+sToCCode (GSource idx (TNum D0 [x])) = "const " ++ sAssign idx ++ show x ++ ";"
+sToCCode (GSource idx (TInt D0 [x])) = "const " ++ sAssign idx ++ show x ++ ";"
+sToCCode (GSource idx (TSym D0 n)) = "const " ++ sAssign idx ++ n ++ ";"
 sToCCode (GUnary idx (TUnary unType _) ic) = "const " ++ sAssign idx ++ cshow unType ++ "(" ++ cName ic ++ ");"
 sToCCode (GBinary idx (TBinary binType _ _) (icx, icy)) = "const " ++ sAssign idx ++ 
                                                           cName icx ++ 
@@ -190,30 +190,30 @@ sToCCode x@(GBroadcast _ _ _) = error $ "sToCCode api fail in GBroadcast _ _)" +
 
 
 -- vector code
-vAssign :: [Int] -> Int -> String
-vAssign d idx = cType ++ " " ++ cName idx ++ "[" ++ show (product d) ++ "] = "
+vAssign :: Dim -> Int -> String
+vAssign d idx = cType ++ " " ++ cName idx ++ "[" ++ show (dsize d) ++ "] = "
 
 l2a :: Show a => [a] -> String
 l2a xs = "{" ++ drop 1 (init (show xs)) ++ "}"
 
-cMap :: [Int] -> String -> Int -> Int -> String
-cMap d f self child = cType ++ " " ++ cName self ++ "[" ++ show (product d) ++ "]; "++
-                      "    for (int k=0; k<"++show (product d)++"; k++){ "++
+cMap :: Dim -> String -> Int -> Int -> String
+cMap d f self child = cType ++ " " ++ cName self ++ "[" ++ show (dsize d) ++ "]; "++
+                      "    for (int k=0; k<"++show (dsize d)++"; k++){ "++
                       cName self ++ "[k] = " ++ f ++ "( " ++ cName child ++ "[k] ); }"
 
-cBroadcast :: [Int] -> Int -> Int -> String
-cBroadcast d self child = cType ++ " " ++ cName self ++ "[" ++ show (product d) ++ "]; "++
-                          "    for (int k=0; k<"++show (product d)++"; k++){ "++
+cBroadcast :: Dim -> Int -> Int -> String
+cBroadcast d self child = cType ++ " " ++ cName self ++ "[" ++ show (dsize d) ++ "]; "++
+                          "    for (int k=0; k<"++show (dsize d)++"; k++){ "++
                           cName self ++ "[k] = " ++ cName child ++ "; }"
 
-cZip :: [Int] -> String -> Int -> Int -> Int -> String
-cZip d f self cx cy = cType ++ " " ++ cName self ++ "[" ++ show (product d) ++ "]; "++
-                      "    for (int k=0; k<"++show (product d)++"; k++){ "++
+cZip :: Dim -> String -> Int -> Int -> Int -> String
+cZip d f self cx cy = cType ++ " " ++ cName self ++ "[" ++ show (dsize d) ++ "]; "++
+                      "    for (int k=0; k<"++show (dsize d)++"; k++){ "++
                       cName self ++ "[k] = " ++ cName cx ++ "[k] " ++ f ++ " "++cName cy++"[k]; }"
 
 
 arrayToCCode :: Show a => GNode (Tensor a) -> String
-arrayToCCode (GOutput idx x cx k name) = "memcpy( out["++ show k ++ "], "++cName cx ++ ", "++show (product (tDim x))++"*sizeof(double) ); // "++name++", output node: " ++ show idx
+arrayToCCode (GOutput idx x cx k name) = "memcpy( out["++ show k ++ "], "++cName cx ++ ", "++show (dsize (tDim x))++"*sizeof(double) ); // "++name++", output node: " ++ show idx
 arrayToCCode (GSource idx (TNum d xs)) = "const " ++ vAssign d idx ++ l2a xs ++ ";"
 arrayToCCode (GSource idx (TInt d xs)) = "const " ++ vAssign d idx ++ l2a xs ++ ";"
 arrayToCCode (GSource idx (TSym _ n)) = "const " ++ cType ++ " * const " ++ cName idx ++ " = " ++ n ++ ";"

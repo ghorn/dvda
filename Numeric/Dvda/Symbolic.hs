@@ -32,9 +32,10 @@ import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Tensor
 import Numeric.Dvda.Internal.BinaryType
 import Numeric.Dvda.Internal.UnaryType
+import Numeric.Dvda.Dim
 
 -- | Get the dimensions of an expression. Scalar: [], vector [r], matrix: [r,c]
-dim :: Expr a -> [Int]
+dim :: Expr a -> Dim
 dim (Expr x) = tDim x
 
 -- | Evalute numeric operations in expression returning numereric `Numeric.Dvda.Expr.Expr` form
@@ -46,39 +47,39 @@ evalE (Expr x) = Expr $ TNum (tDim x) (tEval x)
 -- | Evalute numeric operations in expression returning dimensions and "array"
 --   .
 --   Causes exception if Expression has any symbolic variables
-eval :: Floating a => Expr a -> ([Int],[a])
+eval :: Floating a => Expr a -> (Dim,[a])
 eval (Expr x) = (tDim x, tEval x)
 
 -- | create symbolic scalar
 sym :: String -> Expr a
-sym name = Expr $ TSym [] name
+sym name = Expr $ TSym D0 name
 
 -- | create symbolic vector with length
 symVec :: Int -> String -> Expr a
 symVec d name 
-  | d > 0     = Expr $ TSym [d] name
+  | d > 0     = Expr $ TSym (Dim [d]) name
   | otherwise = error $ "symVec can't make vector with length: " ++ show d
 
 -- | create symbolic matrix with specified (rows, columns)
 symMat :: (Int,Int) -> String -> Expr a
 symMat (r,c) name
-  | r > 0 && c > 0 = Expr $ TSym [r,c] name
+  | r > 0 && c > 0 = Expr $ TSym (Dim [r,c]) name
   | otherwise      = error $ "symMat can't make matrix with dimensions: " ++ show (r,c)
 
 -- | explicitly convert a numeric value to an expression
 sca :: a -> Expr a
-sca x = Expr $ TNum [] [x]
+sca x = Expr $ TNum D0 [x]
 
 -- | create numeric vector
 vec :: [a] -> Expr a
 vec xs 
-  | length xs > 0 = Expr $ TNum [length xs] xs
+  | length xs > 0 = Expr $ TNum (Dim [length xs]) xs
   | otherwise     = error "Improper dimensions in vec :: [a] -> Expr a"
 
 -- | Create numeric matrix with specified (rows, cols). List is taken rowwise.
 mat :: (Int,Int) -> [a] -> Expr a
 mat (r,c) xs 
-  | (length xs == r*c) && (r > 0) && (c > 0) = Expr $ TNum [r,c] xs
+  | (length xs == r*c) && (r > 0) && (c > 0) = Expr $ TNum (Dim [r,c]) xs
   | otherwise                                = error "Improper dimensions in mat :: (Int,Int) -> [a] -> Expr a"
 
 
@@ -97,7 +98,7 @@ subs subslist (Expr tensor)
     subs' x@(TSym _ _) = Expr $ sub tSubslist x
     subs' (TUnary unOp x) = applyUnary unOp $ subs' x
     subs' (TBinary binOp x y) = applyBinary binOp (subs' x) (subs' y)
-    subs' (TBroadcast [] _) = error "api fail in subs' in subs"
+    subs' (TBroadcast D0 _) = error "api fail in subs' in subs"
     subs' (TBroadcast _ x) = subs' x
 
     sub :: Eq a => [(a,a)] -> a -> a

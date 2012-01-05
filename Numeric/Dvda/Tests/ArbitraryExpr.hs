@@ -11,12 +11,13 @@ import Test.QuickCheck
 import Numeric.Dvda.Internal.Expr
 import Numeric.Dvda.Internal.Tensor
 import Numeric.Dvda.Symbolic(eval)
+import Numeric.Dvda.Dim
 
 data Pair a = Pair a (Expr a)
 
 evalScalar :: Floating a => Expr a -> a
 evalScalar expr
-  | d == []   = x
+  | d == D0   = x
   | otherwise = error "evalScalar was not handed a scalar"
     where
       (d,x:[]) = eval expr 
@@ -37,8 +38,8 @@ instance (Arbitrary a, Floating a) => Arbitrary (Pair a) where
     let (Pair x ex) = fx
         (Pair y ey) = fy
     
-    frequency [ (12, return $! Pair sourceNum (Expr (TNum [] [sourceNum])))
-              , (12, return $! Pair (fromIntegral sourceInt) (Expr (TInt [] [sourceInt])))
+    frequency [ (12, return $! Pair sourceNum (Expr (TNum D0 [sourceNum])))
+              , (12, return $! Pair (fromIntegral sourceInt) (Expr (TInt D0 [sourceInt])))
               , (5, return $! Pair (x * y) (ex * ey))
               , (5, return $! Pair (x + y) (ex + ey))
               , (5, return $! Pair (x - y) (ex - ey))
