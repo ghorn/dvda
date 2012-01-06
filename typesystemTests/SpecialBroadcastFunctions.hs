@@ -1,10 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE Rank2Types, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE Rank2Types, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts #-}
 
-data D0 = D0
-data D1 = D1
-data D2 = D2
-data D3 = D3
+import Data.Array.Repa hiding (map, zipWith)
+import qualified Data.Array.Repa as R
 
 data BinaryType = Add
                 | Sub
@@ -19,41 +17,45 @@ data UnaryType = Sin
 
 data Tensor d a = TBinary BinaryType (Tensor d a) (Tensor d a)
                 | TUnary UnaryType (Tensor d a)
-                | TNum [a]
-                | TInt [Int]
+                | TNum (Array d a)
+                | TInt (Array d Int)
                 | TSym String 
-                | TBroadcast (Tensor D0 a) deriving (Show, Eq)
+                | TBroadcast (Tensor DIM0 a) deriving (Show, Eq)
 
 
-safeBinaryApply :: Num a => (forall b . Num b => b -> b -> b) -> BinaryType -> Tensor d a -> Tensor d a -> Tensor d a
-safeBinaryApply f _ (TNum xs) (TNum ys) = TNum $ zipWith f xs ys
-safeBinaryApply f _ (TInt xs) (TInt ys) = TInt $ zipWith f xs ys
-safeBinaryApply f _ (TInt xs) (TNum ys) = TNum $ zipWith f (map fromIntegral xs) ys
-safeBinaryApply f _ (TNum xs) (TInt ys) = TNum $ zipWith f xs (map fromIntegral ys)
+safeBinaryApply :: (Shape d, Elt a, Num a)
+                   => (a -> a -> a)
+                   -> BinaryType
+                   -> Tensor d a -> Tensor d a
+                   -> Tensor d a
+safeBinaryApply f _ (TNum xs) (TNum ys) = TNum $ R.zipWith f xs ys
+safeBinaryApply f _ (TInt xs) (TNum ys) = TNum $ R.zipWith f (R.map fromIntegral xs) ys
+safeBinaryApply f _ (TNum xs) (TInt ys) = TNum $ R.zipWith f xs (R.map fromIntegral ys)
 
-safeBinaryApply f _ (TBroadcast (TNum [tx])) (TNum ys) = TNum $ map (f tx) ys
-safeBinaryApply f _ (TNum xs) (TBroadcast (TNum [ty])) = TNum $ map (\x -> f x ty) xs
+safeBinaryApply f _ (TBroadcast (TNum xs)) (TNum ys) = TNum $ R.map (f (toScalar xs)) ys
+safeBinaryApply f _ (TNum xs) (TBroadcast (TNum ys)) = TNum $ R.map (\x -> f x (toScalar ys)) xs
 
-safeBinaryApply f _ (TBroadcast (TInt [tx])) (TInt ys) = TInt $ map (f tx) ys
-safeBinaryApply f _ (TInt xs) (TBroadcast (TInt [ty])) = TInt $ map (\x -> f x ty) xs
+safeBinaryApply f _ (TBroadcast (TInt xs)) (TNum ys) = TNum $ R.map (f (fromIntegral (toScalar xs))) ys
+safeBinaryApply f _ (TInt xs) (TBroadcast (TNum ys)) = TNum $ R.map (\x -> f (fromIntegral x) (toScalar ys)) xs
 
-safeBinaryApply f _ (TBroadcast (TInt [tx])) (TNum ys) = TNum $ map (f (fromIntegral tx)) ys
-safeBinaryApply f _ (TInt xs) (TBroadcast (TNum [ty])) = TNum $ map (\x -> f (fromIntegral x) ty) xs
-
-safeBinaryApply f _ (TBroadcast (TNum [tx])) (TInt ys) = TNum $ map (f tx . fromIntegral) ys
-safeBinaryApply f _ (TNum xs) (TBroadcast (TInt [ty])) = TNum $ map (\x -> f x (fromIntegral ty)) xs
+safeBinaryApply f _ (TBroadcast (TNum xs)) (TInt ys) = TNum $ R.map (f (toScalar xs) . fromIntegral) ys
+safeBinaryApply f _ (TNum xs) (TBroadcast (TInt ys)) = TNum $ R.map (\x -> f x (fromIntegral (toScalar ys))) xs
 
 safeBinaryApply _ binType x y = TBinary binType x y
 
 
 
-safeUnaryApply :: Num a => (forall b . Num b => b -> b) -> UnaryType -> Tensor d a -> Tensor d a
-safeUnaryApply f _ (TNum xs) = TNum $ map f xs
-safeUnaryApply f _ (TInt xs) = TInt $ map f xs
+safeUnaryApply :: (Shape d, Elt a, Num a) => (forall b . Num b => b -> b) -> UnaryType -> Tensor d a -> Tensor d a
+safeUnaryApply f _ (TNum xs) = TNum $ R.map f xs
+safeUnaryApply f _ (TInt xs) = TInt $ R.map f xs
 safeUnaryApply f _ (TBroadcast tx) = TBroadcast $ f tx
 safeUnaryApply _ unType tx = TUnary unType tx
 
-instance Num a => Num (Tensor d a) where
+
+instance (Shape d, Elt a, Num a, Broadcastable d) => Num (Tensor d a) where
+  (*) (TInt xs) (TInt ys) = TInt $ R.zipWith (*) xs ys
+  (*) (TBroadcast (TInt xs)) (TInt ys) = TInt $ R.map (toScalar xs *) ys
+  (*) (TInt xs) (TBroadcast (TInt ys)) = TInt $ R.map (\x -> x * toScalar ys) xs
   (*) tx ty
     | tIsI 1 tx = ty
     | tIsI 1 ty = tx
@@ -61,72 +63,97 @@ instance Num a => Num (Tensor d a) where
     | tIsI 0 ty = ty
     | otherwise = safeBinaryApply (*) Mul tx ty
 
+  (+) (TInt xs) (TInt ys) = TInt $ R.zipWith (+) xs ys
+  (+) (TBroadcast (TInt xs)) (TInt ys) = TInt $ R.map (toScalar xs +) ys
+  (+) (TInt xs) (TBroadcast (TInt ys)) = TInt $ R.map (\x -> x + toScalar ys) xs
   (+) tx ty
     | tIsI 0 tx = ty
     | tIsI 0 ty = tx
     | otherwise = safeBinaryApply (+) Add tx ty
 
+  (-) (TInt xs) (TInt ys) = TInt $ R.zipWith (-) xs ys
+  (-) (TBroadcast (TInt xs)) (TInt ys) = TInt $ R.map (toScalar xs -) ys
+  (-) (TInt xs) (TBroadcast (TInt ys)) = TInt $ R.map (\x -> x - toScalar ys) xs
   (-) tx ty
     | tIsI 0 tx = negate ty
     | tIsI 0 ty = tx
     | otherwise = safeBinaryApply (-) Sub tx ty
 
-  negate tx = safeUnaryApply negate Neg tx
-  abs tx = safeUnaryApply abs Abs tx
-  signum tx = safeUnaryApply signum Signum tx
+  negate = safeUnaryApply negate Neg
+  abs = safeUnaryApply abs Abs
+  signum = safeUnaryApply signum Signum
 
-  fromInteger x = TBroadcast (TNum [fromInteger x])
+  fromInteger x = bc $ TInt $ singleton (fromInteger x)
 
 
 class Broadcastable d where
-  bc :: Tensor D0 a -> Tensor d a
+  bc :: Tensor DIM0 a -> Tensor d a
+  bcIsI :: Int -> Tensor d a -> Bool
+  bcIsI _ _ = False
+
+instance Broadcastable DIM0 where
+  bc = id
+  bcIsI i (TInt xs) = i == toScalar xs
+  bcIsI _ _ = False
   
-instance Broadcastable D0 where bc = id
-instance Broadcastable D1 where bc = TBroadcast
-instance Broadcastable D2 where bc = TBroadcast
+instance Broadcastable DIM1 where bc = TBroadcast
+instance Broadcastable DIM2 where bc = TBroadcast
 
 
 --infixl 8 .**
 infixl 7 .*, ./
 infixl 6 .+, .-
 
-(.*) :: (Broadcastable d, Num a) => Tensor D0 a -> Tensor d a -> (Tensor d a)
-(.*) tx ty = (bc tx) * ty
+(.*) :: (Broadcastable d, Num (Tensor d a)) => Tensor DIM0 a -> Tensor d a -> Tensor d a
+(.*) tx ty = bc tx * ty
 
-(.+) :: (Broadcastable d, Num a) => Tensor D0 a -> Tensor d a -> (Tensor d a)
-(.+) tx ty = (bc tx) + ty
+(.+) :: (Broadcastable d, Num (Tensor d a)) => Tensor DIM0 a -> Tensor d a -> Tensor d a
+(.+) tx ty = bc tx + ty
 
-(.-) :: (Broadcastable d, Num a) => Tensor D0 a -> Tensor d a -> (Tensor d a)
-(.-) tx ty = (bc tx) - ty
+(.-) :: (Broadcastable d, Num (Tensor d a)) => Tensor DIM0 a -> Tensor d a -> Tensor d a
+(.-) tx ty = bc tx - ty
 
-(./) :: (Broadcastable d, Fractional a) => Tensor D0 a -> Tensor d a -> (Tensor d a)
-(./) tx ty = (bc tx) / ty
+(./) :: (Broadcastable d, Fractional (Tensor d a)) => Tensor DIM0 a -> Tensor d a -> Tensor d a
+(./) tx ty = bc tx / ty
 
 
 -- | test if tensor is (or is broadcast from) SInt x
-tIsI :: Int -> Tensor d a -> Bool
-tIsI i (TInt [x]) = x == i
+tIsI :: Broadcastable d => Int -> Tensor d a -> Bool
 tIsI i (TBroadcast t) = tIsI i t
-tIsI _ _ = False
-
-  
-instance Fractional a => Fractional (Tensor d a) where
-  (/) (TNum x) (TNum y) = TNum $ zipWith (/) x y
-  x / y 
-    | tIsI 0 y  = error "Tensor divide by zero"
-    | tIsI 0 x  = TInt [0]
-    | otherwise = TBinary Div x y
-  fromRational x = TNum [fromRational x]
+tIsI i tx = bcIsI i tx
 
 
-t0 :: Tensor D0 Double
-t0 = TNum [10]
+instance (Shape d, Elt a, Fractional a, Broadcastable d) => Fractional (Tensor d a) where
+  (/) (TInt xs) (TInt ys) = TNum $ R.zipWith (\x y -> fromIntegral x / fromIntegral y) xs ys
+  (/) (TBroadcast (TInt xs)) (TInt ys) = TNum $ R.map (\y -> fromIntegral (toScalar xs) / fromIntegral y) ys
+  (/) (TInt xs) (TBroadcast (TInt ys)) = TNum $ R.map (\x -> fromIntegral x / fromIntegral (toScalar ys)) xs
+  (/) tx ty
+    | tIsI 0 ty = error "Tensor divide by zero"
+    | tIsI 0 tx = tx
+    | otherwise = safeBinaryApply (/) Div tx ty
 
-t1 :: Tensor D1 Double
-t1 = TNum [1,2,3]
+  fromRational x = bc $ TNum $ singleton (fromRational x)
 
-t2 :: Tensor D2 Double
-t2 = TNum [1,2,3]
+
+sca :: Elt a => a -> Tensor DIM0 a
+sca = TNum . singleton
+
+vec :: Elt a => [a] -> Tensor DIM1 a
+vec xs = TNum $ fromList (Z :. length xs) xs
+
+mat :: Elt a => (Int, Int) -> [a] -> Tensor DIM2 a
+mat (ix,iy) xs
+  | ix*iy == length xs = TNum $ fromList (Z :. ix :. iy) xs
+  | otherwise          = error "in \"mat\": dimension mismatch"
+
+t0 :: Tensor DIM0 Double
+t0 = sca 10
+
+t1 :: Tensor DIM1 Double
+t1 = vec [1,2,3]
+
+t2 :: Tensor DIM2 Double
+t2 = mat (2,3) [1,2,3,4,5,6]
 
 doMults :: IO ()
 doMults = do
