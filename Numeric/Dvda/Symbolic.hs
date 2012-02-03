@@ -55,7 +55,7 @@ sym :: String -> Expr a
 sym name = Expr $ TSym D0 name
 
 -- | create symbolic vector with length
-symVec :: Int -> String -> Expr a
+symVec :: Show a => Int -> String -> Expr a
 symVec d name 
   | d > 0     = Expr $ TSym (Dim [d]) name
   | otherwise = error $ "symVec can't make vector with length: " ++ show d
@@ -84,7 +84,7 @@ mat (r,c) xs
 
 
 -- | substitute a list of pairs [(matchThis, replaceWithThis)] in an expression
-subs :: Floating a => [(Expr a, Expr a)] -> Expr a -> Expr a
+subs :: (Floating a, Eq a, Show a) => [(Expr a, Expr a)] -> Expr a -> Expr a
 subs subslist (Expr tensor)
   | length subslist == length (nubBy contradictingSub subslist) = subs' tensor
   | otherwise = error "Error in subs: same input in substitute pairs list twice with different outputs"

@@ -39,7 +39,7 @@ data Function a = Function { funInputs :: [Expr a]
 -- | Call a function without using C code by recursively evaluating children.
 --   This is probably much slower than 'Numeric.Dvda.Function.callC' and
 --   is intended mainly for developing a function or debugging.
-callNative :: Floating a => Function a -> [Expr a] -> [Expr a]
+callNative :: (Floating a, Eq a, Show a) => Function a -> [Expr a] -> [Expr a]
 callNative fun args 
   | length (funInputs fun) == length args = map (evalE . subs subRules) (funOutputs fun)
   | otherwise = error "callNative fail because num arguments /= num function inputs"
@@ -76,7 +76,7 @@ callC fun inputs
 
 
 -- | Turn lists of inputs and outputs into a function
-toFunction :: RealFrac a => [Expr a] -> [Expr a] -> IO (Function a)
+toFunction :: (RealFrac a, Show a) => [Expr a] -> [Expr a] -> IO (Function a)
 toFunction inputs outputs = do
   let symsInOutputs = nub $ concatMap getSyms outputs
       missingInputs = filter (`notElem` inputs) symsInOutputs

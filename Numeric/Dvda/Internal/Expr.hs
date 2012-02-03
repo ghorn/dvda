@@ -25,7 +25,7 @@ tmap f (Expr x) = Expr $ f x
 instance Show a => Show (Expr a) where
   show (Expr x) = show x
 
-instance Num a => Num (Expr a) where
+instance (Num a, Show a) => Num (Expr a) where
   x + y = safeBinaryConstruct (+) x y
   x * y = safeBinaryConstruct (*) x y
   x - y = safeBinaryConstruct (-) x y
@@ -33,11 +33,11 @@ instance Num a => Num (Expr a) where
   signum = tmap signum
   fromInteger i = Expr (TInt D0 [fromInteger i])
 
-instance Fractional a => Fractional (Expr a) where
+instance (Fractional a, Show a) => Fractional (Expr a) where
   x / y = safeBinaryConstruct (/) x y
   fromRational r = Expr $ TNum D0 [fromRational r]
 
-instance (Floating a) => Floating (Expr a) where
+instance (Floating a, Show a) => Floating (Expr a) where
   pi = Expr $ TNum D0 [pi]
   
   exp  = tmap exp
@@ -65,7 +65,7 @@ instance (Floating a) => Floating (Expr a) where
 
 -- | all vector/vector and matrix/matrix dimension checking is done here, not in Num instances of Tensor
 --   this is because those Num instances aren't exported and are only called through the Expr api
-safeBinaryConstruct :: Num a => (Tensor a -> Tensor a -> Tensor a) -> Expr a -> Expr a -> Expr a
+safeBinaryConstruct :: (Show a, Num a) => (Tensor a -> Tensor a -> Tensor a) -> Expr a -> Expr a -> Expr a
 safeBinaryConstruct f (Expr x) (Expr y)
   -- normal combination
   | tDim x == tDim y = Expr $ f x y
