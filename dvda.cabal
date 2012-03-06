@@ -62,6 +62,9 @@ Library
                      Numeric.Dvda.Codegen.CallWrapper
                      Numeric.Dvda.Codegen.WriteC
 
+                     Numeric.Dvda.Symbolic.SymMonad
+                     Numeric.Dvda.Symbolic.BinUn
+
   Build-depends:     base       >= 4     && < 5,
                      graphviz,
                      fgl,
@@ -71,7 +74,9 @@ Library
                      process,
                      unix,
                      QuickCheck,
-                     containers
+                     containers,
+                     transformers >= 0.2 && < 0.3,
+                     mtl >= 2.0 && < 2.1
   Ghc-options:       -O2 -Wall
 
 
