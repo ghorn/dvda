@@ -1,17 +1,17 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Symbolic.SymMonad( makeFun
-                                     , sym
-                                     , symVec
-                                     , symMat
-                                     , node
-                                     , FunGraph
-                                     ) where
+module Dvda2.SymMonad( makeFun
+                     , sym
+                     , symVec
+                     , symMat
+                     , node
+                     , FunGraph
+                     ) where
 
 import Control.Monad.State
 
-import Numeric.Dvda.Symbolic.Expr
-import Numeric.Dvda.Symbolic.Dim
+import Dvda2.Expr
+import Dvda2.Dim
 
 type Key = Int
 

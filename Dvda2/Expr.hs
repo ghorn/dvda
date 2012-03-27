@@ -1,11 +1,11 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Symbolic.Expr( Expr(..)
-                                 , dim
-                                 ) where
+module Dvda2.Expr( Expr(..)
+                 , dim
+                 ) where
 
-import Numeric.Dvda.Symbolic.Dim
-import Numeric.Dvda.Symbolic.BinUn
+import Dvda2.Dim
+import Dvda2.BinUn
 
 data Expr a = ENum Dim [a]
             | EInt Dim [Int]

@@ -2,10 +2,10 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Symbolic.Dim( Dim(..)
-                                , dorder
-                                , dsize
-                                ) where
+module Dvda2.Dim( Dim(..)
+                , dorder
+                , dsize
+                ) where
 
 --type Dim = [Int]
 data Dim = D0 | Dim [Int] deriving Eq

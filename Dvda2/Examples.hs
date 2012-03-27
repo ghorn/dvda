@@ -1,11 +1,11 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Symbolic.Examples( woo
-                                     , run
-                                     ) where
+module Dvda2.Examples( woo
+                     , run
+                     ) where
 
-import Numeric.Dvda.Symbolic.SymMonad
-import Numeric.Dvda.Symbolic.Expr
+import Dvda2.SymMonad
+import Dvda2.Expr
 
 import Control.Monad.State
 import Data.Functor.Identity

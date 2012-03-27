@@ -1,12 +1,12 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Symbolic.BinUn( BinOp(..)
-                                  , UnOp(..)
-                                  , showBinary
-                                  , showUnary
-                                  , applyUnary
-                                  , applyBinary
-                                  ) where
+module Dvda2.BinUn( BinOp(..)
+                  , UnOp(..)
+                  , showBinary
+                  , showUnary
+                  , applyUnary
+                  , applyBinary
+                  ) where
 
 data UnOp = Abs
           | Neg
