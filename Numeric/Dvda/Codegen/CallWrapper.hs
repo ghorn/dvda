@@ -8,7 +8,7 @@ module Numeric.Dvda.Codegen.CallWrapper( callCFunction
 
 import System.IO.Unsafe(unsafePerformIO)
 import Foreign.Marshal.Array(mallocArray, newArray, peekArray)
-import Foreign.C.Types(CDouble, CInt)
+import Foreign.C.Types(CDouble, CInt(..))
 import Foreign.Ptr(Ptr, FunPtr)
 import Control.Monad(zipWithM)
 

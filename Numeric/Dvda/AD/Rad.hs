@@ -13,7 +13,7 @@ import Numeric.Dvda.Internal.UnaryType
 import Numeric.Dvda.Internal.Tensor
 
 -- | Take the gradient of an expression with respect to a list of inputs
-rad :: Floating a => Expr a -> [Expr a] -> [Expr a]
+rad :: (Floating a, Eq a, Show a) => Expr a -> [Expr a] -> [Expr a]
 rad expr args = map getXSens args
   where
     senss = getSensitivities expr 1
@@ -24,7 +24,7 @@ pert :: Dual a -> a
 pert (Dual _ b) = b
 
 
-getSensitivities :: Floating a => Expr a -> Expr a -> [(Expr a, Expr a)]
+getSensitivities :: (Floating a, Show a) => Expr a -> Expr a -> [(Expr a, Expr a)]
 getSensitivities primal@(Expr (TSym _ _)) sens = [(primal, sens)]
 getSensitivities (Expr (TUnary unType g')) sens = getSensitivities g (sens*dfdg)
   where
