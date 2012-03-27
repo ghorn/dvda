@@ -62,9 +62,6 @@ Library
                      Numeric.Dvda.Codegen.CallWrapper
                      Numeric.Dvda.Codegen.WriteC
 
-                     Numeric.Dvda.Symbolic.SymMonad
-                     Numeric.Dvda.Symbolic.BinUn
-
   Build-depends:     base       >= 4     && < 5,
                      graphviz,
                      fgl,
