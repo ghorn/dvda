@@ -6,6 +6,7 @@ module Numeric.Dvda.Symbolic.SymMonad( makeFun
                                      , outputs
                                      , node
                                      , woo
+                                     , run
                                      ) where
 
 import Control.Monad.State
@@ -15,51 +16,54 @@ import Numeric.Dvda.Symbolic.BinUn
 
 type Key = Int
 
-data Graph = Graph [(Key, Expr)] deriving (Show, Eq)
+data FunGraph a = FunGraph [(Key, Expr a)] deriving (Show, Eq)
 
-data Expr = Sym String
-          | Binary BinOp Expr Expr
-          | Unary UnOp Expr
-          | ConstI Int
-          | Output Expr
-          | Ref Key deriving (Show, Eq)
+data Expr a = Sym String
+            | Binary BinOp (Expr a) (Expr a)
+            | Unary UnOp (Expr a)
+            | Const a
+            | Output (Expr a)
+            | Ref Key deriving (Show, Eq)
 
-instance Num Expr where
+instance Num a => Num (Expr a) where
   (*) = Binary Mul
   (+) = Binary Add
   (-) = Binary Sub
   abs = Unary Abs
   negate = Unary Neg
   signum = Unary Signum
-  fromInteger = ConstI . fromInteger
+  fromInteger = Const . fromInteger
 
-freeKey :: Graph -> Key
-freeKey (Graph xs) = length xs
+--newFunGraph = FunGraph []
 
-insert :: Key -> Expr -> Graph -> Graph
-insert k el (Graph xs) = Graph $ xs ++ [(k, el)]
+freeKey :: FunGraph a -> Key
+freeKey (FunGraph xs) = length xs
 
-sym :: String -> State Graph Expr
+insert :: Key -> Expr a -> FunGraph a -> FunGraph a
+insert k el (FunGraph xs) = FunGraph $ xs ++ [(k, el)]
+
+sym :: String -> State (FunGraph a) (Expr a)
 sym = node . Sym
 
---outputs :: MonadState Graph m => [Expr] -> m [Expr]
-outputs :: [Expr] -> StateT Graph Identity [Expr]
+outputs :: [Expr a] -> StateT (FunGraph a) Identity [Expr a]
 outputs = mapM (node . Output)
 
---node :: MonadState Graph m => Expr -> m Expr
-node :: Expr -> State Graph Expr
+node :: Expr a -> State (FunGraph a) (Expr a)
 node expr = do
   gr <- get
   let k = freeKey gr
   put (insert k expr gr)
   return (Ref k)
 
-makeFun :: State Graph a -> Graph
-makeFun f = snd $ runState f (Graph [])
+makeFun :: State (FunGraph a) b -> FunGraph a
+makeFun f = snd $ runState f (FunGraph [])
 
-woo :: StateT Graph Identity [Expr]
+woo :: Num a => StateT (FunGraph a) Identity [Expr a]
 woo = do
   x <- sym "x"
   let y = abs x
   z <- node (x*y)
   outputs [z, z*y]
+
+run :: Num a => FunGraph a
+run = makeFun woo
