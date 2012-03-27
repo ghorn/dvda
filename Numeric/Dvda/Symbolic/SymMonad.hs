@@ -33,5 +33,5 @@ node expr = do
   put (FunGraph $ xs ++ [(k,expr)])
   return (ERef (dim expr) k)
 
-makeFun :: State (FunGraph a) b -> FunGraph a
-makeFun f = snd $ runState f (FunGraph [])
+makeFun :: State (FunGraph a) b -> (b, FunGraph a)
+makeFun f = runState f (FunGraph [])

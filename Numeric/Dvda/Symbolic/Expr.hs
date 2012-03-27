@@ -141,7 +141,6 @@ dim (EBinary _ tx ty)
   | dim tx == dim ty = dim tx
   | otherwise        = error "api error - dim found mismatched dimensions in EBinary"
 
-
 -- | test if tensor is broadcast from (EConst x)
 tIsI :: Int -> Expr a -> Bool
 tIsI i (EInt D0 [s]) = s == i

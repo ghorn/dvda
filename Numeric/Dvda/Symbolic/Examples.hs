@@ -17,5 +17,5 @@ woo = do
   z <- node (x*y)
   return [z, z*y]
 
-run :: Num a => FunGraph a
+run :: Num a => ([Expr a], FunGraph a)
 run = makeFun woo
