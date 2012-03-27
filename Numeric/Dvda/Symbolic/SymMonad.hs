@@ -2,13 +2,13 @@
 
 module Numeric.Dvda.Symbolic.SymMonad( makeFun
                                      , sym
+                                     , symVec
+                                     , symMat
                                      , node
-                                     , woo
-                                     , run
+                                     , FunGraph
                                      ) where
 
 import Control.Monad.State
-import Data.Functor.Identity
 
 import Numeric.Dvda.Symbolic.Expr
 import Numeric.Dvda.Symbolic.Dim
@@ -35,13 +35,3 @@ node expr = do
 
 makeFun :: State (FunGraph a) b -> FunGraph a
 makeFun f = snd $ runState f (FunGraph [])
-
-woo :: Num a => StateT (FunGraph a) Identity [Expr a]
-woo = do
-  x <- sym "x"
-  let y = abs x
-  z <- node (x*y)
-  return [z, z*y]
-
-run :: Num a => FunGraph a
-run = makeFun woo
