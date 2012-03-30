@@ -79,7 +79,7 @@ makeBinary'' :: Shape d => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Exp
 makeBinary'' _ f (EConst d x) (EConst _ y) = EConst d (V.zipWith f x y)
 -- | broadcast constant operations
 makeBinary'' _ f (ESingleton _ x) (EConst d y) = EConst d (V.map (f x) y)
-makeBinary'' _ f (EConst d x) (ESingleton _ y) = EConst d (V.map (flip f y) x)
+makeBinary'' _ f (EConst d x) (ESingleton _ y) = EConst d (V.map (`f` y) x)
 -- | otherwise make symbolic binary
 makeBinary'' op _ x y = EBinary op x y
 
@@ -124,7 +124,7 @@ class (Shape d1, Shape d2) => Dot d1 d2 where
   dotDims :: d1 -> d2 -> DotT d1 d2
   
 dot :: (Dot d1 d2, DotT d1 d2 ~ d) => Expr d1 a -> Expr d2 a -> Expr d a
-dot x y = EDot x y
+dot = EDot
 
 instance Dot DIM2 DIM2 where -- matrix-matrix
   type DotT DIM2 DIM2 = DIM2

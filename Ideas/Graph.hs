@@ -51,16 +51,16 @@ instance (Unbox a, Hashable a) => Hashable (GExpr a) where
 instance Show a => Labellable (GExpr a) where
   toLabelValue (GBinary op _ _) = toLabelValue $ show op
   toLabelValue (GUnary op _)    = toLabelValue $ show op
-  toLabelValue (GSym [] name)   = toLabelValue $ name
+  toLabelValue (GSym [] name)   = toLabelValue name
   toLabelValue (GSym d name)    = toLabelValue $ name ++ "{" ++ show d ++ "}"
   toLabelValue (GSingleton _ x) = toLabelValue $ show x
-  toLabelValue (GScale _ _)     = toLabelValue $ "scale"
-  toLabelValue (GDot _ _)       = toLabelValue $ "dot"
-  toLabelValue (GDeriv _ _)     = toLabelValue $ "deriv"
-  toLabelValue (GGrad _ _)      = toLabelValue $ "grad"
-  toLabelValue (GJacob _ _)     = toLabelValue $ "jacob"
-  toLabelValue (GConst _ _)     = toLabelValue $ "const"
-                                 
+  toLabelValue (GScale _ _)     = toLabelValue "scale"
+  toLabelValue (GDot _ _)       = toLabelValue "dot"
+  toLabelValue (GDeriv _ _)     = toLabelValue "deriv"
+  toLabelValue (GGrad _ _)      = toLabelValue "grad"
+  toLabelValue (GJacob _ _)     = toLabelValue "jacob"
+  toLabelValue (GConst _ _)     = toLabelValue "const"
+
 data FunGraph a = FunGraph (HM.HashMap (GExpr a) Key) [Key] [Key] deriving (Show, Eq)
 
 getChildren :: GExpr a -> [Key]
@@ -87,9 +87,9 @@ insert gexpr = do
   let k = HM.size xs
       ins' = case gexpr of (GSym _ _) -> ins++[k] -- add Sym to FunGraph inputs
                            _          -> ins
-  case (HM.lookup gexpr xs) of Nothing -> do put (FunGraph (HM.insert gexpr k xs) ins' outs)
-                                             return k
-                               Just k' -> do return k'
+  case HM.lookup gexpr xs of Nothing -> do put (FunGraph (HM.insert gexpr k xs) ins' outs)
+                                           return k
+                             Just k' -> return k'
 
 previewGraph :: Show a => FunGraph a -> IO ()
 previewGraph fungraph = do

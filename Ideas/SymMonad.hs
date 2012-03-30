@@ -23,10 +23,10 @@ sym :: (Eq a, Hashable a, Unbox a) => String -> State (FunGraph a) (Expr DIM0 a)
 sym = node . symE
 
 symVec :: (Eq a, Hashable a, Unbox a) => Int -> String -> State (FunGraph a) (Expr DIM1 a)
-symVec d = node . (vsymE d)
+symVec d = node . vsymE d
 
 symMat :: (Eq a, Hashable a, Unbox a) => (Int,Int) -> String -> State (FunGraph a) (Expr DIM2 a)
-symMat (r,c) = node . (msymE (r,c))
+symMat (r,c) = node . msymE (r,c)
 
 -- | take all sub expressions of an Expr and turn them into nodes
 --   return an Expr that is just a ref

@@ -65,8 +65,8 @@ instance Hashable BinOp where
   hash LogBase = 23
                               
 showUnary :: Show a => a -> UnOp -> String
-showUnary x Abs    = "|" ++ show x ++ "|"
-showUnary x Neg    = "-"++paren x
+showUnary x Abs    = '|': show x ++ "|"
+showUnary x Neg    = '-':paren x
 showUnary x Signum = "signum"++paren x
 showUnary x Exp    = "exp"++paren x
 showUnary x Sqrt   = "sqrt"++paren x
