@@ -92,7 +92,8 @@ exampleFun = do
   y <- sym "y"
   z1 <- node ((x*y)**3)
   z2 <- node ((x*y)**2)
-  output_ (z1*z2)
+  z3 <- node (diff z2 x)
+--  output_ (z1*z3)
   return [z1, z2*y]
 
 run :: IO ()

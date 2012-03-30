@@ -9,7 +9,7 @@ module Ideas.Expr( Expr(..)
                  , vsymE
                  , msymE
                  , dot
-                 , deriv
+                 , diff
                  , grad
                  , jacob
                  , hess
@@ -188,8 +188,8 @@ vsymE k = ESym (Z :. k)
 msymE :: (Int,Int) -> String -> Expr DIM2 a
 msymE (r,c) = ESym (Z :. r :. c)
 
-deriv :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
-deriv = EDeriv
+diff :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
+diff = EDeriv
 
 grad :: Expr DIM0 a -> Expr DIM1 a -> Expr DIM1 a
 grad = EGrad
