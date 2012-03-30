@@ -8,6 +8,8 @@ module Ideas.BinUn( BinOp(..)
                   , applyBinary
                   ) where
 
+import Data.Hashable(Hashable,hash)
+
 data UnOp = Abs
           | Neg
           | Signum
@@ -27,6 +29,41 @@ data UnOp = Abs
           | ASinh
           | ACosh deriving (Eq, Show)
 
+data BinOp = Add
+           | Sub
+           | Mul
+           | Div
+           | Pow
+           | LogBase deriving (Eq, Show)
+
+instance Hashable UnOp where
+  hash Abs    = 0
+  hash Neg    = 1
+  hash Signum = 2
+  hash Exp    = 3
+  hash Sqrt   = 4
+  hash Log    = 5
+  hash Sin    = 6
+  hash Cos    = 7
+  hash Tan    = 8
+  hash ASin   = 9
+  hash ACos   = 10
+  hash ATan   = 11
+  hash Tanh   = 12
+  hash Sinh   = 13
+  hash Cosh   = 14
+  hash ATanh  = 15
+  hash ASinh  = 16
+  hash ACosh  = 17
+
+instance Hashable BinOp where
+  hash Add     = 18
+  hash Sub     = 19
+  hash Mul     = 20
+  hash Div     = 21
+  hash Pow     = 22
+  hash LogBase = 23
+                              
 showUnary :: Show a => a -> UnOp -> String
 showUnary x Abs    = "|" ++ show x ++ "|"
 showUnary x Neg    = "-"++paren x
@@ -66,13 +103,6 @@ applyUnary Tanh   = tanh
 applyUnary ASinh  = asinh
 applyUnary ATanh  = atanh
 applyUnary ACosh  = acosh
-
-data BinOp = Add
-           | Sub
-           | Mul
-           | Div
-           | Pow
-           | LogBase deriving (Eq, Show)
 
 applyBinary :: Floating a => BinOp -> a -> a -> a
 applyBinary Add = (+)

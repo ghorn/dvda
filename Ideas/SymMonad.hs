@@ -13,27 +13,28 @@ module Ideas.SymMonad( sym
 
 import Control.Monad.State
 import Data.Array.Repa(DIM0,DIM1,DIM2,listOfShape,Shape)
-import qualified Data.IntMap as IM(null,insert,empty,findMax)
+import Data.Hashable(Hashable)
+import Data.Vector.Unboxed(Unbox)
 
-import Ideas.Graph(FunGraph(..),Key,GExpr(..),previewGraph)
+import Ideas.Graph(FunGraph(..),Key,GExpr(..),previewGraph,insert,emptyFunGraph)
 import Ideas.StrongExpr
 
-sym :: String -> State (FunGraph a) (Expr DIM0 a)
+sym :: (Eq a, Hashable a, Unbox a) => String -> State (FunGraph a) (Expr DIM0 a)
 sym = node . symE
 
-symVec :: Int -> String -> State (FunGraph a) (Expr DIM1 a)
+symVec :: (Eq a, Hashable a, Unbox a) => Int -> String -> State (FunGraph a) (Expr DIM1 a)
 symVec d = node . (vsymE d)
 
-symMat :: (Int,Int) -> String -> State (FunGraph a) (Expr DIM2 a)
+symMat :: (Eq a, Hashable a, Unbox a) => (Int,Int) -> String -> State (FunGraph a) (Expr DIM2 a)
 symMat (r,c) = node . (msymE (r,c))
 
 -- | take all sub expressions of an Expr and turn them into nodes
 --   return an Expr that is just a ref
-node :: Shape d => Expr d a -> State (FunGraph a) (Expr d a)
+node :: (Shape d, Hashable a, Unbox a, Eq a) => Expr d a -> State (FunGraph a) (Expr d a)
 node expr = liftM (ERef (dim expr)) (node' expr)
   where
-    --node' :: Shape d => Expr d a -> StateT (FunGraph a) Identity Int
-    node' :: Shape d => Expr d a -> State (FunGraph a) Key
+    --node' :: (Shape d, Hashable a, Unbox a, Eq a) => Expr d a -> StateT (FunGraph a) Identity Int
+    node' :: (Shape d, Hashable a, Unbox a, Eq a) => Expr d a -> State (FunGraph a) Key
     node' (ESym d name) = insert $ GSym (listOfShape d) name
     node' (ERef _ k) = return k
     node' (EBinary op x y) = do
@@ -67,25 +68,17 @@ node expr = liftM (ERef (dim expr)) (node' expr)
       args' <- node' args
       insert $ GJacob x' args'
 
-    -- insert :: MonadState (FunGraph a) m => GExpr a -> m Int
-    insert gexpr = do
-      FunGraph xs ins outs <- get
-      let k = if IM.null xs then 0
-              else 1 + (fst $ IM.findMax xs)
-          ins' = case gexpr of (GSym _ _) -> ins++[k] -- add Sym to FunGraph inputs
-                               _          -> ins
-      put (FunGraph (IM.insert k gexpr xs) ins' outs)
-      return k
 
 
 makeFun :: State (FunGraph a) b -> (b, FunGraph a)
-makeFun f = runState f (FunGraph IM.empty [] [])
+makeFun f = runState f emptyFunGraph
 
-exampleFun :: Floating a => State (FunGraph a) [Expr DIM0 a]
+exampleFun :: State (FunGraph Double) [Expr DIM0 Double]
 exampleFun = do
   x <- sym "x"
-  let y = abs x
-  z <- node (x*y**3)
+  y <- sym "y"
+  z <- node ((x*y)**3)
+  _ <- node ((x*y)**2)
   return [z, z*y]
 
 run :: IO ()
