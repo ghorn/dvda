@@ -14,16 +14,19 @@ module Ideas.StrongExpr( Expr(..)
                        , jacob
                        , hess
                        , dim
+                       , Dot(..)
                        ) where
 
 import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), showShape, listOfShape,shapeOfList,Shape) -- hiding ((++))
 import Data.Vector.Unboxed(Vector, toList, Unbox)
+import qualified Data.Vector.Unboxed as V(zipWith, map)
 import Ideas.BinUn
 
 dim :: Expr d a -> d
 dim (ESym d _) = d
 dim (EConst d _) = d
-dim (ESingleton _) = error "don't get ESingleton's dim ya goon"
+dim (EDimensionless _) = error "EDimensionless doesn't have a dimension, ya goon"
+dim (ESingleton d _) = d
 dim (EUnary _ x) = dim x
 dim (EBinary _ x1 _) = dim x1
 dim (EScale _ y) = dim y
@@ -33,11 +36,11 @@ dim (EDeriv _ _) = Z
 dim (EGrad _ args) = dim args
 dim (EJacob x args) = shapeOfList $ listOfShape (dim x) ++ listOfShape (dim args)
 
-
 data Expr d a where
   ESym :: d -> String -> Expr d a
-  EConst :: d -> Vector a -> Expr d a
-  ESingleton :: a -> Expr d a
+  EConst :: Unbox a => d -> Vector a -> Expr d a
+  EDimensionless :: a -> Expr d a
+  ESingleton :: d -> a -> Expr d a
   EUnary :: UnOp -> Expr d a -> Expr d a
   EBinary :: BinOp -> Expr d a -> Expr d a -> Expr d a
   EScale :: Expr DIM0 a -> Expr d a -> Expr d a
@@ -48,30 +51,70 @@ data Expr d a where
   EGrad  :: (d ~ DIM1) => Expr DIM0 a -> Expr DIM1 a -> Expr d a
   EJacob :: (d ~ DIM2) => Expr DIM1 a -> Expr DIM1 a -> Expr d a
 
-instance Num a => Num (Expr d a) where
-  (*) = EBinary Mul  
-  (+) = EBinary Add
-  (-) = EBinary Sub
-  abs = EUnary Abs
-  signum = EUnary Signum
-  fromInteger = ESingleton . fromInteger
-  
-instance Fractional a => Fractional (Expr d a) where
-  (/) = EBinary Div
-  fromRational = ESingleton . fromRational
+-- | first layer of binary simplification: infer dimension of EDimensionless if possible
+makeBinary :: Shape d => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
+-- | can't infer dimension, just apply operation
+makeBinary _  f (EDimensionless x) (EDimensionless y) = EDimensionless (f x y)
+-- | infer dimension, then call makeBinary' for further simplification
+makeBinary op f (EDimensionless x) y = makeBinary' op f (ESingleton (dim y) x) y
+makeBinary op f x (EDimensionless y) = makeBinary' op f x (ESingleton (dim x) y)
+-- | dimension inferred, call makeBinary'
+makeBinary op f x y = makeBinary' op f x y
 
-instance Floating a => Floating (Expr d a) where
-  pi    = ESingleton pi
-  (**)  = EBinary Pow
-  exp   = EUnary Exp
-  log   = EUnary Log
-  sin   = EUnary Sin
-  cos   = EUnary Cos
-  asin  = EUnary ASin
-  atan  = EUnary ATan
-  acos  = EUnary ACos
-  sinh  = EUnary Sinh
-  cosh  = EUnary Cosh
+-- | second layer of binary simplification: check dimensions
+makeBinary' :: Shape d => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
+makeBinary' op f x y
+  | dx == dy  = makeBinary'' op f x y
+  | otherwise = error $ "Binary op \""++ sop ++"\" dimension mismatch ya goon (" ++ sdx ++ ", " ++ sdy ++ ")"
+  where
+    dx = dim x
+    dy = dim y
+    sdx = showShape dx
+    sdy = showShape dy
+    sop = show op
+
+-- | third layer of binary simplification: make reasonable simplifications
+makeBinary'' :: Shape d => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
+-- | apply operation to constant vectors
+makeBinary'' _ f (EConst d x) (EConst _ y) = EConst d (V.zipWith f x y)
+-- | broadcast constant operations
+makeBinary'' _ f (ESingleton _ x) (EConst d y) = EConst d (V.map (f x) y)
+makeBinary'' _ f (EConst d x) (ESingleton _ y) = EConst d (V.map (flip f y) x)
+-- | otherwise make symbolic binary
+makeBinary'' op _ x y = EBinary op x y
+
+
+-- | apply unary operations on constants
+makeUnary :: Shape d => UnOp -> (a -> a) -> Expr d a -> Expr d a
+makeUnary _ f (EDimensionless x) = EDimensionless (f x)
+makeUnary _ f (ESingleton d x) = ESingleton d (f x)
+makeUnary _ f (EConst d x) = EConst d (V.map f x)
+makeUnary op _ x = EUnary op x
+
+instance (Shape d, Num a) => Num (Expr d a) where
+  (*) = makeBinary Mul (*)
+  (+) = makeBinary Add (+)
+  (-) = makeBinary Sub (-)
+  abs = makeUnary Abs abs
+  signum = makeUnary Signum signum
+  fromInteger = EDimensionless . fromInteger
+
+instance (Shape d, Fractional a) => Fractional (Expr d a) where
+  (/) = makeBinary Div (/)
+  fromRational = EDimensionless . fromRational
+
+instance (Shape d, Floating a) => Floating (Expr d a) where
+  pi    = EDimensionless pi
+  (**)  = makeBinary Pow (**)
+  exp   = makeUnary Exp exp
+  log   = makeUnary Log log
+  sin   = makeUnary Sin sin
+  cos   = makeUnary Cos cos
+  asin  = makeUnary ASin asin
+  atan  = makeUnary ATan atan
+  acos  = makeUnary ACos acos
+  sinh  = makeUnary Sinh sinh
+  cosh  = makeUnary Cosh cosh
   asinh = error "no instance for asinh"
   atanh = error "no instance for atanh"
   acosh = error "no instance for acosh"
@@ -122,8 +165,9 @@ instance Dot DIM1 DIM2 where -- vector-matrix
 paren :: Show a => a -> String
 paren x = "( "++show x++" )"
 
-instance (Shape d, Unbox a, Show a) => Show (Expr d a) where
-  show (ESingleton x) = show x
+instance (Shape d, Show a) => Show (Expr d a) where
+  show (ESingleton _ x) = show x
+  show (EDimensionless x) = show x
   show (ESym d name) = name++"{"++showShape d++"}"
   show (EConst d x) = "{" ++ showShape d ++ ", "++show (toList x)++"}" 
   show (EUnary op x) = showUnary x op

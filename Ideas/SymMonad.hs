@@ -24,7 +24,8 @@ type Key = Int
 
 data GExpr a = GBinary BinOp Key Key
              | GUnary UnOp Key
-             | GSym String
+             | GSym [Int] String
+             | GSingleton [Int] a
              | GScale Key Key
              | GDot Key Key
              | GDeriv Key Key
@@ -32,7 +33,7 @@ data GExpr a = GBinary BinOp Key Key
              | GJacob Key Key
              | GConst [Int] (Vector a) deriving (Show, Eq)
                                  
-data FunGraph a = FunGraph [(Key, GExpr a)] [Key] [Key] deriving (Show, Eq)
+data FunGraph a = FunGraph [GExpr a] [Key] [Key] deriving (Show, Eq)
 
 sym :: String -> State (FunGraph a) (Expr DIM0 a)
 sym = node . symE
@@ -49,8 +50,8 @@ node :: Shape d => Expr d a -> State (FunGraph a) (Expr d a)
 node expr = liftM (ERef (dim expr)) (node' expr)
   where
     --node' :: Shape d => Expr d a -> StateT (FunGraph a) Identity Int
-    node' :: Shape d => Expr d a -> State (FunGraph a) Int
-    node' (ESym _ name) = insert $ GSym name
+    node' :: Shape d => Expr d a -> State (FunGraph a) Key
+    node' (ESym d name) = insert $ GSym (listOfShape d) name
     node' (ERef _ k) = return k
     node' (EBinary op x y) = do
       x' <- node' x
@@ -60,7 +61,8 @@ node expr = liftM (ERef (dim expr)) (node' expr)
       x' <- node' x
       insert (GUnary op x')
     node' (EConst d x) = insert $ GConst (listOfShape d) x
-    node' (ESingleton _) = error "don't put ESingleton in graph"
+    node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
+    node' (ESingleton d x) = insert $ GSingleton (listOfShape d) x
     node' (EScale x y) = do
       x' <- node' x
       y' <- node' y
@@ -86,7 +88,9 @@ node expr = liftM (ERef (dim expr)) (node' expr)
     insert gexpr = do
       FunGraph xs ins outs <- get
       let k = length xs
-      put (FunGraph (xs ++ [(k,gexpr)]) ins outs)
+          ins' = case gexpr of (GSym _ _) -> ins++[k] -- add Sym to FunGraph inputs
+                               _          -> ins
+      put (FunGraph (xs ++ [gexpr]) ins' outs)
       return k
 
 
@@ -94,12 +98,12 @@ makeFun :: State (FunGraph a) b -> (b, FunGraph a)
 makeFun f = runState f (FunGraph [] [] [])
 
 --woo :: Num a => StateT (FunGraph a) Identity [Expr d a]
-woo :: Num a => StateT (FunGraph a) Identity [Expr DIM0 a]
+woo :: Floating a => StateT (FunGraph a) Identity [Expr DIM0 a]
 woo = do
   x <- sym "x"
   let y = abs x
-  z <- node (x*y)
+  z <- node (x*y**3)
   return [z, z*y]
 
-run :: Num b => ([Expr DIM0 b], FunGraph b)
+run :: Floating b => ([Expr DIM0 b], FunGraph b)
 run = makeFun woo
