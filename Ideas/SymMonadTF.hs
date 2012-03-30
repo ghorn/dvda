@@ -2,7 +2,7 @@
 {-# Language TypeFamilies, MultiParamTypeClasses #-}
 {-# Language FlexibleContexts #-}
 {-# Language FlexibleInstances #-}
-{-# Language FunctionalDependencies #-}
+-- {-# Language OverlappingInstances #-}
 
 module Ideas.SymMonad( node
                      , sym
@@ -22,36 +22,35 @@ import Data.Array.Repa(DIM0, Z(..), Shape, listOfShape)
 import Data.Vector(Vector)
 import qualified Data.Vector as V
 
-import Ideas.BinUn
+import qualified Ideas.BinUn as BU
 
 type Key = Int
 
 class Mul a b where
   type MulT a b
   mul :: a -> b -> MulT a b
---  mul x y = Binary x y
 
 data TensorFromIntegral a = TensorFromIntegral a
 data GraphRef d a = GraphRef d Key
 data ConstTensor d a = ConstTensor d (Vector a)
 data SymTensor d a = SymTensor d String
-data Binary d a b = Binary d BinOp a b
+data Binary d a b = Binary d BU.BinOp a b
 
 class HasDim a where
   type DimT a
-  getDim :: a -> DimT a
+  dim :: a -> DimT a
 instance Shape d => HasDim (GraphRef d a) where
   type DimT (GraphRef d a) = d
-  getDim (GraphRef d _) = d
+  dim (GraphRef d _) = d
 instance Shape d => HasDim (ConstTensor d a) where
   type DimT (ConstTensor d a) = d
-  getDim (ConstTensor d _) = d
+  dim (ConstTensor d _) = d
 instance Shape d => HasDim (SymTensor d a) where
   type DimT (SymTensor d a) = d
-  getDim (SymTensor d _) = d
+  dim (SymTensor d _) = d
 instance Shape d => HasDim (Binary d a b) where
   type DimT (Binary d a b) = d
-  getDim (Binary d _ _ _) = d
+  dim (Binary d _ _ _) = d
 
 ---------------------- specialized reductions -------------------------
 instance Num a => Mul (TensorFromIntegral a) (TensorFromIntegral a) where
@@ -72,7 +71,6 @@ instance Num a => Mul (ConstTensor d a) (TensorFromIntegral a) where
   mul (ConstTensor d xs) (TensorFromIntegral y) = ConstTensor d (V.map (* y) xs)
 
 -------------------------- just make binary ----------------------------
---type family EasyBinary a b
 --type instance EasyBinary 
 --instance (EasyBinary a b) => Mul a b where
 --  type MulT a b = Binary a b
@@ -82,52 +80,65 @@ instance Num a => Mul (ConstTensor d a) (TensorFromIntegral a) where
 --  type MulT a b = Binary d a b
 --  mul x y = Binary d Mul x y
 
+--instance (HasDim a, HasDim b, DimT a ~ DimT b) => Mul a b where
+--  type MulT a b = Binary (DimT a) a b
+--  mul x y = Binary (dim x) Mul x y
+
+--instance Mul x (SymTensor d a) where
+--  type MulT x (SymTensor d a) = Binary d x (SymTensor d a)
+--  mul x y@(SymTensor d _) = Binary d Mul x y
+
+--instance Mul (SymTensor d a) y where
+--  type MulT (SymTensor d a) y = Binary d (SymTensor d a) y
+--  mul x@(SymTensor d _) y = Binary d Mul x y
+
 instance Mul (TensorFromIntegral a) (SymTensor d a) where
   type MulT (TensorFromIntegral a) (SymTensor d a) = Binary d (TensorFromIntegral a) (SymTensor d a)
-  mul x y@(SymTensor d _) = Binary d Mul x y
+  mul x y@(SymTensor d _) = Binary d BU.Mul x y
 instance Mul (SymTensor d a) (TensorFromIntegral a) where
   type MulT (SymTensor d a) (TensorFromIntegral a) = Binary d (SymTensor d a) (TensorFromIntegral a)
-  mul x@(SymTensor d _) y = Binary d Mul x y
+  mul x@(SymTensor d _) y = Binary d BU.Mul x y
 
 instance Eq d => Mul (GraphRef d a) (GraphRef d a) where
   type MulT (GraphRef d a) (GraphRef d a) = Binary d (GraphRef d a) (GraphRef d a)
   mul x@(GraphRef dx _) y@(GraphRef dy _) 
-    | dx == dy  = Binary dx Mul x y
+    | dx == dy  = Binary dx BU.Mul x y
     | otherwise = error "dimension mismatch ya goon"
 
 
 instance Eq d => Mul (SymTensor d a) (GraphRef d a) where
   type MulT (SymTensor d a) (GraphRef d a) = Binary d (SymTensor d a) (GraphRef d a)
   mul x@(SymTensor dx _) y@(GraphRef dy _) 
-    | dx == dy  = Binary dx Mul x y
+    | dx == dy  = Binary dx BU.Mul x y
     | otherwise = error "dimension mismatch ya goon"
 
 instance Eq d => Mul (GraphRef d a) (SymTensor d a) where
   type MulT (GraphRef d a) (SymTensor d a) = Binary d (GraphRef d a) (SymTensor d a)
   mul x@(GraphRef dx _) y@(SymTensor dy _) 
-    | dx == dy  = Binary dx Mul x y
+    | dx == dy  = Binary dx BU.Mul x y
     | otherwise = error "dimension mismatch ya goon"
 
 symE :: String -> SymTensor DIM0 a
 symE = SymTensor Z
 
-----------------------------------------------------------
-class Shape d => Graphable a d | a -> d where
-  node' :: a -> State (FunGraph a) (Key, d)
-  
-instance Shape d => Graphable (SymTensor d a) d where
+------------------------ to graph ----------------------------------
+class HasDim a => Graphable a where
+  node' :: a -> State (FunGraph a) Key
+
+instance Shape d => Graphable (SymTensor d a) where
   node' (SymTensor d' name) = do r <- insert $ GSym (listOfShape d') name
-                                 return (r, d')
+                                 return r
 
-node :: Graphable a d => a -> StateT (FunGraph a) Identity (GraphRef d Key)
-node expr = do (k,d) <- node' expr
-               return (GraphRef d k)
-
-data GExpr a = GBinary BinOp Key Key
+data GExpr a = GBinary BU.BinOp Key Key
 --             | GUnary UnOp Key
              | GSym [Int] String
 --             | GScale [Int] Key Key
              | GConst [Int] (Vector a) deriving (Show, Eq)
+
+node :: (DimT a ~ d) => Graphable a => a -> StateT (FunGraph a) Identity (GraphRef d Key)
+node expr = do k <- node' expr
+               return (GraphRef (dim expr) k)
+
 
 insert :: MonadState (FunGraph a) m => GExpr a -> m Int
 insert gexpr = do
@@ -140,6 +151,24 @@ data FunGraph a = FunGraph [(Key, GExpr a)] [Key] [Key] deriving (Show, Eq)
 
 sym :: String -> StateT (FunGraph (SymTensor DIM0 a)) Identity (GraphRef DIM0 Key)
 sym = node . symE
+
+
+
+--makeFun :: State (FunGraph a) b -> (b, FunGraph a)
+--makeFun f = runState f (FunGraph [] [] [])
+--
+--woo :: Num a => StateT (FunGraph a) Identity [Expr d a]
+woo = do
+  x <- sym "x"
+  let y = mul x x
+  node (mul x y)
+--  z <- node (mul x y)
+--  return [mul z y]
+--
+--run :: Num b => ([Expr a b], FunGraph b)
+--run = makeFun woo
+
+
 
 --symVec :: Int -> String -> State (FunGraph a) (Expr DIM1 a)
 --symVec d = node . (vsymE d)
@@ -275,16 +304,3 @@ sym = node . symE
 --      let k = length xs
 --      put (FunGraph (xs ++ [(k,gexpr)]) ins outs)
 --      return k
-
---makeFun :: State (FunGraph a) b -> (b, FunGraph a)
---makeFun f = runState f (FunGraph [] [] [])
---
---woo :: Num a => StateT (FunGraph a) Identity [Expr d a]
---woo = do
---  x <- sym "x"
---  let y = mul x x
---  z <- node (mul x y)
---  return [mul z y]
---
---run :: Num b => ([Expr a b], FunGraph b)
---run = makeFun woo
