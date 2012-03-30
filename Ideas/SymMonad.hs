@@ -6,6 +6,8 @@ module Ideas.SymMonad( sym
                      , symVec
                      , symMat
                      , node
+                     , output
+                     , output_
                      , exampleFun
                      , run
                      , makeFun
@@ -68,6 +70,17 @@ node expr = liftM (ERef (dim expr)) (node' expr)
       args' <- node' args
       insert $ GJacob x' args'
 
+output :: (Eq a, Hashable a, Unbox a, Shape d) => Expr d a -> State (FunGraph a) (Expr d a)
+output expr = do
+  eref@(ERef _ k) <- node expr
+  FunGraph xs ins outs <- get
+  put (FunGraph xs ins (outs ++ [k]))
+  return eref
+  
+output_ :: (Eq a, Hashable a, Unbox a, Shape d) => Expr d a -> State (FunGraph a) ()
+output_ expr = do
+  _ <- output expr
+  return ()
 
 
 makeFun :: State (FunGraph a) b -> (b, FunGraph a)
@@ -77,9 +90,10 @@ exampleFun :: State (FunGraph Double) [Expr DIM0 Double]
 exampleFun = do
   x <- sym "x"
   y <- sym "y"
-  z <- node ((x*y)**3)
-  _ <- node ((x*y)**2)
-  return [z, z*y]
+  z1 <- node ((x*y)**3)
+  z2 <- node ((x*y)**2)
+  output_ (z1*z2)
+  return [z1, z2*y]
 
 run :: IO ()
 run = do
