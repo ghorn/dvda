@@ -11,8 +11,8 @@ module Numeric.Dvda.Vis( previewExprs
                        , previewExprs_
                        ) where
 
-import Data.Graph.Inductive hiding (nodes, edges)
-import Data.GraphViz
+import Data.Graph.Inductive(Gr,Node,nmap,emap,nmap,mkGraph)
+import Data.GraphViz(Labellable,toLabelValue,preview)
 import Data.Text.Lazy(pack)
 import Control.Concurrent(threadDelay)
 import Data.List(foldl')
