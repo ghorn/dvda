@@ -13,6 +13,7 @@ module Ideas.SymMonad( sym
 
 import Control.Monad.State
 import Data.Array.Repa(DIM0,DIM1,DIM2,listOfShape,Shape)
+import qualified Data.IntMap as IM(null,insert,empty,findMax)
 
 import Ideas.Graph(FunGraph(..),Key,GExpr(..),previewGraph)
 import Ideas.StrongExpr
@@ -69,15 +70,16 @@ node expr = liftM (ERef (dim expr)) (node' expr)
     -- insert :: MonadState (FunGraph a) m => GExpr a -> m Int
     insert gexpr = do
       FunGraph xs ins outs <- get
-      let k = length xs
+      let k = if IM.null xs then 0
+              else 1 + (fst $ IM.findMax xs)
           ins' = case gexpr of (GSym _ _) -> ins++[k] -- add Sym to FunGraph inputs
                                _          -> ins
-      put (FunGraph (xs ++ [gexpr]) ins' outs)
+      put (FunGraph (IM.insert k gexpr xs) ins' outs)
       return k
 
 
 makeFun :: State (FunGraph a) b -> (b, FunGraph a)
-makeFun f = runState f (FunGraph [] [] [])
+makeFun f = runState f (FunGraph IM.empty [] [])
 
 exampleFun :: Floating a => State (FunGraph a) [Expr DIM0 a]
 exampleFun = do

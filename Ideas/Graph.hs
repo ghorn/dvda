@@ -12,6 +12,7 @@ import Data.Graph.Inductive(Gr,mkGraph)
 import Data.GraphViz(Labellable,toLabelValue,preview)
 import Control.Concurrent(threadDelay)
 import Data.Vector.Unboxed(Vector)
+import Data.IntMap(IntMap,assocs)
 
 import Ideas.BinUn(BinOp, UnOp)
 
@@ -41,7 +42,7 @@ instance Show a => Labellable (GExpr a) where
   toLabelValue (GJacob _ _)     = toLabelValue $ "jacob"
   toLabelValue (GConst _ _)     = toLabelValue $ "const"
                                  
-data FunGraph a = FunGraph [GExpr a] [Key] [Key] deriving (Show, Eq)
+data FunGraph a = FunGraph (IntMap (GExpr a)) [Key] [Key] deriving (Show, Eq)
 
 getChildren :: GExpr a -> [Key]
 getChildren (GBinary _ k1 k2) = [k1,k2]
@@ -63,5 +64,5 @@ previewGraph fungraph = do
 toFGLGraph :: FunGraph a -> Gr (GExpr a) String
 toFGLGraph (FunGraph gexprs _ _) = mkGraph lnodes ledges
   where
-    lnodes = zip [0..] gexprs
-    ledges = concat $ zipWith (\k ge -> map (\ch -> (ch,k,"")) (getChildren ge)) [0..] gexprs
+    lnodes = assocs gexprs
+    ledges = concat $ map (\(k,ge) -> map (\ch -> (ch,k,"")) (getChildren ge)) lnodes
