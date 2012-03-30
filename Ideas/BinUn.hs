@@ -25,7 +25,7 @@ data UnOp = Abs
           | Cosh
           | ATanh
           | ASinh
-          | ACosh deriving Eq
+          | ACosh deriving (Eq, Show)
 
 showUnary :: Show a => a -> UnOp -> String
 showUnary x Abs    = "|" ++ show x ++ "|"
@@ -72,7 +72,7 @@ data BinOp = Add
            | Mul
            | Div
            | Pow
-           | LogBase deriving Eq
+           | LogBase deriving (Eq, Show)
 
 applyBinary :: Floating a => BinOp -> a -> a -> a
 applyBinary Add = (+)
