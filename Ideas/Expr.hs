@@ -4,18 +4,18 @@
 {-# Language GADTs #-}
 {-# Language FlexibleInstances #-}
 
-module Ideas.StrongExpr( Expr(..)
-                       , symE
-                       , vsymE
-                       , msymE
-                       , dot
-                       , deriv
-                       , grad
-                       , jacob
-                       , hess
-                       , dim
-                       , Dot(..)
-                       ) where
+module Ideas.Expr( Expr(..)
+                 , symE
+                 , vsymE
+                 , msymE
+                 , dot
+                 , deriv
+                 , grad
+                 , jacob
+                 , hess
+                 , dim
+                 , Dot(..)
+                 ) where
 
 import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), showShape, listOfShape,shapeOfList,Shape) -- hiding ((++))
 import Data.Vector.Unboxed(Vector, toList, Unbox)

@@ -19,7 +19,7 @@ import Data.Hashable(Hashable)
 import Data.Vector.Unboxed(Unbox)
 
 import Ideas.Graph(FunGraph(..),Key,GExpr(..),previewGraph,insert,emptyFunGraph)
-import Ideas.StrongExpr
+import Ideas.Expr
 
 sym :: (Eq a, Hashable a, Unbox a) => String -> State (FunGraph a) (Expr DIM0 a)
 sym = node . symE
