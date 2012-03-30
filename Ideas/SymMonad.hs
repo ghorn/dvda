@@ -6,34 +6,16 @@ module Ideas.SymMonad( sym
                      , symVec
                      , symMat
                      , node
-                     , FunGraph(..)
-                     , woo
+                     , exampleFun
                      , run
                      , makeFun
                      ) where
 
 import Control.Monad.State
-import Data.Functor.Identity
 import Data.Array.Repa(DIM0,DIM1,DIM2,listOfShape,Shape)
-import Data.Vector.Unboxed(Vector)
 
+import Ideas.Graph(FunGraph(..),Key,GExpr(..),previewGraph)
 import Ideas.StrongExpr
-import Ideas.BinUn(BinOp, UnOp)
-
-type Key = Int
-
-data GExpr a = GBinary BinOp Key Key
-             | GUnary UnOp Key
-             | GSym [Int] String
-             | GSingleton [Int] a
-             | GScale Key Key
-             | GDot Key Key
-             | GDeriv Key Key
-             | GGrad Key Key
-             | GJacob Key Key
-             | GConst [Int] (Vector a) deriving (Show, Eq)
-                                 
-data FunGraph a = FunGraph [GExpr a] [Key] [Key] deriving (Show, Eq)
 
 sym :: String -> State (FunGraph a) (Expr DIM0 a)
 sym = node . symE
@@ -97,13 +79,16 @@ node expr = liftM (ERef (dim expr)) (node' expr)
 makeFun :: State (FunGraph a) b -> (b, FunGraph a)
 makeFun f = runState f (FunGraph [] [] [])
 
---woo :: Num a => StateT (FunGraph a) Identity [Expr d a]
-woo :: Floating a => StateT (FunGraph a) Identity [Expr DIM0 a]
-woo = do
+exampleFun :: Floating a => State (FunGraph a) [Expr DIM0 a]
+exampleFun = do
   x <- sym "x"
   let y = abs x
   z <- node (x*y**3)
   return [z, z*y]
 
-run :: Floating b => ([Expr DIM0 b], FunGraph b)
-run = makeFun woo
+run :: IO ()
+run = do
+  let gr :: FunGraph Double
+      gr = snd $ makeFun exampleFun
+  print gr
+  previewGraph gr
