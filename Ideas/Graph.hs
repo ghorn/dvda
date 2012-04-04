@@ -9,6 +9,8 @@ module Ideas.Graph ( GExpr(..)
                    , getChildren
                    , previewGraph
                    , toFGLGraph
+                   , collisions
+                   , showCollisions
                    ) where
 
 import Control.Monad.State
@@ -19,6 +21,7 @@ import Data.Vector.Unboxed(Vector,Unbox)
 import qualified Data.Vector.Unboxed as V(foldl)
 import Data.Hashable(Hashable,hash,combine)
 import qualified Data.HashMap.Strict as HM(HashMap,empty,size,lookup,insert,toList)
+import Data.List(sort)
 
 import Ideas.BinUn(BinOp, UnOp)
 
@@ -62,6 +65,26 @@ instance Show a => Labellable (GExpr a) where
   toLabelValue (GConst _ _)     = toLabelValue "const"
 
 data FunGraph a = FunGraph (HM.HashMap (GExpr a) Key) [Key] [Key] deriving (Show, Eq)
+
+collisions :: (Hashable a, Unbox a) =>
+              FunGraph a -> (Int, Int, Double)
+collisions (FunGraph gr _ _) = (numCollisions, numTotal, (fromIntegral numCollisions)/(fromIntegral numTotal))
+  where
+    allHashes = sort $ map (hash . fst) $ HM.toList gr
+    numTotal = length allHashes
+    numCollisions = countCollisions 0 allHashes
+      where
+        countCollisions n (x:y:ys)
+          | x == y    = countCollisions (n+1) (y:ys)
+          | otherwise = countCollisions n     (y:ys)
+        countCollisions n [_] = n
+        countCollisions n []  = n
+
+showCollisions :: (Hashable a, Unbox a) =>
+                  FunGraph a -> String
+showCollisions gr = show numCollisions ++ '/' : show numTotal ++ " collisions ("++show (100*frac)++" %)"
+  where
+    (numCollisions, numTotal, frac) = collisions gr
 
 getChildren :: GExpr a -> [Key]
 getChildren (GBinary _ k1 k2) = [k1,k2]

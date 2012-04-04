@@ -18,7 +18,7 @@ import Data.Array.Repa(DIM0,DIM1,DIM2,listOfShape,Shape)
 import Data.Hashable(Hashable)
 import Data.Vector.Unboxed(Unbox)
 
-import Ideas.Graph(FunGraph(..),Key,GExpr(..),previewGraph,insert,emptyFunGraph)
+import Ideas.Graph(FunGraph(..),Key,GExpr(..),previewGraph,insert,emptyFunGraph,showCollisions)
 import Ideas.Expr
 
 sym :: (Eq a, Hashable a, Unbox a) => String -> State (FunGraph a) (Expr DIM0 a)
@@ -101,4 +101,5 @@ run = do
   let gr :: FunGraph Double
       gr = snd $ makeFun exampleFun
   print gr
+  putStrLn $ showCollisions gr
   previewGraph gr
