@@ -3,7 +3,7 @@ Version:             0.1
 License:             BSD3
 License-file:        LICENSE
 Author:              Greg Horn
-Maintainer:          ghorn@stanford.edu
+Maintainer:          gregmainland@gmail.edu
 Stability:           Experimental
 Category:            Math
 Build-type:          Simple
@@ -61,6 +61,11 @@ Library
                      Numeric.Dvda.Codegen.Codegen
                      Numeric.Dvda.Codegen.CallWrapper
                      Numeric.Dvda.Codegen.WriteC
+
+                     Ideas.BinUn
+                     Ideas.Expr
+                     Ideas.Graph
+                     Ideas.SymMonad
 
   Build-depends:     base       >= 4     && < 5,
                      graphviz,
