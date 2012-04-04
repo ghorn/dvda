@@ -4,17 +4,17 @@
 {-# Language FlexibleInstances #-}
 -- {-# Language OverlappingInstances #-}
 
-module Ideas.SymMonad( node
-                     , sym
-                     ) where
---                     , symVec
---                     , symMat
---                     , node
---                     , FunGraph(..)
-----                     , woo
-----                     , run
-----                     , makeFun
---                     ) where
+module Ideas.SymMonad ( node
+                      , sym
+                      ) where
+--                      , symVec
+--                      , symMat
+--                      , node
+--                      , FunGraph(..)
+----                      , woo
+----                      , run
+----                      , makeFun
+--                      ) where
 
 import Control.Monad.State
 import Data.Functor.Identity

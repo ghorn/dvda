@@ -2,16 +2,16 @@
 {-# Language GADTs #-}
 {-# Language FlexibleContexts #-}
 
-module Ideas.SymMonad( sym
-                     , symVec
-                     , symMat
-                     , node
-                     , output
-                     , output_
-                     , exampleFun
-                     , run
-                     , makeFun
-                     ) where
+module Ideas.SymMonad ( sym
+                      , symVec
+                      , symMat
+                      , node
+                      , output
+                      , output_
+                      , exampleFun
+                      , run
+                      , makeFun
+                      ) where
 
 import Control.Monad.State
 import Data.Array.Repa(DIM0,DIM1,DIM2,listOfShape,Shape)

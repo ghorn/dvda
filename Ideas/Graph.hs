@@ -1,15 +1,15 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language FlexibleContexts #-}
 
-module Ideas.Graph( GExpr(..)
-                  , FunGraph(..)
-                  , Key
-                  , insert
-                  , emptyFunGraph
-                  , getChildren
-                  , previewGraph
-                  , toFGLGraph
-                  ) where
+module Ideas.Graph ( GExpr(..)
+                   , FunGraph(..)
+                   , Key
+                   , insert
+                   , emptyFunGraph
+                   , getChildren
+                   , previewGraph
+                   , toFGLGraph
+                   ) where
 
 import Control.Monad.State
 import Data.Graph.Inductive(Gr,mkGraph)

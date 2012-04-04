@@ -1,12 +1,12 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Ideas.BinUn( BinOp(..)
-                  , UnOp(..)
-                  , showBinary
-                  , showUnary
-                  , applyUnary
-                  , applyBinary
-                  ) where
+module Ideas.BinUn ( BinOp(..)
+                   , UnOp(..)
+                   , showBinary
+                   , showUnary
+                   , applyUnary
+                   , applyBinary
+                   ) where
 
 import Data.Hashable(Hashable,hash)
 
