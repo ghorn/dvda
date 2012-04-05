@@ -22,6 +22,9 @@ import Data.Vector.Unboxed(Vector, toList, Unbox)
 import qualified Data.Vector.Unboxed as V(zipWith, map)
 import Ideas.BinUn
 
+showShapeR :: Shape sh => sh -> String
+showShapeR = show . reverse . listOfShape
+
 dim :: Expr d a -> d
 dim (ESym d _) = d
 dim (EConst d _) = d
@@ -34,7 +37,7 @@ dim (EDot x y) = dotDims (dim x) (dim y)
 dim (ERef d _) = d
 dim (EDeriv _ _) = Z
 dim (EGrad _ args) = dim args
-dim (EJacob x args) = shapeOfList $ listOfShape (dim x) ++ listOfShape (dim args)
+dim (EJacob x args) = Z :. (head $ listOfShape (dim x)) :. (head $ listOfShape (dim args))
 
 data Expr d a where
   ESym :: d -> String -> Expr d a
@@ -69,8 +72,8 @@ makeBinary' op f x y
   where
     dx = dim x
     dy = dim y
-    sdx = showShape dx
-    sdy = showShape dy
+    sdx = showShapeR dx
+    sdy = showShapeR dy
     sop = show op
 
 -- | third layer of binary simplification: make reasonable simplifications
@@ -129,38 +132,38 @@ dot = EDot
 instance Dot DIM2 DIM2 where -- matrix-matrix
   type DotT DIM2 DIM2 = DIM2
   dotDims d1 d2 
-    | c1 == r2  = shapeOfList [r1, c2]
-    | otherwise = error "MM dimension mismatch"
+    | c1 == r2  = Z :. r1 :. c2
+    | otherwise = error $ "MM dimension mismatch: " ++ show d1' ++ ", " ++ show d2'
     where
-      [r1,c1] = listOfShape d1
-      [r2,c2] = listOfShape d2
+      d1'@[r1,c1] = reverse $ listOfShape d1
+      d2'@[r2,c2] = reverse $ listOfShape d2
   
 instance Dot DIM1 DIM1 where -- vector-vector
   type DotT DIM1 DIM1 = DIM0
   dotDims d1 d2 
     | r1 == r2  = Z
-    | otherwise = error "VV dimension mismatch"
+    | otherwise = error $ "VV dimension mismatch: " ++ show d1' ++ ", " ++ show d2'
     where
-      [r1] = listOfShape d1
-      [r2] = listOfShape d2
+      d1'@[r1] = listOfShape d1
+      d2'@[r2] = listOfShape d2
 
 instance Dot DIM2 DIM1 where -- matrix-vector
   type DotT DIM2 DIM1 = DIM1
   dotDims d1 d2 
-    | c1 == r2  = shapeOfList [r1]
-    | otherwise = error "MV dimension mismatch"
+    | c1 == r2  = Z :. r1
+    | otherwise = error $ "MV dimension mismatch: " ++ show d1' ++ ", " ++ show d2'
     where
-      [r1,c1] = listOfShape d1
-      [r2]    = listOfShape d2
+      d1'@[r1,c1] = reverse $ listOfShape d1
+      d2'@[r2]    = reverse $ listOfShape d2
 
 instance Dot DIM1 DIM2 where -- vector-matrix
   type DotT DIM1 DIM2 = DIM1
   dotDims d1 d2 
-    | c1 == r2  = shapeOfList [c2]
-    | otherwise = error "VM dimension mismatch"
+    | c1 == r2  = Z :. c2
+    | otherwise = error $ "VM dimension mismatch: " ++ show d1' ++ ", " ++ show d2'
     where
-      [c1]    = listOfShape d1
-      [r2,c2] = listOfShape d2
+      d1'@[c1]    = reverse $ listOfShape d1
+      d2'@[r2,c2] = reverse $ listOfShape d2
 
 paren :: Show a => a -> String
 paren x = "( "++show x++" )"
@@ -168,13 +171,13 @@ paren x = "( "++show x++" )"
 instance (Shape d, Show a) => Show (Expr d a) where
   show (ESingleton _ x) = show x
   show (EDimensionless x) = show x
-  show (ESym d name) = name++"{"++showShape d++"}"
-  show (EConst d x) = "{" ++ showShape d ++ ", "++show (toList x)++"}" 
+  show (ESym d name) = name++"{"++showShapeR d++"}"
+  show (EConst d x) = "{" ++ showShapeR d ++ ", "++show (toList x)++"}" 
   show (EUnary op x) = showUnary x op
   show (EBinary op x y) = paren x ++ showBinary op ++ paren y
   show (EScale s x) = paren s ++ "*" ++ paren x
   show (EDot _ _) = "EDot ?? ??"
-  show (ERef d k) = "{ref:" ++ showShape d ++ ":" ++ show k ++ "}"
+  show (ERef d k) = "{ref:" ++ showShapeR d ++ ":" ++ show k ++ "}"
   show (EDeriv x y) = "deriv(" ++ show x ++ ", " ++ show y ++ ")"
   show (EGrad  x y) = "grad("  ++ show x ++ ", " ++ show y ++ ")"
   show (EJacob x y) = "jacob(" ++ show x ++ ", " ++ show y ++ ")"
