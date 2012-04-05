@@ -78,7 +78,11 @@ Library
                      QuickCheck,
                      containers,
                      transformers >= 0.2 && < 0.3,
-                     mtl >= 2.0 && < 2.1
+                     mtl >= 2.0 && < 2.1,
+                     hashable  >= 1.1 && < 1.2,
+                     unordered-containers  >= 0.2 && < 0.3,
+                     vector  >= 0.9 && < 0.10,
+                     repa  >= 3.0 && < 3.1
   Ghc-options:       -O2 -Wall
 
 
