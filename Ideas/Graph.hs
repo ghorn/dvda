@@ -27,6 +27,8 @@ import Ideas.BinUn(BinOp, UnOp)
 
 type Key = Int
 
+data FunGraph a b c = FunGraph (HM.HashMap (GExpr a) Key) (b,[Key]) (c,[Key]) deriving (Show, Eq)
+
 data GExpr a = GBinary BinOp Key Key
              | GUnary UnOp Key
              | GSym [Int] String
@@ -64,10 +66,7 @@ instance Show a => Labellable (GExpr a) where
   toLabelValue (GJacob _ _)     = toLabelValue "jacob"
   toLabelValue (GConst _ _)     = toLabelValue "const"
 
-data FunGraph a = FunGraph (HM.HashMap (GExpr a) Key) [Key] [Key] deriving (Show, Eq)
-
-collisions :: (Hashable a, Unbox a) =>
-              FunGraph a -> (Int, Int, Double)
+collisions :: (Hashable a, Unbox a) => FunGraph a b c -> (Int, Int, Double)
 collisions (FunGraph gr _ _) = (numCollisions, numTotal, (fromIntegral numCollisions)/(fromIntegral numTotal))
   where
     allHashes = sort $ map (hash . fst) $ HM.toList gr
@@ -80,8 +79,7 @@ collisions (FunGraph gr _ _) = (numCollisions, numTotal, (fromIntegral numCollis
         countCollisions n [_] = n
         countCollisions n []  = n
 
-showCollisions :: (Hashable a, Unbox a) =>
-                  FunGraph a -> String
+showCollisions :: (Hashable a, Unbox a) => FunGraph a b c -> String
 showCollisions gr = show numCollisions ++ '/' : show numTotal ++ " collisions ("++show (100*frac)++" %)"
   where
     (numCollisions, numTotal, frac) = collisions gr
@@ -98,28 +96,30 @@ getChildren (GGrad k1 k2) = [k1,k2]
 getChildren (GJacob k1 k2) = [k1,k2]
 getChildren (GConst _ _) = []
 
-emptyFunGraph :: FunGraph a
-emptyFunGraph = FunGraph HM.empty [] []
+emptyFunGraph :: FunGraph a b c
+emptyFunGraph = FunGraph HM.empty (inerr,inerr) (outerr,outerr)
+  where
+    inerr = error "must specify inputs"
+    outerr = error "must specify outputs"
+
 
 -- | Try to insert a GExpr into the hashmap performing CSE.
 --   If the GExpr is not yet in the map, insert it.
 --   Otherwise don't insert, just return existing key.
-insert :: (Unbox a, Hashable a, Eq a, MonadState (FunGraph a) m) => GExpr a -> m Int
+insert :: (Unbox a, Hashable a, Eq a, MonadState (FunGraph a b c) m) => GExpr a -> m Int
 insert gexpr = do
-  FunGraph xs ins outs <- get
+  (FunGraph xs ins outs) <- get
   let k = HM.size xs
-      ins' = case gexpr of (GSym _ _) -> ins++[k] -- add Sym to FunGraph inputs
-                           _          -> ins
-  case HM.lookup gexpr xs of Nothing -> do put (FunGraph (HM.insert gexpr k xs) ins' outs)
+  case HM.lookup gexpr xs of Nothing -> do put (FunGraph (HM.insert gexpr k xs) ins outs)
                                            return k
                              Just k' -> return k'
 
-previewGraph :: Show a => FunGraph a -> IO ()
+previewGraph :: Show a => FunGraph a b c -> IO ()
 previewGraph fungraph = do
   preview $ toFGLGraph fungraph
   threadDelay 10000
 
-toFGLGraph :: FunGraph a -> Gr (GExpr a) String
+toFGLGraph :: FunGraph a b c -> Gr (GExpr a) String
 toFGLGraph (FunGraph gexprs _ _) = mkGraph lnodes ledges
   where
     lnodes = map (\(x,y) -> (y,x)) $ HM.toList gexprs

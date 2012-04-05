@@ -1,42 +1,33 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language GADTs #-}
 {-# Language FlexibleContexts #-}
+{-# Language TypeOperators #-}
+{-# Language TypeFamilies #-}
 
-module Ideas.SymMonad ( sym
-                      , symVec
-                      , symMat
+module Ideas.SymMonad ( (:*)(..)
+                      , HList(..)
                       , node
-                      , output
-                      , output_
+                      , inputs
+                      , outputs
                       , exampleFun
                       , run
                       , makeFun
                       ) where
 
-import Control.Monad.State
+import Control.Monad.State(State,get,put,liftM,runState)
 import Data.Array.Repa(DIM0,DIM1,DIM2,listOfShape,Shape)
 import Data.Hashable(Hashable)
 import Data.Vector.Unboxed(Unbox)
 
-import Ideas.Graph(FunGraph(..),Key,GExpr(..),previewGraph,insert,emptyFunGraph,showCollisions)
+import Ideas.Graph
 import Ideas.Expr
-
-sym :: (Eq a, Hashable a, Unbox a) => String -> State (FunGraph a) (Expr DIM0 a)
-sym = node . symE
-
-symVec :: (Eq a, Hashable a, Unbox a) => Int -> String -> State (FunGraph a) (Expr DIM1 a)
-symVec d = node . vsymE d
-
-symMat :: (Eq a, Hashable a, Unbox a) => (Int,Int) -> String -> State (FunGraph a) (Expr DIM2 a)
-symMat (r,c) = node . msymE (r,c)
 
 -- | take all sub expressions of an Expr and turn them into nodes
 --   return an Expr that is just a ref
-node :: (Shape d, Hashable a, Unbox a, Eq a) => Expr d a -> State (FunGraph a) (Expr d a)
+node :: (Shape d, Hashable a, Unbox a, Eq a) => Expr d a -> State (FunGraph a b c) (Expr d a)
 node expr = liftM (ERef (dim expr)) (node' expr)
   where
-    --node' :: (Shape d, Hashable a, Unbox a, Eq a) => Expr d a -> StateT (FunGraph a) Identity Int
-    node' :: (Shape d, Hashable a, Unbox a, Eq a) => Expr d a -> State (FunGraph a) Key
+    node' :: (Shape d, Hashable a, Unbox a, Eq a) => Expr d a -> State (FunGraph a b c) Key
     node' (ESym d name) = insert $ GSym (listOfShape d) name
     node' (ERef _ k) = return k
     node' (EBinary op x y) = do
@@ -70,35 +61,78 @@ node expr = liftM (ERef (dim expr)) (node' expr)
       args' <- node' args
       insert $ GJacob x' args'
 
-output :: (Eq a, Hashable a, Unbox a, Shape d) => Expr d a -> State (FunGraph a) (Expr d a)
-output expr = do
-  eref@(ERef _ k) <- node expr
-  FunGraph xs ins outs <- get
-  put (FunGraph xs ins (outs ++ [k]))
-  return eref
-  
-output_ :: (Eq a, Hashable a, Unbox a, Shape d) => Expr d a -> State (FunGraph a) ()
-output_ expr = do
-  _ <- output expr
+---------------------- heterogenous inputs/outputs ------------------
+data a :* b = a :* b deriving Show
+infixr 6 :*
+
+class HList a where
+  type NumT a
+  type DimT a
+  mkNodes :: (NumT a ~ b) => a -> State (FunGraph b c d) (a,[Key])
+  getHDim :: a -> DimT a
+
+instance (HList a, HList b, NumT a ~ NumT b) => HList (a :* b) where
+  type NumT (a :* b) = NumT a
+  type DimT (a :* b) = (DimT a) :* (DimT b)
+  mkNodes (x :* y) = do
+    (exs,kxs) <- mkNodes x
+    (eys,kys) <- mkNodes y
+    return (exs :* eys, kxs++kys)
+  getHDim (x :* y) = (getHDim x) :* (getHDim y)
+
+instance (Shape d, Hashable a, Unbox a, Eq a) => HList (Expr d a) where
+  type NumT (Expr d a) = a
+  type DimT (Expr d a) = d
+  mkNodes expr = do
+    expr'@(ERef _ k) <- node expr
+    return (expr', [k])
+  getHDim = dim
+
+inputs :: HList b => b -> State (FunGraph (NumT b) (DimT b) c) b
+inputs exprs = do
+  (exprs', keys) <- mkNodes exprs
+  FunGraph xs _ outs <- get
+  put (FunGraph xs (getHDim exprs, keys) outs)
+  return exprs'
+
+outputs :: HList c => c -> State (FunGraph (NumT c) b (DimT c)) c
+outputs exprs = do
+  (exprs',keys) <- mkNodes exprs
+  FunGraph xs ins _ <- get
+  put (FunGraph xs ins (getHDim exprs,keys))
+  return exprs'
+
+inputs_ :: HList b => b -> State (FunGraph (NumT b) (DimT b) c) ()
+inputs_ exprs = do
+  _ <- inputs exprs
+  return ()
+
+outputs_ :: HList c => c -> State (FunGraph (NumT c) b (DimT c)) ()
+outputs_ exprs = do
+  _ <- outputs exprs
   return ()
 
 
-makeFun :: State (FunGraph a) b -> (b, FunGraph a)
+---------------- utility functions -----------------
+makeFun :: State (FunGraph a b c) d -> (d, FunGraph a b c)
 makeFun f = runState f emptyFunGraph
 
-exampleFun :: State (FunGraph Double) [Expr DIM0 Double]
+exampleFun :: State (FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)) ()
 exampleFun = do
-  x <- sym "x"
-  y <- sym "y"
-  z1 <- node ((x*y)**3)
-  z2 <- node ((x*y)**2)
-  z3 <- node (diff z2 x)
---  output_ (z1*z3)
-  return [z1, z2*y]
+  let x = sym "x"
+      y = vsym 5 "y"
+      z = msym (3,5) "Z"
+  inputs_ (x :* y :* z)
+  
+  z1 <- node $ (scale x z)**3
+  z2 <- node $ (dot z y)**2
+  z3 <- node $ diff ((x*x/2)**x) x
+  
+  outputs_ (z1 :* z2 :* z3)
 
 run :: IO ()
 run = do
-  let gr :: FunGraph Double
+  let gr :: FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)
       gr = snd $ makeFun exampleFun
   print gr
   putStrLn $ showCollisions gr

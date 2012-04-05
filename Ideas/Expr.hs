@@ -5,9 +5,10 @@
 {-# Language FlexibleInstances #-}
 
 module Ideas.Expr ( Expr(..)
-                  , symE
-                  , vsymE
-                  , msymE
+                  , sym
+                  , vsym
+                  , msym
+                  , scale
                   , dot
                   , diff
                   , grad
@@ -17,7 +18,7 @@ module Ideas.Expr ( Expr(..)
                   , Dot(..)
                   ) where
 
-import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), showShape, listOfShape,shapeOfList,Shape) -- hiding ((++))
+import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape,Shape)
 import Data.Vector.Unboxed(Vector, toList, Unbox)
 import qualified Data.Vector.Unboxed as V(zipWith, map)
 import Ideas.BinUn
@@ -126,9 +127,6 @@ class (Shape d1, Shape d2) => Dot d1 d2 where
   type DotT d1 d2
   dotDims :: d1 -> d2 -> DotT d1 d2
   
-dot :: (Dot d1 d2, DotT d1 d2 ~ d) => Expr d1 a -> Expr d2 a -> Expr d a
-dot = EDot
-
 instance Dot DIM2 DIM2 where -- matrix-matrix
   type DotT DIM2 DIM2 = DIM2
   dotDims d1 d2 
@@ -182,14 +180,20 @@ instance (Shape d, Show a) => Show (Expr d a) where
   show (EGrad  x y) = "grad("  ++ show x ++ ", " ++ show y ++ ")"
   show (EJacob x y) = "jacob(" ++ show x ++ ", " ++ show y ++ ")"
 
-symE :: String -> Expr DIM0 a
-symE = ESym Z
+sym :: String -> Expr DIM0 a
+sym = ESym Z
 
-vsymE :: Int -> String -> Expr DIM1 a
-vsymE k = ESym (Z :. k)
+vsym :: Int -> String -> Expr DIM1 a
+vsym k = ESym (Z :. k)
 
-msymE :: (Int,Int) -> String -> Expr DIM2 a
-msymE (r,c) = ESym (Z :. r :. c)
+msym :: (Int,Int) -> String -> Expr DIM2 a
+msym (r,c) = ESym (Z :. r :. c)
+
+scale :: Expr DIM0 a -> Expr d a -> Expr d a
+scale = EScale
+
+dot :: (Dot d1 d2, DotT d1 d2 ~ d) => Expr d1 a -> Expr d2 a -> Expr d a
+dot = EDot
 
 diff :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
 diff = EDeriv
