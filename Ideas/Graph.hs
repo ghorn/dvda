@@ -22,7 +22,7 @@ import Data.Hashable(Hashable,hash,combine)
 import qualified Data.HashMap.Strict as HM(HashMap,empty,size,lookup,insert,toList)
 import Data.List(sort)
 
-import Ideas.BinUn(BinOp, UnOp)
+import Ideas.BinUn(BinOp, UnOp, isCommutative)
 
 type Key = Int
 
@@ -40,7 +40,16 @@ data GExpr a = GBinary BinOp Key Key
              | GConst [Int] (Vector a) deriving (Show, Eq)
                                                 
 instance (Unbox a, Hashable a) => Hashable (GExpr a) where
-  hash (GBinary op k1 k2) = 24 `combine` hash op `combine` hash k1 `combine` hash k2
+  -- if the binary operator is commutative then always put the lesser hash first
+  -- so that e.g. x*y and y*x are not computed twice
+  hash (GBinary op k1 k2) = 24 `combine` hash op `combine` hk1' `combine` hk2'
+    where
+      hk1 = hash k1
+      hk2 = hash k2
+      (hk1', hk2')
+        | isCommutative op && hk2 < hk1 = (hk2, hk1)
+        | otherwise = (hk1, hk2)
+  --  hash (GBinary op k1 k2) = 24 `combine` hash op `combine` hash k1 `combine` hash k2
   hash (GUnary op k)      = 25 `combine` hash op `combine` hash k
   hash (GSym d name)      = 26 `combine` hash d `combine` hash name
   hash (GSingleton d x)   = 27 `combine` hash d `combine` hash x

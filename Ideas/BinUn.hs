@@ -6,6 +6,7 @@ module Ideas.BinUn ( BinOp(..)
                    , showUnary
                    , applyUnary
                    , applyBinary
+                   , isCommutative
                    ) where
 
 import Data.Hashable(Hashable,hash)
@@ -120,6 +121,13 @@ showBinary Div = "/"
 showBinary Pow = "**"
 showBinary LogBase = "`logbase`"
 
+isCommutative :: BinOp -> Bool
+isCommutative Add     = True
+isCommutative Sub     = False
+isCommutative Mul     = True
+isCommutative Div     = False
+isCommutative Pow     = False
+isCommutative LogBase = False
 
 paren :: Show a => a -> String
 paren x = "( "++show x++" )"
