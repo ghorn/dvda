@@ -6,7 +6,6 @@ module Ideas.Graph ( GExpr(..)
                    , Key
                    , insert
                    , emptyFunGraph
-                   , getChildren
                    , previewGraph
                    , toFGLGraph
                    , collisions
@@ -84,18 +83,6 @@ showCollisions gr = show numCollisions ++ '/' : show numTotal ++ " collisions ("
   where
     (numCollisions, numTotal, frac) = collisions gr
 
-getChildren :: GExpr a -> [Key]
-getChildren (GBinary _ k1 k2) = [k1,k2]
-getChildren (GUnary _ k) = [k]
-getChildren (GSym _ _ ) = []
-getChildren (GSingleton _ _) = []
-getChildren (GScale k1 k2) = [k1,k2]
-getChildren (GDot k1 k2) = [k1,k2]
-getChildren (GDeriv k1 k2) = [k1,k2]
-getChildren (GGrad k1 k2) = [k1,k2]
-getChildren (GJacob k1 k2) = [k1,k2]
-getChildren (GConst _ _) = []
-
 emptyFunGraph :: FunGraph a b c
 emptyFunGraph = FunGraph HM.empty (inerr,inerr) (outerr,outerr)
   where
@@ -124,3 +111,14 @@ toFGLGraph (FunGraph gexprs _ _) = mkGraph lnodes ledges
   where
     lnodes = map (\(x,y) -> (y,x)) $ HM.toList gexprs
     ledges = concatMap (\(k,ge) -> map (\ch -> (ch,k,"")) (getChildren ge)) lnodes
+      where
+        getChildren (GBinary _ k1 k2) = [k1,k2]
+        getChildren (GUnary _ k) = [k]
+        getChildren (GSym _ _ ) = []
+        getChildren (GSingleton _ _) = []
+        getChildren (GScale k1 k2) = [k1,k2]
+        getChildren (GDot k1 k2) = [k1,k2]
+        getChildren (GDeriv k1 k2) = [k1,k2]
+        getChildren (GGrad k1 k2) = [k1,k2]
+        getChildren (GJacob k1 k2) = [k1,k2]
+        getChildren (GConst _ _) = []
