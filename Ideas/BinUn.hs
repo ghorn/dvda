@@ -6,10 +6,14 @@ module Ideas.BinUn ( BinOp(..)
                    , showUnary
                    , applyUnary
                    , applyBinary
+                   , unaryDeriv
+                   , binaryDeriv
                    , isCommutative
                    ) where
 
 import Data.Hashable(Hashable,hash)
+
+import Ideas.Dual
 
 data UnOp = Abs
           | Neg
@@ -112,6 +116,12 @@ applyBinary Mul = (*)
 applyBinary Div = (/)
 applyBinary Pow = (**)
 applyBinary LogBase = logBase
+
+unaryDeriv :: Floating a => UnOp -> (a,a) -> a
+unaryDeriv op (x,x') = dualPerturbation $ (applyUnary op) (Dual x x')
+
+binaryDeriv :: Floating a => BinOp -> (a,a) -> (a,a) -> a
+binaryDeriv op (x,x') (y,y') = dualPerturbation $ (applyBinary op) (Dual x x') (Dual y y')
 
 showBinary :: BinOp -> String
 showBinary Add = "+"
