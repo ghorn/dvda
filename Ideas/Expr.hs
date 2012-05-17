@@ -3,6 +3,7 @@
 {-# Language MultiParamTypeClasses #-}
 {-# Language GADTs #-}
 {-# Language FlexibleInstances #-}
+{-# Language FlexibleContexts #-}
 
 module Ideas.Expr ( Expr(..)
                   , sym
@@ -123,9 +124,10 @@ instance (Shape d, Floating a) => Floating (Expr d a) where
   atanh = error "no instance for atanh"
   acosh = error "no instance for acosh"
 
-class (Shape d1, Shape d2) => Dot d1 d2 where
+class (Shape d1, Shape d2, Shape (DotT d1 d2)) => Dot d1 d2 where
   type DotT d1 d2
   dotDims :: d1 -> d2 -> DotT d1 d2
+
   
 instance Dot DIM2 DIM2 where -- matrix-matrix
   type DotT DIM2 DIM2 = DIM2
