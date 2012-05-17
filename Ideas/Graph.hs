@@ -3,8 +3,8 @@
 
 module Ideas.Graph ( GExpr(..)
                    , FunGraph(..)
+                   , DerivMap
                    , Key
-                   , insert
                    , emptyFunGraph
                    , previewGraph
                    , toFGLGraph
@@ -12,21 +12,26 @@ module Ideas.Graph ( GExpr(..)
                    , showCollisions
                    ) where
 
-import Control.Monad.State
-import Data.Graph.Inductive(Gr,mkGraph)
-import Data.GraphViz(Labellable,toLabelValue,preview)
-import Control.Concurrent(threadDelay)
-import Data.Vector.Unboxed(Vector,Unbox)
-import qualified Data.Vector.Unboxed as V(foldl)
-import Data.Hashable(Hashable,hash,combine)
-import qualified Data.HashMap.Strict as HM(HashMap,empty,size,lookup,insert,toList)
-import Data.List(sort)
+import Data.Graph.Inductive ( Gr, mkGraph )
+import Data.GraphViz ( Labellable, toLabelValue, preview )
+import Control.Concurrent ( threadDelay )
+import Data.Vector.Unboxed ( Vector, Unbox )
+import qualified Data.Vector.Unboxed as V( foldl )
+import Data.Hashable ( Hashable, hash, combine )
+import Data.List ( sort )
+import qualified Data.HashMap.Strict as HM
+import qualified Data.IntMap as IM
 
-import Ideas.BinUn(BinOp, UnOp, isCommutative)
+import Ideas.BinUn( BinOp, UnOp, isCommutative )
 
 type Key = Int
+type DerivMap a = HM.HashMap (GExpr a) Key
 
-data FunGraph a b c = FunGraph (HM.HashMap (GExpr a) Key) (b,[Key]) (c,[Key]) deriving (Show, Eq)
+data FunGraph a b c = FunGraph
+                      (HM.HashMap (GExpr a) Key)
+                      (IM.IntMap (GExpr a, DerivMap a))
+                      (b,[Key])
+                      (c,[Key]) deriving (Show, Eq)
 
 data GExpr a = GBinary BinOp Key Key
              | GUnary UnOp Key
@@ -34,9 +39,9 @@ data GExpr a = GBinary BinOp Key Key
              | GSingleton [Int] a
              | GScale Key Key
              | GDot Key Key
-             | GDeriv Key Key
-             | GGrad Key Key
-             | GJacob Key Key
+--             | GDeriv Key Key
+--             | GGrad Key Key
+--             | GJacob Key Key
              | GConst [Int] (Vector a) deriving (Show, Eq)
                                                 
 instance (Unbox a, Hashable a) => Hashable (GExpr a) where
@@ -55,9 +60,9 @@ instance (Unbox a, Hashable a) => Hashable (GExpr a) where
   hash (GSingleton d x)   = 27 `combine` hash d `combine` hash x
   hash (GScale k1 k2)     = 28 `combine` hash k1 `combine` hash k2
   hash (GDot k1 k2)       = 29 `combine` hash k1 `combine` hash k2
-  hash (GDeriv k1 k2)     = 30 `combine` hash k1 `combine` hash k2
-  hash (GGrad k1 k2)      = 31 `combine` hash k1 `combine` hash k2
-  hash (GJacob k1 k2)     = 32 `combine` hash k1 `combine` hash k2
+--  hash (GDeriv k1 k2)     = 30 `combine` hash k1 `combine` hash k2
+--  hash (GGrad k1 k2)      = 31 `combine` hash k1 `combine` hash k2
+--  hash (GJacob k1 k2)     = 32 `combine` hash k1 `combine` hash k2
   hash (GConst d v)       = V.foldl (\acc x -> acc `combine` hash x) (33 `combine` hash d) v
 
 
@@ -69,13 +74,13 @@ instance Show a => Labellable (GExpr a) where
   toLabelValue (GSingleton _ x) = toLabelValue $ show x
   toLabelValue (GScale _ _)     = toLabelValue "scale"
   toLabelValue (GDot _ _)       = toLabelValue "dot"
-  toLabelValue (GDeriv _ _)     = toLabelValue "deriv"
-  toLabelValue (GGrad _ _)      = toLabelValue "grad"
-  toLabelValue (GJacob _ _)     = toLabelValue "jacob"
+--  toLabelValue (GDeriv _ _)     = toLabelValue "deriv"
+--  toLabelValue (GGrad _ _)      = toLabelValue "grad"
+--  toLabelValue (GJacob _ _)     = toLabelValue "jacob"
   toLabelValue (GConst _ _)     = toLabelValue "const"
 
 collisions :: (Hashable a, Unbox a) => FunGraph a b c -> (Int, Int, Double)
-collisions (FunGraph gr _ _) = (numCollisions, numTotal, (fromIntegral numCollisions)/(fromIntegral numTotal))
+collisions (FunGraph gr _ _ _) = (numCollisions, numTotal, (fromIntegral numCollisions)/(fromIntegral numTotal))
   where
     allHashes = sort $ map (hash . fst) $ HM.toList gr
     numTotal = length allHashes
@@ -93,22 +98,11 @@ showCollisions gr = show numCollisions ++ '/' : show numTotal ++ " collisions ("
     (numCollisions, numTotal, frac) = collisions gr
 
 emptyFunGraph :: FunGraph a b c
-emptyFunGraph = FunGraph HM.empty (inerr,inerr) (outerr,outerr)
+emptyFunGraph = FunGraph HM.empty IM.empty (inerr,inerr) (outerr,outerr)
   where
     inerr = error "must specify inputs"
     outerr = error "must specify outputs"
 
-
--- | Try to insert a GExpr into the hashmap performing CSE.
---   If the GExpr is not yet in the map, insert it.
---   Otherwise don't insert, just return existing key.
-insert :: (Unbox a, Hashable a, Eq a, MonadState (FunGraph a b c) m) => GExpr a -> m Int
-insert gexpr = do
-  (FunGraph xs ins outs) <- get
-  let k = HM.size xs
-  case HM.lookup gexpr xs of Nothing -> do put (FunGraph (HM.insert gexpr k xs) ins outs)
-                                           return k
-                             Just k' -> return k'
 
 previewGraph :: Show a => FunGraph a b c -> IO ()
 previewGraph fungraph = do
@@ -116,9 +110,10 @@ previewGraph fungraph = do
   threadDelay 10000
 
 toFGLGraph :: FunGraph a b c -> Gr (GExpr a) String
-toFGLGraph (FunGraph gexprs _ _) = mkGraph lnodes ledges
+toFGLGraph (FunGraph gexprs _ _ _) = mkGraph lnodes ledges
   where
     lnodes = map (\(x,y) -> (y,x)) $ HM.toList gexprs
+--    lnodes = IM.toList gexprs
     ledges = concatMap (\(k,ge) -> map (\ch -> (ch,k,"")) (getChildren ge)) lnodes
       where
         getChildren (GBinary _ k1 k2) = [k1,k2]
@@ -127,7 +122,7 @@ toFGLGraph (FunGraph gexprs _ _) = mkGraph lnodes ledges
         getChildren (GSingleton _ _) = []
         getChildren (GScale k1 k2) = [k1,k2]
         getChildren (GDot k1 k2) = [k1,k2]
-        getChildren (GDeriv k1 k2) = [k1,k2]
-        getChildren (GGrad k1 k2) = [k1,k2]
-        getChildren (GJacob k1 k2) = [k1,k2]
+--        getChildren (GDeriv k1 k2) = [k1,k2]
+--        getChildren (GGrad k1 k2) = [k1,k2]
+--        getChildren (GJacob k1 k2) = [k1,k2]
         getChildren (GConst _ _) = []
