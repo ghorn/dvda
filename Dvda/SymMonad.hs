@@ -23,7 +23,6 @@ import Data.Maybe ( fromJust )
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 
-
 import Dvda.Graph ( FunGraph(..), GExpr(..), DerivMap, Key, emptyFunGraph )
 import Dvda.Expr ( Expr(..), dim, scale, dot )
 import Dvda.BinUn ( binaryDeriv, unaryDeriv )
@@ -170,15 +169,6 @@ node expr = liftM (ERef (dim expr)) (node' expr)
       case HM.lookup var derivMap of Nothing     -> node' $ ESingleton (dim args) 0
                                      Just derivK -> return derivK
 
-
-----    node' (EGrad x args) = do
-----      x' <- node' x
-----      args' <- node' args
-----      insert $ GGrad x' args'
-----    node' (EJacob x args) = do
-----      x' <- node' x
-----      args' <- node' args
-----      insert $ GJacob x' args'
 
 -- | Try to insert the GExpr into the hashmap performing CSE.
 --   Take a GExpr and it's perturbation GExprs.
