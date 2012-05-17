@@ -38,53 +38,55 @@ Flag stressTest
   Default: False
 
 Library
-  Exposed-modules:   Numeric.Dvda
-                     Numeric.Dvda.Symbolic
-                     Numeric.Dvda.Dim
-                     Numeric.Dvda.AD
-                     Numeric.Dvda.Vis
-                     Numeric.Dvda.Function
-                     Numeric.Dvda.Examples
---                     Numeric.Dvda.Tests.Tests
-
-  Other-modules:     Numeric.Dvda.Internal.Expr
-                     Numeric.Dvda.Internal.Tensor
-                     Numeric.Dvda.Internal.BinaryType
-                     Numeric.Dvda.Internal.UnaryType
-                     Numeric.Dvda.Internal.GNode
-                     Numeric.Dvda.Internal.ExprGraph
-                     Numeric.Dvda.Internal.ExprUtils
-                     Numeric.Dvda.AD.Dual
-                     Numeric.Dvda.AD.Rad
-                     Numeric.Dvda.AD.Fad
-                     Numeric.Dvda.Config
-                     Numeric.Dvda.Codegen.Codegen
-                     Numeric.Dvda.Codegen.CallWrapper
-                     Numeric.Dvda.Codegen.WriteC
-
-                     Dvda.BinUn
+  Exposed-modules:   Dvda.BinUn
                      Dvda.Expr
                      Dvda.Graph
                      Dvda.SymMonad
                      Dvda.Dual
                      Dvda.Examples
 
+--                     Numeric.Dvda
+--                     Numeric.Dvda.Symbolic
+--                     Numeric.Dvda.Dim
+--                     Numeric.Dvda.AD
+--                     Numeric.Dvda.Vis
+--                     Numeric.Dvda.Function
+--                     Numeric.Dvda.Examples
+----                     Numeric.Dvda.Tests.Tests
+
+  Other-modules:     
+                     --Numeric.Dvda.Internal.Expr
+                     --Numeric.Dvda.Internal.Tensor
+                     --Numeric.Dvda.Internal.BinaryType
+                     --Numeric.Dvda.Internal.UnaryType
+                     --Numeric.Dvda.Internal.GNode
+                     --Numeric.Dvda.Internal.ExprGraph
+                     --Numeric.Dvda.Internal.ExprUtils
+                     --Numeric.Dvda.AD.Dual
+                     --Numeric.Dvda.AD.Rad
+                     --Numeric.Dvda.AD.Fad
+                     --Numeric.Dvda.Config
+                     --Numeric.Dvda.Codegen.Codegen
+                     --Numeric.Dvda.Codegen.CallWrapper
+                     --Numeric.Dvda.Codegen.WriteC
+
+
   Build-depends:     base       >= 4     && < 5,
-                     graphviz,
-                     fgl,
-                     text,
-                     directory,
-                     MissingH,
-                     process,
-                     unix,
-                     QuickCheck,
-                     containers,
-                     transformers >= 0.2 && < 0.3,
-                     mtl >= 2.0 && < 2.1,
                      hashable  >= 1.1 && < 1.2,
-                     unordered-containers  >= 0.2 && < 0.3,
                      vector  >= 0.9 && < 0.10,
-                     repa  >= 3.0 && < 3.1
+                     repa  >= 3.1 && < 3.2,
+                     containers >= 0.4 && < 0.5,
+                     unordered-containers  >= 0.2 && < 0.3,
+                     graphviz >= 2999.12 && < 2999.13,
+                     fgl >= 5.4 && < 5.5,
+                     mtl >= 2.0 && < 2.1
+--                     text,
+--                     directory,
+--                     MissingH,
+--                     process,
+--                     unix,
+--                     QuickCheck,
+--                     transformers >= 0.2 && < 0.3,
   Ghc-options:       -O2 -Wall
 
 
