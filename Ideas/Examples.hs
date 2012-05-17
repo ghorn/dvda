@@ -32,6 +32,6 @@ run :: IO ()
 run = do
   let gr :: FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)
       gr = snd $ makeFun exampleFun
-  print gr
+  putStrLn $ funGraphSummary gr
   putStrLn $ showCollisions gr
   previewGraph gr

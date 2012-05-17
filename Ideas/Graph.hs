@@ -10,6 +10,7 @@ module Ideas.Graph ( GExpr(..)
                    , toFGLGraph
                    , collisions
                    , showCollisions
+                   , funGraphSummary
                    ) where
 
 import Data.Graph.Inductive ( Gr, mkGraph )
@@ -32,6 +33,15 @@ data FunGraph a b c = FunGraph
                       (IM.IntMap (GExpr a, DerivMap a))
                       (b,[Key])
                       (c,[Key]) deriving (Show, Eq)
+                                         
+funGraphSummary :: (Show a, Unbox a, Show b, Show c) => FunGraph a b c -> String
+funGraphSummary (FunGraph hm _ (b,bkeys) (c,ckeys)) =
+  init $ unlines [ "input dims: " ++ show b
+                 , "input nodes:" ++ show bkeys
+                 , "output dims: " ++ show c
+                 , "output nodes:" ++ show ckeys
+                 , "graph: " ++ show hm
+                 ]
 
 data GExpr a = GBinary BinOp Key Key
              | GUnary UnOp Key
