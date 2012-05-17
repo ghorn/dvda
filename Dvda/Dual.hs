@@ -4,8 +4,8 @@
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
 
-module Ideas.Dual ( Dual(..)
-                  ) where
+module Dvda.Dual ( Dual(..)
+                 ) where
 
 import Data.Ratio(numerator, denominator)
 

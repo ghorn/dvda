@@ -5,24 +5,25 @@
 {-# Language FlexibleInstances #-}
 {-# Language FlexibleContexts #-}
 
-module Ideas.Expr ( Expr(..)
-                  , sym
-                  , vsym
-                  , msym
-                  , scale
-                  , dot
-                  , diff
-                  , grad
-                  , jacob
-                  , hess
-                  , dim
-                  , Dot(..)
-                  ) where
+module Dvda.Expr ( Expr(..)
+                 , sym
+                 , vsym
+                 , msym
+                 , scale
+                 , dot
+                 , diff
+                 , grad
+                 , jacob
+                 , hess
+                 , dim
+                 , Dot(..)
+                 ) where
 
 import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape,Shape)
 import Data.Vector.Unboxed(Vector, toList, Unbox)
 import qualified Data.Vector.Unboxed as V(zipWith, map)
-import Ideas.BinUn
+
+import Dvda.BinUn
 
 showShapeR :: Shape sh => sh -> String
 showShapeR = show . reverse . listOfShape

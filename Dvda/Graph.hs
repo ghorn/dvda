@@ -1,17 +1,17 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language FlexibleContexts #-}
 
-module Ideas.Graph ( GExpr(..)
-                   , FunGraph(..)
-                   , DerivMap
-                   , Key
-                   , emptyFunGraph
-                   , previewGraph
-                   , toFGLGraph
-                   , collisions
-                   , showCollisions
-                   , funGraphSummary
-                   ) where
+module Dvda.Graph ( GExpr(..)
+                  , FunGraph(..)
+                  , DerivMap
+                  , Key
+                  , emptyFunGraph
+                  , previewGraph
+                  , toFGLGraph
+                  , collisions
+                  , showCollisions
+                  , funGraphSummary
+                  ) where
 
 import Data.Graph.Inductive ( Gr, mkGraph )
 import Data.GraphViz ( Labellable, toLabelValue, preview )
@@ -23,7 +23,7 @@ import Data.List ( sort )
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 
-import Ideas.BinUn( BinOp, UnOp, isCommutative )
+import Dvda.BinUn( BinOp, UnOp, isCommutative )
 
 type Key = Int
 type DerivMap a = HM.HashMap (GExpr a) Key

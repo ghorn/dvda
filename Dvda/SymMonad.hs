@@ -4,15 +4,15 @@
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
 
-module Ideas.SymMonad ( (:*)(..)
-                      , HList(..)
-                      , node
-                      , inputs
-                      , inputs_
-                      , outputs
-                      , outputs_
-                      , makeFun
-                      ) where
+module Dvda.SymMonad ( (:*)(..)
+                     , HList(..)
+                     , node
+                     , inputs
+                     , inputs_
+                     , outputs
+                     , outputs_
+                     , makeFun
+                     ) where
 
 import Control.Monad ( when )
 import Control.Monad.State ( MonadState, State, get, put, liftM, runState )
@@ -24,9 +24,9 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 
 
-import Ideas.Graph ( FunGraph(..), GExpr(..), DerivMap, Key, emptyFunGraph )
-import Ideas.Expr ( Expr(..), dim, scale, dot )
-import Ideas.BinUn ( binaryDeriv, unaryDeriv )
+import Dvda.Graph ( FunGraph(..), GExpr(..), DerivMap, Key, emptyFunGraph )
+import Dvda.Expr ( Expr(..), dim, scale, dot )
+import Dvda.BinUn ( binaryDeriv, unaryDeriv )
 
 -- | take all sub expressions of an Expr and turn them into nodes
 --   return an Expr that is just a ref

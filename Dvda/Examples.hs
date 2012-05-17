@@ -4,16 +4,16 @@
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
 
-module Ideas.Examples ( exampleFun
-                      , run
-                      ) where
+module Dvda.Examples ( exampleFun
+                     , run
+                     ) where
 
 import Control.Monad.State (State)
 import Data.Array.Repa (DIM0,DIM1,DIM2)
 
-import Ideas.SymMonad
-import Ideas.Expr
-import Ideas.Graph
+import Dvda.SymMonad
+import Dvda.Expr
+import Dvda.Graph
 
 exampleFun :: State (FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)) ()
 exampleFun = do

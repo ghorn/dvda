@@ -1,19 +1,19 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Ideas.BinUn ( BinOp(..)
-                   , UnOp(..)
-                   , showBinary
-                   , showUnary
-                   , applyUnary
-                   , applyBinary
-                   , unaryDeriv
-                   , binaryDeriv
-                   , isCommutative
-                   ) where
+module Dvda.BinUn ( BinOp(..)
+                  , UnOp(..)
+                  , showBinary
+                  , showUnary
+                  , applyUnary
+                  , applyBinary
+                  , unaryDeriv
+                  , binaryDeriv
+                  , isCommutative
+                  ) where
 
 import Data.Hashable(Hashable,hash)
 
-import Ideas.Dual
+import Dvda.Dual
 
 data UnOp = Abs
           | Neg
