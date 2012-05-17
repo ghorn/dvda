@@ -38,38 +38,15 @@ Flag stressTest
   Default: False
 
 Library
-  Exposed-modules:   Dvda.BinUn
+  Exposed-modules:   Dvda
+                     Dvda.BinUn
                      Dvda.Expr
                      Dvda.Graph
                      Dvda.SymMonad
                      Dvda.Dual
                      Dvda.Examples
 
---                     Numeric.Dvda
---                     Numeric.Dvda.Symbolic
---                     Numeric.Dvda.Dim
---                     Numeric.Dvda.AD
---                     Numeric.Dvda.Vis
---                     Numeric.Dvda.Function
---                     Numeric.Dvda.Examples
-----                     Numeric.Dvda.Tests.Tests
-
   Other-modules:     
-                     --Numeric.Dvda.Internal.Expr
-                     --Numeric.Dvda.Internal.Tensor
-                     --Numeric.Dvda.Internal.BinaryType
-                     --Numeric.Dvda.Internal.UnaryType
-                     --Numeric.Dvda.Internal.GNode
-                     --Numeric.Dvda.Internal.ExprGraph
-                     --Numeric.Dvda.Internal.ExprUtils
-                     --Numeric.Dvda.AD.Dual
-                     --Numeric.Dvda.AD.Rad
-                     --Numeric.Dvda.AD.Fad
-                     --Numeric.Dvda.Config
-                     --Numeric.Dvda.Codegen.Codegen
-                     --Numeric.Dvda.Codegen.CallWrapper
-                     --Numeric.Dvda.Codegen.WriteC
-
 
   Build-depends:     base       >= 4     && < 5,
                      hashable  >= 1.1 && < 1.2,
