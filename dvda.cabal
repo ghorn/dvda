@@ -46,8 +46,11 @@ Library
                      Dvda.Dual
                      Dvda.Examples
                      Dvda.Config
-                     Dvda.Codegen.CFunction
+--                     Dvda.CFunction
+                     Dvda.Codegen.CBuilder
+                     Dvda.Codegen.CCallWrapper
                      Dvda.Codegen.CSyntax
+                     Dvda.Codegen.HSSyntax
 
   Other-modules:     
 
@@ -61,9 +64,9 @@ Library
                      fgl >= 5.4 && < 5.5,
                      mtl >= 2.0 && < 2.1,
                      directory >= 1.1 && < 1.2,
-                     process >= 1.1 && < 1.2
+                     process >= 1.1 && < 1.2,
+--                     unix
 --                     text,
---                     unix,
 --                     QuickCheck,
 --                     transformers >= 0.2 && < 0.3,
   Ghc-options:       -O2 -Wall

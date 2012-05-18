@@ -18,7 +18,7 @@ import Dvda.BinUn
 import qualified Dvda.Config as Config
 
 name :: Key -> String
-name k = "t_" ++ show k
+name = Config.cName
 
 -- assign a scalar
 sassign :: Key -> String

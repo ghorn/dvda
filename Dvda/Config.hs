@@ -2,14 +2,23 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Dvda.Config( cType
-                  , cName
-                  , dvdaDir
+module Dvda.Config( -- * directory stuff
+                    dvdaDir
                   , functionDir
+                    -- * C syntax
+                  , cType
+                  , cName
                   , nameCSource
                   , nameCInclude
                   , nameCObject
                   , nameCFunction
+                    -- * Haskell syntax
+                  , nameHSModule
+                  , nameHSFunction
+                  , nameHSSource
+                  , nameHSVar
+                  , nameHSConst
+                    -- * gcc stuff
                   , gccString
                   , spewGccCall
                   , outputNames
@@ -21,14 +30,6 @@ import Control.Monad(unless)
 -- | what symbolic variable names to use when generating a function
 outputNames :: [String]
 outputNames = map (\x -> "out"++show x) [(0::Integer)..]
-
--- | type to use when generating c code
-cType :: String
-cType = "double"
-
--- | name convention for c variables
-cName :: Int -> String
-cName idx = 't':show idx
 
 -- | whether to print the gcc call when generating code
 spewGccCall :: Bool
@@ -61,6 +62,16 @@ functionDir hash = do
   topDir <- dvdaDir
   return (topDir ++ "/" ++ nameCFunction hash)
 
+-- c syntax
+-- | type to use when generating c code
+cType :: String
+cType = "double"
+
+-- | name convention for c variables
+cName :: Int -> String
+cName k
+  | k < 0 = error "cName got negative index" 
+  | otherwise = 't':show k     
 
 nameCSource :: String -> String
 nameCSource hash = nameCFunction hash ++ ".c"
@@ -73,3 +84,24 @@ nameCObject hash = nameCFunction hash ++ ".o"
 
 nameCFunction :: String -> String
 nameCFunction hash = "call_" ++ hash
+
+-- haskell syntax
+nameHSVar :: Int -> String
+nameHSVar k
+  | k < 0 = error "nameHSVar got negative index" 
+  | otherwise = 'v':show k
+
+-- haskell syntax
+nameHSConst :: Int -> String
+nameHSConst k
+  | k < 0 = error "nameHSConst got negative index" 
+  | otherwise = 'c':show k
+
+nameHSFunction :: String -> String
+nameHSFunction hash = "call_" ++ hash
+
+nameHSModule :: String -> String
+nameHSModule hash = "Call_" ++ hash
+
+nameHSSource :: String -> String
+nameHSSource = (++ ".hs") . nameHSModule
