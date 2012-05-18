@@ -12,14 +12,25 @@ import qualified Data.HashMap.Lazy as HM
 import System.Directory
 import Control.Monad(when)
 import System.Plugins.Make
+import System.Plugins.Load
 
 import Dvda.Codegen.HSSyntax
 import Dvda.Graph
 import qualified Dvda.Config as Config
 
 
+-- for example:
+import Data.Array.Repa hiding ((++))
+import qualified Data.Vector.Unboxed as V
+import Dvda.Expr
+import Dvda
+
+
 -- | make source functions
 --buildHSFunction :: (Show a, Show b, Show c, V.Unbox a, H.Hashable a) => FunGraph a b c -> IO ()
+buildHSFunction :: (Show a, Show b, Show c, V.Unbox a, H.Hashable a) => FunGraph a b c ->
+                   IO ( ((Expr DIM0 a) :* (Expr DIM1 a) :* (Expr DIM2 a)) ->
+                        ((Expr DIM2 a) :* (Expr DIM1 a) :* (Expr DIM0 a)) )
 buildHSFunction fg@(FunGraph hm _ _ _) = do
   -- C source and hash
   let hash = show $ abs $ H.hash $ HM.toList hm
@@ -33,7 +44,7 @@ buildHSFunction fg@(FunGraph hm _ _ _) = do
   
   -- filenames
   let sourcePath  = dir ++ "/" ++ Config.nameHSSource  hash
-      objectPath  = dir ++ "/" ++ Config.nameHSObject  hash
+--      objectPath  = dir ++ "/" ++ Config.nameHSObject  hash
       
   -- make function directory if it doesn't exist
   createDirectoryIfMissing False dir
@@ -46,7 +57,7 @@ buildHSFunction fg@(FunGraph hm _ _ _) = do
       "====================================================\n" ++ 
       "WARNING: Hash not unique or source code has been edited\n"++ 
       "If you have not edited the auto-generated code, please let me\n" ++
-      "know that Hash clashes are a problem IRL at gregmainland@gmail.com\n" ++
+      "know that Hash collisions are a problem at gregmainland@gmail.com\n" ++
       "====================================================\n\n"
   
   -- write  source
@@ -57,11 +68,13 @@ buildHSFunction fg@(FunGraph hm _ _ _) = do
   putStrLn "building source"
   status <- make sourcePath [] -- ["-v3"]
   
-  case status of MakeSuccess code path -> do putStrLn "Success!"
-                                             print code
-                                             print path
-                 MakeFailure code -> do putStrLn "Failure"
-                                        mapM_ putStrLn code
+  path' <- case status of (MakeSuccess _ path_) -> do putStrLn "Success!"
+                                                      return path_
+                          (MakeFailure code)    -> do mapM_ putStrLn code
+                                                      error "Make Failure"
   
-  -- return info
---  return (hash, cObjectFile)
+  status' <- load_ path' [] "call_3078470392799845284"
+  case status' of (LoadFailure codes) -> do mapM_ putStrLn codes
+                                            error "Load Failure"
+                  (LoadSuccess _ fun) -> do putStrLn "load success!"
+                                            return fun

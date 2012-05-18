@@ -9,6 +9,8 @@ module Dvda.Expr ( Expr(..)
                  , sym
                  , vsym
                  , msym
+                 , vec
+                 , mat
                  , scale
                  , dot
                  , diff
@@ -19,9 +21,8 @@ module Dvda.Expr ( Expr(..)
                  , Dot(..)
                  ) where
 
-import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape,Shape)
-import Data.Vector.Unboxed(Vector, toList, Unbox)
-import qualified Data.Vector.Unboxed as V(zipWith, map)
+import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape, shapeOfList)
+import qualified Data.Vector.Unboxed as V
 
 import Dvda.BinUn
 
@@ -44,7 +45,7 @@ dim (EJacob x args) = Z :. (head $ listOfShape (dim x)) :. (head $ listOfShape (
 
 data Expr d a where
   ESym :: d -> String -> Expr d a
-  EConst :: Unbox a => d -> Vector a -> Expr d a
+  EConst :: V.Unbox a => d -> V.Vector a -> Expr d a
   EDimensionless :: a -> Expr d a
   ESingleton :: d -> a -> Expr d a
   EUnary :: UnOp -> Expr d a -> Expr d a
@@ -173,7 +174,7 @@ instance (Shape d, Show a) => Show (Expr d a) where
   show (ESingleton _ x) = show x
   show (EDimensionless x) = show x
   show (ESym d name) = name++"{"++showShapeR d++"}"
-  show (EConst d x) = "{" ++ showShapeR d ++ ", "++show (toList x)++"}" 
+  show (EConst d x) = "{" ++ showShapeR d ++ ", "++show (V.toList x)++"}" 
   show (EUnary op x) = showUnary x op
   show (EBinary op x y) = paren x ++ showBinary op ++ paren y
   show (EScale s x) = paren s ++ "*" ++ paren x
@@ -191,6 +192,14 @@ vsym k = ESym (Z :. k)
 
 msym :: (Int,Int) -> String -> Expr DIM2 a
 msym (r,c) = ESym (Z :. r :. c)
+
+vec :: V.Unbox a => [a] -> Expr DIM1 a
+vec xs = EConst (shapeOfList [length xs]) (V.fromList xs)
+
+mat :: V.Unbox a => (Int,Int) -> [a] -> Expr DIM2 a
+mat (r,c) xs 
+  | r*c == length xs = EConst (shapeOfList [c,r]) (V.fromList xs)
+  | otherwise = error "bad dims in mat"
 
 scale :: Expr DIM0 a -> Expr d a -> Expr d a
 scale = EScale
