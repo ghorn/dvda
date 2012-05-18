@@ -4,50 +4,18 @@
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
 
-module Dvda.Codegen.HSSyntax ( writeHSource
-                             , run
+module Dvda.Codegen.HSSyntax ( writeHSSource
                              ) where
 
-import Data.Array.Repa (DIM0) -- ,DIM1,DIM2)
 import qualified Data.Vector.Unboxed as V
 import qualified Data.IntMap as IM
 --import Data.Maybe ( fromJust )
 import Data.List ( intersperse )
+import qualified Data.Text.Lazy as T
 
-import Dvda.SymMonad ( (:*)(..), makeFun, inputs_, outputs_ , node )
-import Dvda.Expr
 import Dvda.Graph
 import Dvda.BinUn
 import qualified Dvda.Config as Config
-
-
---gr :: FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)
-gr :: FunGraph Double (DIM0 :* DIM0 :* DIM0) (DIM0 :* DIM0 :* DIM0)
-gr = snd $ makeFun $ do
-  let x = sym "x"
---      y = vsym 5 "y"
-      y = sym "y"
---      z = msym (3,5) "Z"
-      z = sym "Z"
-  inputs_ (x :* z :* y)
-  
-  z1 <- node $ (scale x z)**3
---  z2 <- node $ (dot z y)**2
-  z2 <- node $ (z*y)**2
---  z3 <- node $ diff ((x*x/2)**x) x
-  z3 <- node $ ((x*x/2)**x)*x
-  
-  outputs_ (z1 :* z2 :* z3)
-
-
-run :: IO ()
-run = do
---  putStrLn $ funGraphSummary gr
---  putStrLn $ funGraphSummary' gr
---  putStrLn $ showCollisions gr
-  print gr
-  putStrLn $ writeHSource gr "214234098"
---  previewGraph gr
 
 
 -- assign a scalar
@@ -96,10 +64,10 @@ writeAssignment :: (Show a, V.Unbox a) => (Key, GExpr a) -> String
 writeAssignment (k, gexpr@(GSym _ _)) = "-- " ++ Config.nameHSVar k ++ ": " ++ show gexpr
 writeAssignment (k, gexpr) = sassign k ++ pretty (k,gexpr) ++ " -- " ++ show gexpr
 
-writeHSource :: (V.Unbox a, Show a, Show b, Show c) => FunGraph a b c -> String -> String
-writeHSource (FunGraph _ im (insT,ins) (outsT,outs)) hash =
+writeHSSource :: (V.Unbox a, Show a, Show b, Show c) => FunGraph a b c -> String -> String
+writeHSSource (FunGraph _ im (insT,ins) (outsT,outs)) hash =
   init $ unlines $
-  [ "{-# OPTIONS_GHC -Wall #-}"
+  [ "-- {-# OPTIONS_GHC -Wall #-}"
   , "{-# Language GADTs #-}"
   , "{-# Language FlexibleContexts #-}"
   , "{-# Language TypeOperators #-}"
@@ -107,19 +75,76 @@ writeHSource (FunGraph _ im (insT,ins) (outsT,outs)) hash =
   , ""
   , "module " ++ Config.nameHSModule hash ++ " ( " ++ Config.nameHSFunction hash ++ " ) where"
   , ""
-  , "import Data.Vector.Unbox as V"
+  , "import Data.Array.Repa"
+  , "import Data.Vector.Unboxed as V"
   , "import Dvda"
   , ""
 --  , "-- constants:"
 --  , constants
 --  , ""
-  , Config.nameHSFunction hash ++ " :: " ++ show insT ++ " -> " ++ show outsT
+  , Config.nameHSFunction hash ++ " :: Floating a => " 
+  , spaces ++ rewriteType (show insT) ++ " -> " 
+  , spaces ++ rewriteType (show outsT)
   , Config.nameHSFunction hash ++ " ( " ++ inputs ++ " ) = " ++ outputs
   , "  where"
   , init $ unlines $ map ("    " ++) body 
   ]
     where
+      spaces = replicate ((length (Config.nameHSFunction hash)) + 4) ' '
       inputs  = concat $ intersperse " :* " (map Config.nameHSVar ins)
       outputs = concat $ intersperse " :* " (map Config.nameHSVar outs)
       body = map writeAssignment gnodes
       gnodes = map (\(k,(y,_)) -> (k,y)) (IM.toList im)
+
+
+intercalate :: String -> [String] -> String
+intercalate _ [] = []
+intercalate _ [x] = x
+intercalate int (x:xs) = (x++int) ++ intercalate int xs
+
+rewriteType :: String -> String
+rewriteType typeString = final
+  where
+    text = T.pack typeString
+    -- "Z :* ((Z :. 5) :* ((Z :. 3) :. 5))"
+    
+    cleaned = T.filter (\x -> not (elem x "() ")) text
+    -- "Z:*Z:.5:*Z:.3:.5"
+    
+    grouped :: [T.Text]
+    grouped = T.splitOn (T.pack ":*") cleaned
+    -- ["Z", "Z:.5", "Z:.3:.5"]
+    
+    
+    grouped' :: [[T.Text]]
+    grouped' = map (T.splitOn (T.pack ":.")) grouped
+    -- [["Z"], ["Z","5"], ["Z","3","5"]]
+
+    counted :: [Int]
+    counted = map (\x -> length x - 1) grouped'
+    -- [0, 1, 2]
+
+    addExpr = map (\x -> "(Expr DIM" ++ show x ++ " a)")  counted
+    -- ["(Expr DIM0 a)", "(Expr DIM1 a)", "(Expr DIM2 a)"]
+    
+    final = "( " ++ (intercalate " :* " addExpr) ++ " )"
+    -- "( (Expr (Z) a) :* (Expr (Z:.5) a) :* (Expr (Z:.3:.5) a) )"
+
+
+-- rewriteType :: String -> String
+-- rewriteType typeString = final
+--   where
+--     text = T.pack typeString
+--     -- "Z :* ((Z :. 5) :* ((Z :. 3) :. 5))"
+--     
+--     cleaned = T.filter (\x -> not (elem x "() ")) text
+--     -- "Z:*Z:.5:*Z:.3:.5"
+--     
+--     grouped = T.splitOn (T.pack ":*") cleaned
+--     -- ["Z", "Z:.5", "Z:.3:.5"]
+--     
+--     addExpr = map (\x -> T.append "(Expr (" (T.append x ") a)"))  grouped
+--     -- ["(Expr (Z) a)", "(Expr (Z:.5) a)", "(Expr (Z:.3:.5) a)"]
+--     
+--     final = "( " ++ T.unpack (T.intercalate " :* " addExpr) ++ " )"
+--     -- "( (Expr (Z) a) :* (Expr (Z:.5) a) :* (Expr (Z:.3:.5) a) )"

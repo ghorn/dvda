@@ -13,6 +13,7 @@ module Dvda.Config( -- * directory stuff
                   , nameCObject
                   , nameCFunction
                     -- * Haskell syntax
+                  , nameHSObject
                   , nameHSModule
                   , nameHSFunction
                   , nameHSSource
@@ -80,7 +81,7 @@ nameCInclude :: String -> String
 nameCInclude hash = nameCFunction hash ++ ".h"
 
 nameCObject :: String -> String
-nameCObject hash = nameCFunction hash ++ ".o"
+nameCObject hash = "c_" ++ nameCFunction hash ++ ".o"
 
 nameCFunction :: String -> String
 nameCFunction hash = "call_" ++ hash
@@ -105,3 +106,6 @@ nameHSModule hash = "Call_" ++ hash
 
 nameHSSource :: String -> String
 nameHSSource = (++ ".hs") . nameHSModule
+
+nameHSObject :: String -> String
+nameHSObject = (++ ".o") . nameHSModule

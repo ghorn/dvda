@@ -210,7 +210,7 @@ instance (Shape d, Hashable a, Unbox a, Eq a, Floating a) => HList (Expr d a) wh
     expr'@(ERef _ k) <- node expr
     return (expr', [k])
   getHDim = dim
-
+  
 inputs :: HList b => b -> State (FunGraph (NumT b) (DimT b) c) b
 inputs exprs = do
   (exprs', keys) <- mkNodes exprs
