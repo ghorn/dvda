@@ -2,18 +2,18 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Numeric.Dvda.Config( cType
-                          , cName
-                          , dvdaDir
-                          , functionDir
-                          , nameCSource
-                          , nameCInclude
-                          , nameCObject
-                          , nameCFunction
-                          , gccString
-                          , spewGccCall
-                          , outputNames
-                          ) where
+module Dvda.Config( cType
+                  , cName
+                  , dvdaDir
+                  , functionDir
+                  , nameCSource
+                  , nameCInclude
+                  , nameCObject
+                  , nameCFunction
+                  , gccString
+                  , spewGccCall
+                  , outputNames
+                  ) where
 
 import System.Directory
 import Control.Monad(unless)
@@ -72,4 +72,4 @@ nameCObject :: String -> String
 nameCObject hash = nameCFunction hash ++ ".o"
 
 nameCFunction :: String -> String
-nameCFunction hash = "call_" ++ hash
+nameCFunction hash = hash

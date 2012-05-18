@@ -45,6 +45,9 @@ Library
                      Dvda.SymMonad
                      Dvda.Dual
                      Dvda.Examples
+                     Dvda.Config
+                     Dvda.Codegen.CFunction
+                     Dvda.Codegen.CSyntax
 
   Other-modules:     
 
@@ -56,9 +59,9 @@ Library
                      unordered-containers  >= 0.2 && < 0.3,
                      graphviz >= 2999.12 && < 2999.13,
                      fgl >= 5.4 && < 5.5,
-                     mtl >= 2.0 && < 2.1
+                     mtl >= 2.0 && < 2.1,
+                     directory >= 1.1 && < 1.2
 --                     text,
---                     directory,
 --                     MissingH,
 --                     process,
 --                     unix,
