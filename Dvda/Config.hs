@@ -59,7 +59,7 @@ functionDir :: String -> IO FilePath
 functionDir hash = do
   -- dvda directory
   topDir <- dvdaDir
-  return (topDir ++ "/" ++ hash)
+  return (topDir ++ "/" ++ nameCFunction hash)
 
 
 nameCSource :: String -> String
@@ -72,4 +72,4 @@ nameCObject :: String -> String
 nameCObject hash = nameCFunction hash ++ ".o"
 
 nameCFunction :: String -> String
-nameCFunction hash = hash
+nameCFunction hash = "call_" ++ hash

@@ -60,10 +60,9 @@ Library
                      graphviz >= 2999.12 && < 2999.13,
                      fgl >= 5.4 && < 5.5,
                      mtl >= 2.0 && < 2.1,
-                     directory >= 1.1 && < 1.2
+                     directory >= 1.1 && < 1.2,
+                     process >= 1.1 && < 1.2
 --                     text,
---                     MissingH,
---                     process,
 --                     unix,
 --                     QuickCheck,
 --                     transformers >= 0.2 && < 0.3,

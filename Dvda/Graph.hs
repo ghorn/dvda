@@ -11,6 +11,7 @@ module Dvda.Graph ( GExpr(..)
                   , collisions
                   , showCollisions
                   , funGraphSummary
+                  , funGraphSummary'
                   ) where
 
 import Data.Graph.Inductive ( Gr, mkGraph )
@@ -40,7 +41,20 @@ funGraphSummary (FunGraph hm _ (b,bkeys) (c,ckeys)) =
                  , "input nodes:" ++ show bkeys
                  , "output dims: " ++ show c
                  , "output nodes:" ++ show ckeys
+                 , "number of nodes: " ++ show (HM.size hm)
                  , "graph: " ++ show hm
+                 ]
+
+-- more extensive
+funGraphSummary' :: (Show a, Unbox a, Show b, Show c) => FunGraph a b c -> String
+funGraphSummary' (FunGraph hm im (b,bkeys) (c,ckeys)) =
+  init $ unlines [ "input dims: " ++ show b
+                 , "input nodes:" ++ show bkeys
+                 , "output dims: " ++ show c
+                 , "output nodes:" ++ show ckeys
+                 , "number of nodes: " ++ show (HM.size hm)
+                 , "graph:" 
+                 , unlines (map show (IM.toList im))
                  ]
 
 data GExpr a = GBinary BinOp Key Key

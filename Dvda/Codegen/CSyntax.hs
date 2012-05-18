@@ -4,12 +4,14 @@
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
 
-module Dvda.Codegen.CSyntax ( writeC
+module Dvda.Codegen.CSyntax ( writeCSource
+                            , writeCInclude
                             ) where
 
 import qualified Data.Vector.Unboxed as V
 import qualified Data.IntMap as IM
 import Data.Maybe ( fromJust )
+import Data.Char ( toUpper )
 
 import Dvda.Graph
 import Dvda.BinUn
@@ -77,22 +79,19 @@ writeAssignment _ (k, g@(GConst _ vec)) =
 prototype :: String -> String
 prototype hash = "void " ++ Config.nameCFunction hash ++ "(const double * const in[] __attribute__ ((__unused__)), double * const out[])"
     
-writeC :: (Show a, V.Unbox a) => FunGraph a b c -> (String, String)
-writeC fg = (writeCSource fg hash, writeCInclude hash)
-  where
-    hash = "im_a_hash_lol"
-
 writeCInclude :: String -> String
 writeCInclude hash = init $ unlines $
                     [ "// " ++ Config.nameCInclude hash
                     , ""
-                    , "#ifndef __" ++ hash ++ "__"
-                    , "#define __" ++ hash ++ "__"
+                    , "#ifndef " ++ pragma
+                    , "#define " ++ pragma
                     , ""
                     , prototype hash ++ ";"
                     , ""
-                    , "#endif //__" ++ hash ++ "__"
+                    , "#endif // " ++ pragma
                     ]
+  where
+    pragma = "__" ++ map toUpper hash ++ "__"
 
 writeCSource :: (Show a, V.Unbox a) => FunGraph a b c -> String -> String
 writeCSource (FunGraph _ im (_,ins) (_,outs)) hash =
