@@ -13,7 +13,7 @@ module Dvda.SymMonad ( (:*)(..)
                      , outputs_
                      , makeFun
                      ) where
-
+  
 import Control.Monad ( when )
 import Control.Monad.State ( MonadState, State, get, put, liftM, runState )
 import Data.Array.Repa ( listOfShape, Shape )
@@ -35,8 +35,7 @@ node expr = liftM (ERef (dim expr)) (node' expr)
     node' :: (Shape d, Hashable a, Unbox a, Floating a, Eq a) => Expr d a -> State (FunGraph a b c) Key
     node' (ERef _ k) = return k
     node' (ESym d name) = do
-      let d' = listOfShape d
-          gexpr = GSym d' name
+      let gexpr = GSym (listOfShape d) name
           mkDerivMap = do pert <- node' (ESingleton d 1)
                           return (HM.singleton gexpr pert)
       insert gexpr mkDerivMap
@@ -80,8 +79,7 @@ node expr = liftM (ERef (dim expr)) (node' expr)
       insert gexpr mkDerivMap
     node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
     node' (ESingleton d x) = do
-      let d' = listOfShape d
-          gexpr = GSingleton d' x
+      let gexpr = GSingleton (listOfShape d) x
           mkDerivMap = do pert <- node' (ESingleton d 0)
                           return (HM.singleton gexpr pert)
       insert gexpr mkDerivMap
@@ -137,8 +135,8 @@ node expr = liftM (ERef (dim expr)) (node' expr)
       x' <- node' x
       arg' <- node' arg
       (FunGraph _ im _ _) <- get
-      let derivMap = snd $ fromJust $ IM.lookup x' im
-          var = fst $ fromJust $ IM.lookup arg' im
+      let var      = fst $ fromJust $ IM.lookup arg' im
+          derivMap = snd $ fromJust $ IM.lookup x' im
           isSym (GSym _ _) = True
           isSym _ = False
       when (not (isSym var)) $ error $ "can't take a derivative of something that isn't symbolic"
@@ -149,8 +147,8 @@ node expr = liftM (ERef (dim expr)) (node' expr)
       x' <- node' x
       args' <- node' args
       (FunGraph _ im _ _) <- get
-      let derivMap = snd $ fromJust $ IM.lookup x' im
-          var = fst $ fromJust $ IM.lookup args' im
+      let var      = fst $ fromJust $ IM.lookup args' im
+          derivMap = snd $ fromJust $ IM.lookup x' im
           isSym (GSym _ _) = True
           isSym _ = False
       when (not (isSym var)) $ error "can't take a derivative of something that isn't symbolic"
@@ -161,8 +159,8 @@ node expr = liftM (ERef (dim expr)) (node' expr)
       xs' <- node' xs
       args' <- node' args
       (FunGraph _ im _ _) <- get
-      let derivMap = snd $ fromJust $ IM.lookup xs' im
-          var = fst $ fromJust $ IM.lookup args' im
+      let var      = fst $ fromJust $ IM.lookup args' im
+          derivMap = snd $ fromJust $ IM.lookup xs' im
           isSym (GSym _ _) = True
           isSym _ = False
       when (not (isSym var)) $ error "can't take a derivative of something that isn't symbolic"
