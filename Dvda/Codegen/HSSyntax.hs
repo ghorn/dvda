@@ -82,8 +82,10 @@ writeHSSource (FunGraph _ im (insT,ins) (outsT,outs)) hash =
 --  , "-- constants:"
 --  , constants
 --  , ""
-  , Config.nameHSFunction hash ++ " :: Floating a => " 
-  , spaces ++ rewriteType (show insT) ++ " -> " 
+--  , Config.nameHSFunction hash ++ " :: Floating a => " 
+--  , spaces ++ rewriteType (show insT) ++ " -> " 
+--  , spaces ++ rewriteType (show outsT)
+  , Config.nameHSFunction hash ++ " :: " ++ rewriteType (show insT) ++ " ->"
   , spaces ++ rewriteType (show outsT)
   , Config.nameHSFunction hash ++ " ( " ++ inputs ++ " ) = " ++ outputs
   , "  where"
@@ -124,11 +126,11 @@ rewriteType typeString = final
     counted = map (\x -> length x - 1) grouped'
     -- [0, 1, 2]
 
-    addExpr = map (\x -> "(Expr DIM" ++ show x ++ " a)")  counted
-    -- ["(Expr DIM0 a)", "(Expr DIM1 a)", "(Expr DIM2 a)"]
+    addExpr = map (\x -> "(Expr DIM" ++ show x ++ " Double)")  counted
+    -- ["(Expr DIM0 Double)", "(Expr DIM1 Double)", "(Expr DIM2 Double)"]
     
     final = "( " ++ (intercalate " :* " addExpr) ++ " )"
-    -- "( (Expr (Z) a) :* (Expr (Z:.5) a) :* (Expr (Z:.3:.5) a) )"
+    -- "( (Expr DIM0 Double) :* (Expr DIM1 Double) :* (Expr DIM2 Double) )"
 
 
 -- rewriteType :: String -> String

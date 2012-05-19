@@ -72,7 +72,9 @@ Library
 --                     text,
 --                     QuickCheck,
 --                     transformers >= 0.2 && < 0.3,
+
   Ghc-options:       -O2 -Wall
+--  Ghc-options:       -O2 -Wall -threaded
 
 
 Executable stressTest

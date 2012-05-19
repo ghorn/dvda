@@ -18,9 +18,9 @@ gr :: FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)
 --gr :: FunGraph Double (DIM0 :* DIM0 :* DIM0) (DIM0 :* DIM0 :* DIM0)
 gr = snd $ makeFun $ do
   let x = sym "x"
-      y = vsym 5 "y"
+      y = vsym 3 "y"
 --      y = sym "y"
-      z = msym (3,5) "Z"
+      z = msym (2,3) "Z"
 --      z = sym "Z"
   inputs_ (x :* y :* z)
   
@@ -35,4 +35,10 @@ gr = snd $ makeFun $ do
 
 main :: IO ()
 main = do
-  buildHSFunction gr
+  fun <- buildHSFunction gr
+  let x = 0
+      y = vec [0,1,2::Double]
+      z = mat (2,3) [0,1,2,3,4,5]
+      answer = fun (x :* y :* z)
+      
+  print answer

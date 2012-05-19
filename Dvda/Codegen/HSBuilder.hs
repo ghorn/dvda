@@ -27,10 +27,9 @@ import Dvda
 
 
 -- | make source functions
---buildHSFunction :: (Show a, Show b, Show c, V.Unbox a, H.Hashable a) => FunGraph a b c -> IO ()
-buildHSFunction :: (Show a, Show b, Show c, V.Unbox a, H.Hashable a) => FunGraph a b c ->
-                   IO ( ((Expr DIM0 a) :* (Expr DIM1 a) :* (Expr DIM2 a)) ->
-                        ((Expr DIM2 a) :* (Expr DIM1 a) :* (Expr DIM0 a)) )
+buildHSFunction :: (Show b, Show c) => FunGraph Double b c ->
+                   IO ( ((Expr DIM0 Double) :* (Expr DIM1 Double) :* (Expr DIM2 Double)) ->
+                        ((Expr DIM2 Double) :* (Expr DIM1 Double) :* (Expr DIM0 Double)) )
 buildHSFunction fg@(FunGraph hm _ _ _) = do
   -- C source and hash
   let hash = show $ abs $ H.hash $ HM.toList hm
@@ -73,7 +72,7 @@ buildHSFunction fg@(FunGraph hm _ _ _) = do
                           (MakeFailure code)    -> do mapM_ putStrLn code
                                                       error "Make Failure"
   
-  status' <- load_ path' [] "call_3078470392799845284"
+  status' <- load_ path' [] (Config.nameHSFunction hash)
   case status' of (LoadFailure codes) -> do mapM_ putStrLn codes
                                             error "Load Failure"
                   (LoadSuccess _ fun) -> do putStrLn "load success!"
