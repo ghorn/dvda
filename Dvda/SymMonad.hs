@@ -185,30 +185,6 @@ node expr = liftM (ERef (dim expr)) (node' expr)
                 node' (dot x y' + dot x' y)
       insert (GDot xk yk) derivMap
 
---    node' (EDot x_ y_) = do
---      xk <- node' x_
---      yk <- node' y_
---      (FunGraph _ im _ _) <- get
---      let dx = dim x_
---          dy = dim y_
---          x = ERef dx xk
---          y = ERef dy yk
---          xperts = snd $ fromJust (IM.lookup xk im)
---          yperts = snd $ fromJust (IM.lookup yk im)
---          -- vars is all the variables which the node is a function of
---          -- switch to HM.keysSet when it is created
---          vars = HM.keys (HM.union xperts yperts)
---          mkDerivMap = mapM diffDot vars >>= (return . HM.fromList)
---            where
---              diffDot var = do
---                let x' = case HM.lookup var xperts of Nothing -> ESingleton dx 0
---                                                      Just k  -> ERef dx k
---                    y' = case HM.lookup var yperts of Nothing -> ESingleton dy 0
---                                                      Just k  -> ERef dy k
---                pert <- node' (dot x y' + dot x' y)
---                return (var, pert)
---      insert (GDot xk yk) mkDerivMap
-
     node' (EDeriv x arg) = do
       x' <- node' x
       arg' <- node' arg

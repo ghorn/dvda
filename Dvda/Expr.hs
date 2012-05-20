@@ -58,8 +58,13 @@ data Expr d a where
   EGrad  :: (d ~ DIM1) => Expr DIM0 a -> Expr DIM1 a -> Expr d a
   EJacob :: (d ~ DIM2) => Expr DIM1 a -> Expr DIM1 a -> Expr d a
 
+isVal :: Eq a => a -> Expr d a -> Bool
+isVal x (EDimensionless y) = x == y
+isVal x (ESingleton _ y) = x == y
+isVal _ _ = False
+
 -- | first layer of binary simplification: infer dimension of EDimensionless if possible
-makeBinary :: Shape d => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
+makeBinary :: (Num a, Eq a, Shape d) => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
 -- | can't infer dimension, just apply operation
 makeBinary _  f (EDimensionless x) (EDimensionless y) = EDimensionless (f x y)
 -- | infer dimension, then call makeBinary' for further simplification
@@ -69,7 +74,7 @@ makeBinary op f x (EDimensionless y) = makeBinary' op f x (ESingleton (dim x) y)
 makeBinary op f x y = makeBinary' op f x y
 
 -- | second layer of binary simplification: check dimensions
-makeBinary' :: Shape d => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
+makeBinary' :: (Num a, Eq a, Shape d) => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
 makeBinary' op f x y
   | dx == dy  = makeBinary'' op f x y
   | otherwise = error $ "Binary op \""++ sop ++"\" dimension mismatch ya goon (" ++ sdx ++ ", " ++ sdy ++ ")"
@@ -80,8 +85,35 @@ makeBinary' op f x y
     sdy = showShapeR dy
     sop = show op
 
--- | third layer of binary simplification: make reasonable simplifications
-makeBinary'' :: Shape d => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
+-- | third layer of binary simplification: 0*x == x*0 == 0
+-- |                                       1*x == x*1 == x
+-- |                                       0+x == x+0 == x
+-- |                                       x/0 == error
+-- |                                       x/1 == x
+-- |                                       0/x == 0
+-- |                                       x - 0 == 0
+-- |                                       0 - x == neg x
+makeBinary'' :: (Num a, Eq a, Shape d) => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
+makeBinary'' Mul f x y
+  | isVal 0 x = x
+  | isVal 0 y = y
+  | isVal 1 x = y
+  | isVal 1 y = x
+  | otherwise = makeBinary''' Mul f x y
+makeBinary'' Add f x y
+  | isVal 0 x = y
+  | isVal 0 y = x
+  | otherwise = makeBinary''' Add f x y
+makeBinary'' Div f x y
+  | isVal 0 y = error "divide by zero"
+  | isVal 1 y = x
+  | isVal 0 x = x
+  | otherwise = makeBinary''' Div f x y
+makeBinary'' Sub f x y
+  | isVal 0 x = negate y
+  | isVal 0 y = x
+  | otherwise = makeBinary''' Sub f x y
+
 -- | apply operation to constant vectors
 makeBinary'' _ f (EConst d x) (EConst _ y) = EConst d (V.zipWith f x y)
 -- | broadcast constant operations
@@ -89,6 +121,16 @@ makeBinary'' _ f (ESingleton _ x) (EConst d y) = EConst d (V.map (f x) y)
 makeBinary'' _ f (EConst d x) (ESingleton _ y) = EConst d (V.map (`f` y) x)
 -- | otherwise make symbolic binary
 makeBinary'' op _ x y = EBinary op x y
+
+-- | fourth layer of binary simplification: make reasonable simplifications
+makeBinary''' :: Shape d => BinOp -> (a -> a -> a) -> Expr d a -> Expr d a -> Expr d a
+-- | apply operation to constant vectors
+makeBinary''' _ f (EConst d x) (EConst _ y) = EConst d (V.zipWith f x y)
+-- | broadcast constant operations
+makeBinary''' _ f (ESingleton _ x) (EConst d y) = EConst d (V.map (f x) y)
+makeBinary''' _ f (EConst d x) (ESingleton _ y) = EConst d (V.map (`f` y) x)
+-- | otherwise make symbolic binary
+makeBinary''' op _ x y = EBinary op x y
 
 
 -- | apply unary operations on constants
@@ -98,7 +140,7 @@ makeUnary _ f (ESingleton d x) = ESingleton d (f x)
 makeUnary _ f (EConst d x) = EConst d (V.map f x)
 makeUnary op _ x = EUnary op x
 
-instance (Shape d, Num a) => Num (Expr d a) where
+instance (Shape d, Num a, Eq a) => Num (Expr d a) where
   (*) = makeBinary Mul (*)
   (+) = makeBinary Add (+)
   (-) = makeBinary Sub (-)
@@ -106,11 +148,11 @@ instance (Shape d, Num a) => Num (Expr d a) where
   signum = makeUnary Signum signum
   fromInteger = EDimensionless . fromInteger
 
-instance (Shape d, Fractional a) => Fractional (Expr d a) where
+instance (Shape d, Fractional a, Eq a) => Fractional (Expr d a) where
   (/) = makeBinary Div (/)
   fromRational = EDimensionless . fromRational
 
-instance (Shape d, Floating a) => Floating (Expr d a) where
+instance (Shape d, Floating a, Eq a) => Floating (Expr d a) where
   pi    = EDimensionless pi
   (**)  = makeBinary Pow (**)
   exp   = makeUnary Exp exp
