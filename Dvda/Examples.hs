@@ -6,6 +6,7 @@
 
 module Dvda.Examples ( exampleFun
                      , run
+                     , run'
                      ) where
 
 import Control.Monad.State (State)
@@ -42,15 +43,34 @@ exampleFun' = do
   inputs_ (x :* y :* z)
   outputs_ (z1 :* z2 :* z3)
 
-run :: IO ()
-run = do
+run' :: IO ()
+run' = do
   let gr :: FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)
-      gr@( FunGraph hm  im  _ _) = snd $ makeFun exampleFun
-      (FunGraph hm' im' _ _) = snd $ makeFun exampleFun'
+      gr@( FunGraph _ _ _ _) = snd $ makeFun exampleFun
+      (FunGraph _ _ _ _) = snd $ makeFun exampleFun'
       
   putStrLn $ funGraphSummary gr
   putStrLn $ showCollisions gr
   previewGraph gr
-  putStrLn "\nimperative same as pure+cse?:"
-  print $ hm == hm'
-  print $ im == im'
+--  putStrLn "\nimperative same as pure+cse?:"
+--  print $ hm == hm'
+--  print $ im == im'
+
+run :: IO ()
+run = do
+  let gr :: FunGraph Double (DIM0 :* DIM0) (DIM0 :* DIM0)
+      gr@( FunGraph _ _ _ _) = snd $ makeFun $ do
+        let x = sym "x"
+            y = sym "y"
+            z1 = x * y
+            z2 = diff z1 x
+
+        inputs_ (x :* y)
+        outputs_ (z1 :* z2)
+
+  putStrLn $ showCollisions gr
+  putStrLn "-------------------------------------------"
+  putStrLn $ funGraphSummary gr
+  putStrLn "-------------------------------------------"
+  putStrLn $ funGraphSummary' gr
+  previewGraph gr

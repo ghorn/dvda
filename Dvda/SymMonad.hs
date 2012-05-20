@@ -13,8 +13,10 @@ module Dvda.SymMonad ( (:*)(..)
                      , outputs_
                      , makeFun
                      ) where
-  
-import Control.Monad ( when )
+
+import Control.Monad.State.Lazy ( StateT )
+import Data.Functor.Identity ( Identity )
+
 import Control.Monad.State ( MonadState, State, get, put, liftM, runState )
 import Data.Array.Repa ( listOfShape, Shape )
 import Data.Hashable ( Hashable )
@@ -23,165 +25,241 @@ import Data.Maybe ( fromJust )
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 
-import Dvda.Graph ( FunGraph(..), GExpr(..), DerivMap, Key, emptyFunGraph )
+import Dvda.Graph ( FunGraph(..), GExpr(..), LazyDeriv(..), DerivMap, Key, emptyFunGraph, fgLookup, fgReverseLookup, fgGExprFromKey )
 import Dvda.Expr ( Expr(..), dim, scale, dot )
 import Dvda.BinUn ( binaryDeriv, unaryDeriv )
 
+-- __VERY INEFFICIENT__
+-- replace once mapWithKey function is added to unordered-containers
+hashmapMapWithKey :: (Eq k, Hashable k) => (k -> a -> b) -> HM.HashMap k a -> HM.HashMap k b
+hashmapMapWithKey f hm = HM.fromList $ map g (HM.toList hm)
+  where
+    g (x,y) = (x, f x y)
+
+-- evaluates the derivative and inserts the Evaluated form back into the graph
+evalLazyDeriv :: (Eq a, Hashable a, Unbox a) => GExpr a -> GExpr a -> StateT (FunGraph a b c) Identity (Maybe Key)
+evalLazyDeriv expr arg = do
+  -- lookup the function which makes the derivative
+  fg0 <- get
+  let (_, derivMap0) = fromJust $ fgLookup expr fg0
+      lazyMkDeriv = HM.lookup arg derivMap0
+--        Nothing -> error "some goon tried to evalLazyDeriv when there was no value"
+--        Just lazyMkDeriv_ -> lazyMkDeriv_
+        
+  case lazyMkDeriv of
+    Nothing                      -> return Nothing
+    -- return the derivative if it has already been computed
+    (Just (Evaluated derivK))    -> return (Just derivK)
+    -- otherwise compute the derivative and insert evaluated form into graph
+    (Just (Unevaluated mkDeriv)) -> do
+      derivK <- mkDeriv
+      fg1@(FunGraph hm1 im1 ins outs) <- get
+      let (k, derivMap1) = fromJust $ fgLookup expr fg1
+          derivMap2 = HM.insert arg (Evaluated derivK) derivMap1
+          hm2 = HM.insert expr (k, derivMap2) hm1
+      put (FunGraph hm2 im1 ins outs)
+      return (Just derivK)
+
+
 -- | take all sub expressions of an Expr and turn them into nodes
 --   return an Expr that is just a ref
-node :: (Shape d, Hashable a, Unbox a, Floating a, Eq a) => Expr d a -> State (FunGraph a b c) (Expr d a)
+node :: (Shape d, Hashable a, Unbox a, Floating a, Eq a) => Expr d a -> StateT (FunGraph a b c) Identity (Expr d a)
 node expr = liftM (ERef (dim expr)) (node' expr)
   where
-    node' :: (Shape d, Hashable a, Unbox a, Floating a, Eq a) => Expr d a -> State (FunGraph a b c) Key
+    node' :: (Shape d, Hashable a, Unbox a, Floating a, Eq a) => Expr d a -> StateT (FunGraph a b c) Identity Key
     node' (ERef _ k) = return k
     node' (ESym d name) = do
       let gexpr = GSym (listOfShape d) name
-          mkDerivMap = do pert <- node' (ESingleton d 1)
-                          return (HM.singleton gexpr pert)
-      insert gexpr mkDerivMap
-    node' (EBinary op x_ y_) = do
-      xk <- node' x_
-      yk <- node' y_
-      (FunGraph _ im _ _) <- get
-      let d = dim x_
-          x = ERef d xk
-          y = ERef d yk
-          xperts = snd $ fromJust (IM.lookup xk im)
-          yperts = snd $ fromJust (IM.lookup yk im)
-          -- vars is all the variables which the node is a function of
-          -- switch to HM.keysSet when it is created
-          vars = HM.keys (HM.union xperts yperts)
-          mkDerivMap = mapM diffBinary vars >>= (return . HM.fromList)
-            where
-              diffBinary var = do 
-                let x' = case HM.lookup var xperts of Nothing -> ESingleton d 0
-                                                      Just k  -> ERef d k
-                    y' = case HM.lookup var yperts of Nothing -> ESingleton d 0
-                                                      Just k  -> ERef d k
-                pert <- node' (binaryDeriv op (x,x') (y,y'))
-                return (var, pert)
-      insert (GBinary op xk yk) mkDerivMap
-    node' (EUnary op x) = do
-      x' <- node' x
-      (FunGraph _ im _ _) <- get
-      let d = dim x
-          mkDerivMap = mapM diffUnary (HM.toList (snd $ fromJust $ IM.lookup x' im))
-                       >>= (return . HM.fromList)
-            where
-              diffUnary (var,childPert) = do pert <- node' (unaryDeriv op (ERef d x', ERef d childPert))
-                                             return (var, pert)
-      insert (GUnary op x') mkDerivMap
+          derivMap = HM.singleton gexpr (Unevaluated $ node' (ESingleton d 1))
+      insert gexpr derivMap
+    node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
     node' (EConst d x) = do
       let d' = listOfShape d
           gexpr = GConst d' x
-          mkDerivMap = do pert <- node' (ESingleton d 0)
-                          return (HM.singleton gexpr pert)
-      insert gexpr mkDerivMap
-    node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
+      insert gexpr HM.empty
     node' (ESingleton d x) = do
       let gexpr = GSingleton (listOfShape d) x
-          mkDerivMap = do pert <- node' (ESingleton d 0)
-                          return (HM.singleton gexpr pert)
-      insert gexpr mkDerivMap
+      insert gexpr HM.empty
+
+    node' (EUnary op x) = do
+      -- insert the child node
+      x' <- node' x
+      fg <- get
+      let d = dim x
+          childPrimal = ERef d x'
+          childGExpr = fromJust $ fgGExprFromKey x' fg
+          (_, childDerivs) = fromJust $ fgReverseLookup x' fg
+          derivMap = hashmapMapWithKey mkDeriv childDerivs
+            where
+              mkDeriv arg _ = Unevaluated $ do
+                childPert <- evalLazyDeriv childGExpr arg
+                node' $ unaryDeriv op (childPrimal, ERef d (fromJust childPert))
+      -- insert the parent node
+      insert (GUnary op x') derivMap
+    
+    node' (EBinary op x_ y_) = do
+      xk <- node' x_
+      yk <- node' y_
+      fg <- get
+      let d = dim x_
+          x = ERef d xk
+          y = ERef d yk
+          xgexpr = fromJust $ fgGExprFromKey xk fg
+          ygexpr = fromJust $ fgGExprFromKey yk fg
+          -- vars is all the variables which the node is a function of
+          -- switch to HM.keysSet when it is created
+          vars = HM.keys (HM.union xperts yperts)
+            where
+              xperts = snd $ fromJust (fgReverseLookup xk fg)
+              yperts = snd $ fromJust (fgReverseLookup yk fg)
+          derivMap = HM.fromList $ map diffBinary vars
+            where
+              diffBinary arg = (arg, diffBinary' arg)
+              diffBinary' arg = Unevaluated $ do
+                xk_ <- evalLazyDeriv xgexpr arg
+                yk_ <- evalLazyDeriv ygexpr arg
+                
+                let x' = case xk_ of Nothing -> ESingleton d 0
+                                     Just k  -> ERef d k
+                    y' = case yk_ of Nothing -> ESingleton d 0
+                                     Just k  -> ERef d k
+                node' (binaryDeriv op (x,x') (y,y'))
+      insert (GBinary op xk yk) derivMap
+
     node' (EScale x_ y_) = do
       xk <- node' x_
       yk <- node' y_
-      (FunGraph _ im _ _) <- get
-      let dx = dim x_
-          dy = dim y_
-          x = ERef dx xk
-          y = ERef dy yk
-          xperts = snd $ fromJust (IM.lookup xk im)
-          yperts = snd $ fromJust (IM.lookup yk im)
+      fg <- get
+      let d = dim x_
+          x = ERef d xk
+          y = ERef d yk
+          xgexpr = fromJust $ fgGExprFromKey xk fg
+          ygexpr = fromJust $ fgGExprFromKey yk fg
           -- vars is all the variables which the node is a function of
           -- switch to HM.keysSet when it is created
           vars = HM.keys (HM.union xperts yperts)
-          mkDerivMap = mapM diffScale vars >>= (return . HM.fromList)
             where
-              diffScale var = do 
-                let x' = case HM.lookup var xperts of Nothing -> ESingleton dx 0
-                                                      Just k  -> ERef dx k
-                    y' = case HM.lookup var yperts of Nothing -> ESingleton dy 0
-                                                      Just k  -> ERef dy k
-                pert <- node' (scale x y' + scale x' y)
-                return (var, pert)
-      insert (GScale xk yk) mkDerivMap
-      
+              xperts = snd $ fromJust (fgReverseLookup xk fg)
+              yperts = snd $ fromJust (fgReverseLookup yk fg)
+          derivMap = HM.fromList $ map diffBinary vars
+            where
+              diffBinary arg = (arg, diffBinary' arg)
+              diffBinary' arg = Unevaluated $ do
+                xk_ <- evalLazyDeriv xgexpr arg
+                yk_ <- evalLazyDeriv ygexpr arg
+                
+                let x' = case xk_ of Nothing -> ESingleton d 0
+                                     Just k  -> ERef d k
+                    y' = case yk_ of Nothing -> ESingleton d 0
+                                     Just k  -> ERef d k
+                node' (scale x y' + scale x' y)
+      insert (GScale xk yk) derivMap
+
     node' (EDot x_ y_) = do
       xk <- node' x_
       yk <- node' y_
-      (FunGraph _ im _ _) <- get
+      fg <- get
       let dx = dim x_
           dy = dim y_
           x = ERef dx xk
           y = ERef dy yk
-          xperts = snd $ fromJust (IM.lookup xk im)
-          yperts = snd $ fromJust (IM.lookup yk im)
+          xgexpr = fromJust $ fgGExprFromKey xk fg
+          ygexpr = fromJust $ fgGExprFromKey yk fg
           -- vars is all the variables which the node is a function of
           -- switch to HM.keysSet when it is created
           vars = HM.keys (HM.union xperts yperts)
-          mkDerivMap = mapM diffDot vars >>= (return . HM.fromList)
             where
-              diffDot var = do
-                let x' = case HM.lookup var xperts of Nothing -> ESingleton dx 0
-                                                      Just k  -> ERef dx k
-                    y' = case HM.lookup var yperts of Nothing -> ESingleton dy 0
-                                                      Just k  -> ERef dy k
-                pert <- node' (dot x y' + dot x' y)
-                return (var, pert)
-      insert (GDot xk yk) mkDerivMap
+              xperts = snd $ fromJust (fgReverseLookup xk fg)
+              yperts = snd $ fromJust (fgReverseLookup yk fg)
+          derivMap = HM.fromList $ map diffBinary vars
+            where
+              diffBinary arg = (arg, diffBinary' arg)
+              diffBinary' arg = Unevaluated $ do
+                xk_ <- evalLazyDeriv xgexpr arg
+                yk_ <- evalLazyDeriv ygexpr arg
+                
+                let x' = case xk_ of Nothing -> ESingleton dx 0
+                                     Just k  -> ERef dx k
+                    y' = case yk_ of Nothing -> ESingleton dy 0
+                                     Just k  -> ERef dy k
+                node' (dot x y' + dot x' y)
+      insert (GDot xk yk) derivMap
+
+--    node' (EDot x_ y_) = do
+--      xk <- node' x_
+--      yk <- node' y_
+--      (FunGraph _ im _ _) <- get
+--      let dx = dim x_
+--          dy = dim y_
+--          x = ERef dx xk
+--          y = ERef dy yk
+--          xperts = snd $ fromJust (IM.lookup xk im)
+--          yperts = snd $ fromJust (IM.lookup yk im)
+--          -- vars is all the variables which the node is a function of
+--          -- switch to HM.keysSet when it is created
+--          vars = HM.keys (HM.union xperts yperts)
+--          mkDerivMap = mapM diffDot vars >>= (return . HM.fromList)
+--            where
+--              diffDot var = do
+--                let x' = case HM.lookup var xperts of Nothing -> ESingleton dx 0
+--                                                      Just k  -> ERef dx k
+--                    y' = case HM.lookup var yperts of Nothing -> ESingleton dy 0
+--                                                      Just k  -> ERef dy k
+--                pert <- node' (dot x y' + dot x' y)
+--                return (var, pert)
+--      insert (GDot xk yk) mkDerivMap
 
     node' (EDeriv x arg) = do
       x' <- node' x
       arg' <- node' arg
-      (FunGraph _ im _ _) <- get
-      let var      = fst $ fromJust $ IM.lookup arg' im
-          derivMap = snd $ fromJust $ IM.lookup x' im
-          isSym (GSym _ _) = True
-          isSym _ = False
-      when (not (isSym var)) $ error $ "can't take a derivative of something that isn't symbolic"
-      case HM.lookup var derivMap of Nothing     -> node' $ ESingleton (dim arg) 0
-                                     Just derivK -> return derivK
+      fg <- get
+      let xG   = fromJust $ fgGExprFromKey x' fg
+          argG = fromJust $ fgGExprFromKey arg' fg
+      derivK <- evalLazyDeriv xG argG
+      case derivK of Nothing -> node' $ ESingleton (dim arg) 0
+                     Just k  -> return k
 
-    node' (EGrad x args) = do
-      x' <- node' x
-      args' <- node' args
-      (FunGraph _ im _ _) <- get
-      let var      = fst $ fromJust $ IM.lookup args' im
-          derivMap = snd $ fromJust $ IM.lookup x' im
-          isSym (GSym _ _) = True
-          isSym _ = False
-      when (not (isSym var)) $ error "can't take a derivative of something that isn't symbolic"
-      case HM.lookup var derivMap of Nothing     -> node' $ ESingleton (dim args) 0
-                                     Just derivK -> return derivK
-
-    node' (EJacob xs args) = do
-      xs' <- node' xs
-      args' <- node' args
-      (FunGraph _ im _ _) <- get
-      let var      = fst $ fromJust $ IM.lookup args' im
-          derivMap = snd $ fromJust $ IM.lookup xs' im
-          isSym (GSym _ _) = True
-          isSym _ = False
-      when (not (isSym var)) $ error "can't take a derivative of something that isn't symbolic"
-      case HM.lookup var derivMap of Nothing     -> node' $ ESingleton (dim args) 0
-                                     Just derivK -> return derivK
+--    node' (EGrad x args) = do
+--      x' <- node' x
+--      args' <- node' args
+--      (FunGraph _ im _ _) <- get
+--      let var      = fst $ fromJust $ IM.lookup args' im
+--          derivMap = snd $ fromJust $ IM.lookup x' im
+--          isSym (GSym _ _) = True
+--          isSym _ = False
+--      when (not (isSym var)) $ error "can't take a derivative of something that isn't symbolic"
+--      case HM.lookup var derivMap of Nothing     -> node' $ ESingleton (dim args) 0
+--                                     Just derivK -> return derivK
+--
+--    node' (EJacob xs args) = do
+--      xs' <- node' xs
+--      args' <- node' args
+--      (FunGraph _ im _ _) <- get
+--      let var      = fst $ fromJust $ IM.lookup args' im
+--          derivMap = snd $ fromJust $ IM.lookup xs' im
+--          isSym (GSym _ _) = True
+--          isSym _ = False
+--      when (not (isSym var)) $ error "can't take a derivative of something that isn't symbolic"
+--      case HM.lookup var derivMap of Nothing     -> node' $ ESingleton (dim args) 0
+--                                     Just derivK -> return derivK
 
 
 -- | Try to insert the GExpr into the hashmap performing CSE.
 --   Take a GExpr and it's perturbation GExprs.
 --   If the GExpr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
-insert :: (Eq a, Hashable a, Unbox a, MonadState (FunGraph a b c) m) => GExpr a -> m (DerivMap a) -> m Key
-insert gexpr mkDerivMap = do
+--insert :: (Eq a, Hashable a, Unbox a, MonadState (FunGraph a b c) m) => GExpr a -> (DerivMap a b c) -> m Key
+insert :: (Hashable a, Unbox a, Floating a, Eq a) =>
+          GExpr a -> DerivMap a b c -> StateT (FunGraph a b c) Identity Key
+insert gexpr derivMap = do
   (FunGraph hm im ins outs) <- get
-  case HM.lookup gexpr hm of Just k' -> return k'
-                             Nothing -> do derivMap <- mkDerivMap
-                                           let k = HM.size hm
-                                               hm' = HM.insert gexpr k hm
-                                               im' = IM.insert k (gexpr,derivMap) im
-                                           put $ FunGraph hm' im' ins outs
-                                           return k
+  case HM.lookup gexpr hm of
+    Just (k',_) -> return k'
+    Nothing -> do let k = HM.size hm
+                      hm' = HM.insert gexpr (k,derivMap) hm
+                      im' = IM.insert k gexpr im
+                  put (FunGraph hm' im' ins outs)
+                  return k
                              
 
 ---------------------- heterogenous inputs/outputs ------------------

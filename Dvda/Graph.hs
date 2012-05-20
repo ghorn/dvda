@@ -4,8 +4,13 @@
 module Dvda.Graph ( GExpr(..)
                   , FunGraph(..)
                   , DerivMap
+                  , MkDeriv
+                  , LazyDeriv(..)
                   , Key
                   , emptyFunGraph
+                  , fgLookup
+                  , fgReverseLookup
+                  , fgGExprFromKey
                   , previewGraph
                   , toFGLGraph
                   , collisions
@@ -14,6 +19,9 @@ module Dvda.Graph ( GExpr(..)
                   , funGraphSummary'
                   ) where
 
+import Control.Monad.State.Lazy ( StateT )
+import Data.Functor.Identity ( Identity )
+--import Control.Monad.State ( MonadState, State, get, put, liftM, runState )
 import Data.Graph.Inductive ( Gr, mkGraph )
 import Data.GraphViz ( Labellable, toLabelValue, preview )
 import Control.Concurrent ( threadDelay )
@@ -21,20 +29,41 @@ import Data.Vector.Unboxed ( Vector, Unbox )
 import qualified Data.Vector.Unboxed as V( foldl )
 import Data.Hashable ( Hashable, hash, combine )
 import Data.List ( sort )
+import Data.Maybe ( fromJust )
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 
 import Dvda.BinUn( BinOp, UnOp, isCommutative )
 
 type Key = Int
-type DerivMap a = HM.HashMap (GExpr a) Key
 
+type DerivMap a b c = HM.HashMap (GExpr a) (LazyDeriv a b c)
+type MkDeriv a b c = StateT (FunGraph a b c) Identity Key
+
+data LazyDeriv a b c = Unevaluated (MkDeriv a b c)
+                     | Evaluated Key
+                       
 data FunGraph a b c = FunGraph
-                      (HM.HashMap (GExpr a) Key)
-                      (IM.IntMap (GExpr a, DerivMap a))
+                      (HM.HashMap (GExpr a) (Key, DerivMap a b c)) -- main lookup
+                      (IM.IntMap (GExpr a)) -- internal for reverse lookup
                       (b,[Key])
-                      (c,[Key]) deriving (Show, Eq)
+                      (c,[Key]) deriving (Show)--, Eq)
                                          
+instance (Show a, Unbox a) => Show (LazyDeriv a b c) where
+  show (Unevaluated _) = "Unevaluated"
+  show (Evaluated x) = "Evaluted " ++ show x
+
+fgLookup :: (Eq a, Hashable a, Unbox a) => GExpr a -> FunGraph a b c -> Maybe (Key, DerivMap a b c)
+fgLookup gexpr (FunGraph hm _ _ _) = HM.lookup gexpr hm
+
+fgGExprFromKey :: (Eq a, Hashable a, Unbox a) => Key -> FunGraph a b c -> Maybe (GExpr a)
+fgGExprFromKey k (FunGraph _ im _ _) = IM.lookup k im
+
+fgReverseLookup :: (Eq a, Hashable a, Unbox a) => Key -> FunGraph a b c -> Maybe (Key, DerivMap a b c)
+fgReverseLookup k fg = do
+  gexpr <- fgGExprFromKey k fg
+  fgLookup gexpr fg
+
 funGraphSummary :: (Show a, Unbox a, Show b, Show c) => FunGraph a b c -> String
 funGraphSummary (FunGraph hm _ (b,bkeys) (c,ckeys)) =
   init $ unlines [ "input dims: " ++ show b
@@ -54,7 +83,9 @@ funGraphSummary' (FunGraph hm im (b,bkeys) (c,ckeys)) =
                  , "output nodes:" ++ show ckeys
                  , "number of nodes: " ++ show (HM.size hm)
                  , "graph:" 
-                 , unlines (map show (IM.toList im))
+                 , init $ unlines (map show (IM.toList im))
+                 , "outputs:"
+                 , init $ unlines (map (show . (\k -> fromJust (IM.lookup k im))) ckeys)
                  ]
 
 data GExpr a = GBinary BinOp Key Key
@@ -136,7 +167,7 @@ previewGraph fungraph = do
 toFGLGraph :: FunGraph a b c -> Gr (GExpr a) String
 toFGLGraph (FunGraph gexprs _ _ _) = mkGraph lnodes ledges
   where
-    lnodes = map (\(x,y) -> (y,x)) $ HM.toList gexprs
+    lnodes = map (\(x,(y,_)) -> (y,x)) $ HM.toList gexprs
 --    lnodes = IM.toList gexprs
     ledges = concatMap (\(k,ge) -> map (\ch -> (ch,k,"")) (getChildren ge)) lnodes
       where
