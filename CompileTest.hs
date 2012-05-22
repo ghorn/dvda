@@ -4,7 +4,6 @@
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
 
-import qualified Data.Vector.Unboxed as V
 import Data.Array.Repa (DIM0,DIM1,DIM2)
 
 import Dvda.SymMonad ( (:*)(..), makeFun, inputs_, outputs_, node )

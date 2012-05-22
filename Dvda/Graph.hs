@@ -49,6 +49,9 @@ data FunGraph a b c = FunGraph
                       (b,[Key])
                       (c,[Key]) deriving (Show)--, Eq)
                                          
+instance (Hashable a, Unbox a)  => Hashable (FunGraph a b c) where
+  hash (FunGraph _ im (_, inskeys) (_, outskeys)) = hash (IM.toList im, inskeys, outskeys)
+  
 instance (Show a, Unbox a) => Show (LazyDeriv a b c) where
   show (Unevaluated _) = "Unevaluated"
   show (Evaluated x) = "Evaluted " ++ show x

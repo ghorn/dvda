@@ -8,7 +8,6 @@ module Dvda.Codegen.HSBuilder ( buildHSFunction
                               ) where
 
 import qualified Data.Hashable as H
-import qualified Data.HashMap.Lazy as HM
 import System.Directory
 import Control.Monad(when)
 import System.Plugins.Make
@@ -21,7 +20,6 @@ import qualified Dvda.Config as Config
 
 -- for example:
 import Data.Array.Repa hiding ((++))
-import qualified Data.Vector.Unboxed as V
 import Dvda.Expr
 import Dvda
 
@@ -30,9 +28,9 @@ import Dvda
 buildHSFunction :: (Show b, Show c) => FunGraph Double b c ->
                    IO ( ((Expr DIM0 Double) :* (Expr DIM1 Double) :* (Expr DIM2 Double)) ->
                         ((Expr DIM2 Double) :* (Expr DIM1 Double) :* (Expr DIM0 Double)) )
-buildHSFunction fg@(FunGraph hm _ _ _) = do
+buildHSFunction fg = do
   -- C source and hash
-  let hash = show $ abs $ H.hash $ HM.toList hm
+  let hash = show $ abs $ H.hash fg
       source = writeHSSource fg hash 
 
   -- function directory

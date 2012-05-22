@@ -95,8 +95,7 @@ writeHSSource (FunGraph _ im (insT,ins) (outsT,outs)) hash =
       spaces = replicate ((length (Config.nameHSFunction hash)) + 4) ' '
       inputs  = concat $ intersperse " :* " (map Config.nameHSVar ins)
       outputs = concat $ intersperse " :* " (map Config.nameHSVar outs)
-      body = map writeAssignment gnodes
-      gnodes = map (\(k,(y,_)) -> (k,y)) (IM.toList im)
+      body = map writeAssignment (IM.toList im)
 
 
 intercalate :: String -> [String] -> String

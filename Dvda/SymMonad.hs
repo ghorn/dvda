@@ -67,12 +67,12 @@ node :: (Shape d, Hashable a, Unbox a, Floating a, Eq a) => Expr d a -> StateT (
 node expr = liftM (ERef (dim expr)) (node' expr)
   where
     node' :: (Shape d, Hashable a, Unbox a, Floating a, Eq a) => Expr d a -> StateT (FunGraph a b c) Identity Key
+    node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
     node' (ERef _ k) = return k
     node' (ESym d name) = do
       let gexpr = GSym (listOfShape d) name
           derivMap = HM.singleton gexpr (Unevaluated $ node' (ESingleton d 1))
       insert gexpr derivMap
-    node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
     node' (EConst d x) = do
       let d' = listOfShape d
           gexpr = GConst d' x
