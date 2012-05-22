@@ -23,6 +23,8 @@ module Dvda.Config( -- * directory stuff
                   , gccString
                   , spewGccCall
                   , outputNames
+                    -- * ghc stuff
+                  , ghcString
                   ) where
 
 import System.Directory
@@ -55,6 +57,9 @@ dvdaDir = do
 -- | take in source file and object, return string suitible for calling to compile
 gccString :: FilePath -> FilePath -> String
 gccString src obj = "gcc -O2 -std=gnu99 -fPIC -shared -Wall -Wextra -Werror " ++ src ++ " -o " ++ obj
+
+ghcString :: FilePath -> FilePath -> String
+ghcString src obj = "ghc -c " ++ src ++ " -o " ++ obj
 
 
 functionDir :: String -> IO FilePath

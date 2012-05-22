@@ -10,6 +10,7 @@ import Dvda.SymMonad ( (:*)(..), makeFun, inputs_, outputs_, node )
 import Dvda.Expr
 import Dvda.Graph
 import Dvda.Codegen.HSBuilder
+import Dvda.Codegen.CBuilder
 
 import Dvda
 
@@ -32,8 +33,8 @@ gr = snd $ makeFun $ do
   outputs_ (z1 :* z2 :* z3)
 
 
-main :: IO ()
-main = do
+main' :: IO ()
+main' = do
   fun <- buildHSFunction gr
   let x = 0
       y = vec [0,1,2::Double]
@@ -41,3 +42,15 @@ main = do
       answer = fun (x :* y :* z)
       
   print answer
+
+
+main :: IO ()
+main = do
+  fun <- buildCFunction gr
+  print fun
+--  let x = 0
+--      y = vec [0,1,2::Double]
+--      z = mat (2,3) [0,1,2,3,4,5]
+--      answer = fun (x :* y :* z)
+--      
+--  print answer

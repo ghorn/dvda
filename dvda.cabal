@@ -47,9 +47,10 @@ Library
                      Dvda.Examples
                      Dvda.Config
 --                     Dvda.CFunction
---                     Dvda.Codegen.CBuilder
+                     Dvda.Codegen.CBuilder
 --                     Dvda.Codegen.CCallWrapper
---                     Dvda.Codegen.CSyntax
+                     Dvda.Codegen.CSyntax
+                     Dvda.Codegen.Utils
                      Dvda.Codegen.HSSyntax
                      Dvda.Codegen.HSBuilder
 
@@ -67,11 +68,11 @@ Library
                      directory >= 1.1 && < 1.2,
                      process >= 1.1 && < 1.2,
                      text >= 0.11 && < 0.12,
+                     transformers >= 0.2 && < 0.3,
                      plugins >= 1.5 && < 1.6
 --                     unix
 --                     text,
 --                     QuickCheck,
---                     transformers >= 0.2 && < 0.3,
 
   Ghc-options:       -O2 -Wall
 --  Ghc-options:       -O2 -Wall -threaded

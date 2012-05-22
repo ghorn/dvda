@@ -9,55 +9,22 @@ module Dvda.Codegen.CBuilder ( buildCFunction
                              ) where
 
 import qualified Data.Hashable as H
-import qualified Data.HashMap.Lazy as HM
 import qualified Data.Vector.Unboxed as V
 
 import System.Directory
-import System.Process(runCommand, waitForProcess)
-import System.Exit(ExitCode(ExitSuccess))
 import Control.Monad(when)
 
 import qualified Dvda.Config as Config
 import Dvda.Graph
 import Dvda.Codegen.CSyntax ( writeCSource, writeCInclude )
-
--- | shorten path name for display purposes
-shortName :: String -> String
-shortName full
-  | length name <= maxN = name ++ extension
-  | otherwise           = take firstN name ++ "..." ++ drop (length name - lastN) name ++ extension
-  where
-    firstN = 20
-    lastN  = 10
-    maxN = firstN + lastN
-
-    (name, extension) = break (== '.') $ reverse $ takeWhile (/= '/') (reverse full)
-
-
--- | take in name of source and future object, compile object
-callGcc :: FilePath -> FilePath -> IO ()
-callGcc srcname objname = do
-  -- compile new object
-  let compileString = Config.gccString srcname objname
-      displayString = Config.gccString (shortName srcname) (shortName objname)
-
-  -- print compilation string
-  when Config.spewGccCall $ putStrLn displayString
-  
-  -- run compilation string
-  p <- runCommand compileString
-  
-  -- check for errors
-  exitCode <- waitForProcess p
-  when (exitCode /= ExitSuccess) $ error $ "failed compiling " ++ srcname
-
+import Dvda.Codegen.Utils ( callGcc )
 
 -- | make source functions
 --buildCFunction :: (Eq a, Show a) => [Expr a] -> [Expr a] -> IO (String, FilePath)
 buildCFunction :: (Show a, V.Unbox a, H.Hashable a) => FunGraph a b c -> IO (String, FilePath)
-buildCFunction fg@(FunGraph hm _ _ _) = do
+buildCFunction fg = do
   -- C source and hash
-  let hash = show $ abs $ H.hash $ HM.toList hm
+  let hash = show $ abs $ H.hash fg
       cSource = writeCSource fg hash 
       cInclude = writeCInclude hash
 
@@ -72,9 +39,6 @@ buildCFunction fg@(FunGraph hm _ _ _) = do
       cIncludeFile = dir ++ "/" ++ Config.nameCInclude hash
       cObjectFile  = dir ++ "/" ++ Config.nameCObject  hash
       
-  -- make function directory if it doesn't exist
-  createDirectoryIfMissing False dir
-  
   -- if the source already exists, make sure it matches the old source
   srcExists <- doesFileExist cSourceFile
   when srcExists $ do

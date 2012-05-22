@@ -43,9 +43,6 @@ buildHSFunction fg = do
   let sourcePath  = dir ++ "/" ++ Config.nameHSSource  hash
 --      objectPath  = dir ++ "/" ++ Config.nameHSObject  hash
       
-  -- make function directory if it doesn't exist
-  createDirectoryIfMissing False dir
-  
   -- if the source already exists, make sure it matches the old source
   srcExists <- doesFileExist sourcePath
   when srcExists $ do

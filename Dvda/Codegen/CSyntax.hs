@@ -110,8 +110,7 @@ writeCSource (FunGraph _ im (_,ins) (_,outs)) hash =
   , "}"
   ]
     where
-      gnodes = map (\(k,(y,_)) -> (k,y)) (IM.toList im)
-      body = map (writeAssignment (\k -> fromJust $ IM.lookup k inputMap)) gnodes
+      body = map (writeAssignment (\k -> fromJust $ IM.lookup k inputMap)) (IM.toList im)
         where
           -- map node -> input number
           inputMap = IM.fromList $ zip ins [0..]
