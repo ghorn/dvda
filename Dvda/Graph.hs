@@ -1,11 +1,9 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language FlexibleContexts #-}
 
 module Dvda.Graph ( GExpr(..)
                   , FunGraph(..)
-                  , DerivMap
-                  , MkDeriv
-                  , LazyDeriv(..)
+                  , FgNode
+                  , SymSet
                   , Key
                   , emptyFunGraph
                   , fgLookup
@@ -19,9 +17,6 @@ module Dvda.Graph ( GExpr(..)
                   , funGraphSummary'
                   ) where
 
-import Control.Monad.State.Lazy ( StateT )
-import Data.Functor.Identity ( Identity )
---import Control.Monad.State ( MonadState, State, get, put, liftM, runState )
 import Data.Graph.Inductive ( Gr, mkGraph )
 import Data.GraphViz ( Labellable, toLabelValue, preview )
 import Control.Concurrent ( threadDelay )
@@ -30,21 +25,18 @@ import qualified Data.Vector.Unboxed as V( foldl )
 import Data.Hashable ( Hashable, hash, combine )
 import Data.List ( sort )
 import Data.Maybe ( fromJust )
+import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 
 import Dvda.BinUn( BinOp, UnOp, isCommutative )
 
 type Key = Int
+type SymSet a = HS.HashSet (GExpr a)
+type FgNode a = (Key, SymSet a)
 
-type DerivMap a b c = HM.HashMap (GExpr a) (LazyDeriv a b c)
-type MkDeriv a b c = StateT (FunGraph a b c) Identity Key
-
-data LazyDeriv a b c = Unevaluated (MkDeriv a b c)
-                     | Evaluated Key
-                       
 data FunGraph a b c = FunGraph
-                      (HM.HashMap (GExpr a) (Key, DerivMap a b c)) -- main lookup
+                      (HM.HashMap (GExpr a) (FgNode a)) -- main lookup
                       (IM.IntMap (GExpr a)) -- internal for reverse lookup
                       (b,[Key])
                       (c,[Key]) deriving (Show)--, Eq)
@@ -52,20 +44,16 @@ data FunGraph a b c = FunGraph
 instance (Hashable a, Unbox a)  => Hashable (FunGraph a b c) where
   hash (FunGraph _ im (_, inskeys) (_, outskeys)) = hash (IM.toList im, inskeys, outskeys)
   
-instance (Show a, Unbox a) => Show (LazyDeriv a b c) where
-  show (Unevaluated _) = "Unevaluated"
-  show (Evaluated x) = "Evaluted " ++ show x
-
-fgLookup :: (Eq a, Hashable a, Unbox a) => GExpr a -> FunGraph a b c -> Maybe (Key, DerivMap a b c)
+fgLookup :: (Eq a, Hashable a, Unbox a) => GExpr a -> FunGraph a b c -> Maybe (FgNode a)
 fgLookup gexpr (FunGraph hm _ _ _) = HM.lookup gexpr hm
 
-fgGExprFromKey :: (Eq a, Hashable a, Unbox a) => Key -> FunGraph a b c -> Maybe (GExpr a)
-fgGExprFromKey k (FunGraph _ im _ _) = IM.lookup k im
-
-fgReverseLookup :: (Eq a, Hashable a, Unbox a) => Key -> FunGraph a b c -> Maybe (Key, DerivMap a b c)
+fgReverseLookup :: (Eq a, Hashable a, Unbox a) => Key -> FunGraph a b c -> Maybe (FgNode a)
 fgReverseLookup k fg = do
   gexpr <- fgGExprFromKey k fg
   fgLookup gexpr fg
+
+fgGExprFromKey :: (Eq a, Hashable a, Unbox a) => Key -> FunGraph a b c -> Maybe (GExpr a)
+fgGExprFromKey k (FunGraph _ im _ _) = IM.lookup k im
 
 funGraphSummary :: (Show a, Unbox a, Show b, Show c) => FunGraph a b c -> String
 funGraphSummary (FunGraph hm _ (b,bkeys) (c,ckeys)) =
@@ -97,11 +85,8 @@ data GExpr a = GBinary BinOp Key Key
              | GSingleton [Int] a
              | GScale Key Key
              | GDot Key Key
---             | GDeriv Key Key
---             | GGrad Key Key
---             | GJacob Key Key
              | GConst [Int] (Vector a) deriving (Show, Eq)
-                                                
+
 instance (Unbox a, Hashable a) => Hashable (GExpr a) where
   -- if the binary operator is commutative then always put the lesser hash first
   -- so that e.g. x*y and y*x are not computed twice
