@@ -99,21 +99,21 @@ instance (Unbox a, Hashable a) => Hashable (GExpr a) where
         | otherwise = (hk1, hk2)
   --  hash (GBinary op k1 k2) = 24 `combine` hash op `combine` hash k1 `combine` hash k2
   hash (GUnary op k)      = 25 `combine` hash op `combine` hash k
-  hash (GSym d name)      = 26 `combine` hash d `combine` hash name
-  hash (GSingleton d x)   = 27 `combine` hash d `combine` hash x
+  hash (GSym sh name)     = 26 `combine` hash sh `combine` hash name
+  hash (GSingleton sh x)  = 27 `combine` hash sh `combine` hash x
   hash (GScale k1 k2)     = 28 `combine` hash k1 `combine` hash k2
   hash (GDot k1 k2)       = 29 `combine` hash k1 `combine` hash k2
 --  hash (GDeriv k1 k2)     = 30 `combine` hash k1 `combine` hash k2
 --  hash (GGrad k1 k2)      = 31 `combine` hash k1 `combine` hash k2
 --  hash (GJacob k1 k2)     = 32 `combine` hash k1 `combine` hash k2
-  hash (GConst d v)       = V.foldl (\acc x -> acc `combine` hash x) (33 `combine` hash d) v
+  hash (GConst sh v)      = V.foldl (\acc x -> acc `combine` hash x) (33 `combine` hash sh) v
 
 
 instance Show a => Labellable (GExpr a) where
   toLabelValue (GBinary op _ _) = toLabelValue $ show op
   toLabelValue (GUnary op _)    = toLabelValue $ show op
   toLabelValue (GSym [] name)   = toLabelValue name
-  toLabelValue (GSym d name)    = toLabelValue $ name ++ "{" ++ (tail . init . show . reverse) d ++ "}"
+  toLabelValue (GSym sh name)    = toLabelValue $ name ++ "{" ++ (tail . init . show . reverse) sh ++ "}"
   toLabelValue (GSingleton _ x) = toLabelValue $ show x
   toLabelValue (GScale _ _)     = toLabelValue "scale"
   toLabelValue (GDot _ _)       = toLabelValue "dot"

@@ -131,7 +131,8 @@ infixr 6 :*
 class HList a where
   type NumT a
   type DimT a
-  mkNodes :: (NumT a ~ b) => a -> State (FunGraph b c d) (a,[Key])
+--  mkNodes :: (NumT a ~ b) => a -> State (FunGraph b c d) (a,[Key])
+  mkNodes :: a -> State (FunGraph (NumT a) b c) (a,[Key])
   getHDim :: a -> DimT a
 
 instance (HList a, HList b, NumT a ~ NumT b) => HList (a :* b) where
@@ -143,9 +144,9 @@ instance (HList a, HList b, NumT a ~ NumT b) => HList (a :* b) where
     return (exs :* eys, kxs++kys)
   getHDim (x :* y) = (getHDim x) :* (getHDim y)
 
-instance (Shape d, Hashable a, Unbox a, Eq a, Floating a) => HList (Expr d a) where
-  type NumT (Expr d a) = a
-  type DimT (Expr d a) = d
+instance (Shape sh, Hashable a, Unbox a, Eq a, Floating a) => HList (Expr sh a) where
+  type NumT (Expr sh a) = a
+  type DimT (Expr sh a) = sh
   mkNodes expr = do
     expr'@(ERef _ k) <- node expr
     return (expr', [k])
