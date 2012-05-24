@@ -13,116 +13,228 @@ module Dvda.SymMonad ( (:*)(..)
                      , outputs
                      , outputs_
                      , makeFun
+                     , rad
+                     , getSensitivities
                      ) where
 
-import Control.Monad.State.Lazy ( StateT )
+import Control.Monad ( foldM )
+import Control.Monad.State ( MonadState, StateT, get, put, liftM, runState )
 import Data.Functor.Identity ( Identity )
-
-import Control.Monad.State ( MonadState, State, get, put, liftM, runState )
-import Data.Array.Repa ( listOfShape, Shape )
+import Data.Array.Repa ( Shape )
 import Data.Hashable ( Hashable )
 import Data.Vector.Unboxed ( Unbox )
 import Data.Maybe ( fromJust )
+
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import qualified Data.IntMap as IM
+import Data.IntMap ( Key )
 
-import Dvda.Graph ( FunGraph(..), GExpr(..), SymSet, Key, emptyFunGraph, fgReverseLookup )
-import Dvda.Expr ( Expr(..), dim )
+import Dvda.Dual
+import Dvda.BinUn
+
+import Dvda.Graph ( FunGraph(..), emptyFunGraph, fgReverseLookup, fgGExprFromKey, exprOfGExpr )
+import Dvda.GExpr ( GExpr(..), gdim )
+import Dvda.Expr ( Expr(..), Dot(..), dim )
+import Dvda.HomoDim
 
 -- | take all sub expressions of an Expr and turn them into nodes
 --   return an Expr that is just a ref
 node :: (Shape sh, Hashable a, Unbox a, Floating a, Eq a) => Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
 node expr = liftM (ERef (dim expr)) (node' expr)
-
+            
 node' :: (Shape sh, Hashable a, Unbox a, Floating a, Eq a) => Expr sh a -> StateT (FunGraph a b c) Identity Key
 node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
 node' (ERef _ k) = return k
-node' (ESym sh name) = do
-  let gexpr = GSym (listOfShape sh) name
-  insert gexpr (HS.singleton gexpr)
-node' (EConst sh x) = do
-  let gexpr = GConst (listOfShape sh) x
-  insert gexpr HS.empty
-node' (ESingleton sh x) = do
-  let gexpr = GSingleton (listOfShape sh) x
-  insert gexpr HS.empty
+node' (ESym sh name) = insert $ GSym (homoOfShape sh) name
+node' (EConst sh x) = insert $ GConst (homoOfShape sh) x
+node' (ESingleton sh x) = insert $ GSingleton (homoOfShape sh) x
 node' (EUnary op x) = do
   xk <- node' x
-  fg <- get
-  let (_,symMap) = fromJust $ fgReverseLookup xk fg
-  insert (GUnary op xk) symMap
+  insert $ GUnary (homoOfShape $ dim x) op xk
 node' (EBinary op x y) = do
   xk <- node' x
   yk <- node' y
-  fg <- get
-  let (_,symMapX) = fromJust $ fgReverseLookup xk fg
-      (_,symMapY) = fromJust $ fgReverseLookup yk fg
-  insert (GBinary op xk yk) (HS.union symMapX symMapY)
+  insert $ GBinary (homoOfShape $ dim x) op xk yk
 node' (EScale x y) = do
   xk <- node' x
   yk <- node' y
-  fg <- get
-  let (_,symMapX) = fromJust $ fgReverseLookup xk fg
-      (_,symMapY) = fromJust $ fgReverseLookup yk fg
-  insert (GScale xk yk) (HS.union symMapX symMapY)
+  insert $ GScale (homoOfShape $ dim y) xk yk
 node' (EDot x y) = do
   xk <- node' x
   yk <- node' y
-  fg <- get
-  let (_,symMapX) = fromJust $ fgReverseLookup xk fg
-      (_,symMapY) = fromJust $ fgReverseLookup yk fg
-  insert (GDot xk yk) (HS.union symMapX symMapY)
---    node' (EDeriv x arg) = do
---      xk <- node' x
---      argk <- node' arg
---      fg <- get
---      let xG   = fromJust $ fgGExprFromKey xk fg
---          argG = fromJust $ fgGExprFromKey argk fg
---      derivK <- evalLazyDeriv xG argG
---      case derivK of Nothing -> node' $ ESingleton (dim arg) 0
---                     Just k  -> return k
---    node' (EGrad x args) = do
---      x' <- node' x
---      args' <- node' args
---      (FunGraph _ im _ _) <- get
---      let var      = fst $ fromJust $ IM.lookup args' im
---          derivMap = snd $ fromJust $ IM.lookup x' im
---          isSym (GSym _ _) = True
---          isSym _ = False
---      when (not (isSym var)) $ error "can't take a derivative of something that isn't symbolic"
---      case HM.lookup var derivMap of Nothing     -> node' $ ESingleton (dim args) 0
---                                     Just derivK -> return derivK
---
---    node' (EJacob xs args) = do
---      xs' <- node' xs
---      args' <- node' args
---      (FunGraph _ im _ _) <- get
---      let var      = fst $ fromJust $ IM.lookup args' im
---          derivMap = snd $ fromJust $ IM.lookup xs' im
---          isSym (GSym _ _) = True
---          isSym _ = False
---      when (not (isSym var)) $ error "can't take a derivative of something that isn't symbolic"
---      case HM.lookup var derivMap of Nothing     -> node' $ ESingleton (dim args) 0
---                                     Just derivK -> return derivK
+  let --shx = homoOfShape $ dim x
+      --shy = homoOfShape $ dim x
+      sh = homoOfShape $ dotDims (dim x) (dim y)
+  insert $ GDot sh xk yk
+node' (EDeriv x' arg') = do
+  x <- node x'
+  arg <- node arg'
+  outs <- rad x [arg]
+  node' (head outs)
 
 
 -- | Try to insert the GExpr into the hashmap performing CSE.
 --   If the GExpr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
---insert :: (Eq a, Hashable a, Unbox a, MonadState (FunGraph a b c) m) => GExpr a -> (DerivMap a b c) -> m Key
-insert :: (Hashable a, Unbox a, Floating a, Eq a) =>
-          GExpr a -> SymSet a -> StateT (FunGraph a b c) Identity Key
-insert gexpr symSet = do
+insert :: (Hashable a, Unbox a, Floating a, Eq a) => GExpr a -> StateT (FunGraph a b c) Identity Key
+insert gexpr = do
+  fg <- get
+  let symSet (GSym _ _)          = HS.singleton gexpr
+      symSet (GSingleton _ _)    = HS.empty
+      symSet (GConst _ _)        = HS.empty
+      symSet (GUnary _ _ k)      = snd $ fromJust $ fgReverseLookup k fg
+      symSet (GBinary _ _ xk yk) = HS.union symMapX symMapY
+        where
+          (_,symMapX) = fromJust $ fgReverseLookup xk fg
+          (_,symMapY) = fromJust $ fgReverseLookup yk fg
+      symSet (GScale _ xk yk) = HS.union symMapX symMapY
+        where
+          (_,symMapX) = fromJust $ fgReverseLookup xk fg
+          (_,symMapY) = fromJust $ fgReverseLookup yk fg
+      symSet (GDot _ xk yk) = HS.union symMapX symMapY
+        where
+          (_,symMapX) = fromJust $ fgReverseLookup xk fg
+          (_,symMapY) = fromJust $ fgReverseLookup yk fg
+
   (FunGraph hm im ins outs) <- get
   case HM.lookup gexpr hm of
     Just (k',_) -> return k'
     Nothing -> do let k = HM.size hm
-                      hm' = HM.insert gexpr (k,symSet) hm
+                      hm' = HM.insert gexpr (k,symSet gexpr) hm
                       im' = IM.insert k gexpr im
                   put (FunGraph hm' im' ins outs)
                   return k
-                             
+
+
+gexprOfExpr :: (Eq a, Floating a, Hashable a, Unbox a, Shape sh) =>
+               Expr sh a -> StateT (FunGraph a b c) Identity (GExpr a)
+gexprOfExpr expr = do
+  k <- node' expr
+  fg <- get
+  return (fromJust $ fgGExprFromKey k fg)
+  
+-- gradient of expression w.r.t. list of args
+rad :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh) => 
+       Expr sh a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [Expr sh a]
+rad expr_ args_ = do
+  expr <- gexprOfExpr expr_
+  args <- mapM gexprOfExpr args_
+  let argSet = HS.fromList args
+  sensitivities <- getSensitivities argSet expr (ESingleton (dim expr_) 1)
+  -- order inputs requested by user
+  let orderedSensitivities = map (\x -> fromJust $ HM.lookup x sensitivities) args
+      argDims = map dim args_
+  return $ zipWith (\sh k -> ERef sh k) argDims orderedSensitivities
+
+
+-- combine two (GExpr, Key) hashmaps
+-- if there is a conflict, add the two GExprs together
+unionWithPlus :: (Eq a, Floating a, Hashable a, Unbox a) =>
+                 HM.HashMap (GExpr a) Key -> HM.HashMap (GExpr a) Key ->
+                 StateT (FunGraph a b c) Identity (HM.HashMap (GExpr a) Key)
+unionWithPlus xs ys = foldM addCommon union0 commonGExprs
+  where
+    -- the gexprs that occur in both maps
+    commonGExprs = HM.keys $ HM.intersection xs ys
+    -- the initial union that needs conflicts fixed
+    union0 = HM.union xs ys
+    addCommon hm commonGExpr = do
+      let xsensk = fromJust $ HM.lookup commonGExpr xs
+          ysensk = fromJust $ HM.lookup commonGExpr ys
+      k <- insert $ GBinary (gdim commonGExpr) Add xsensk ysensk
+      return (HM.insert commonGExpr k hm)
+              
+
+lookupSymSet :: (Eq a, Hashable a, Unbox a) => Key -> StateT (FunGraph a b c) Identity (HS.HashSet (GExpr a))
+lookupSymSet k = do
+  fg <- get
+  let (_,symSet) = fromJust $ fgReverseLookup k fg
+  return symSet
+
+
+getSensitivities :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh) => 
+                     HS.HashSet (GExpr a) -> GExpr a -> Expr sh a ->
+                     StateT (FunGraph a b c) Identity (HM.HashMap (GExpr a) Key)
+getSensitivities _ (GSingleton _ _) _ = return HM.empty
+getSensitivities _ (GConst _ _) _ = return HM.empty
+getSensitivities args primal@(GSym _ _) sens = case HS.member primal args of
+  -- don't backprop if there aren't any interesting symbols farther in the tree
+  False -> return HM.empty
+  True -> do
+    k <- node' sens
+    return $ HM.fromList [(primal, k)]
+getSensitivities args (GUnary _ op gk) sens = do
+  symSetG <- lookupSymSet gk
+  case HS.size (HS.intersection args symSetG) of
+    -- don't backprop if there aren't any interesting symbols farther in the tree
+    0 -> return $ HM.empty
+    _ -> do
+      fg <- get
+      let g' = fromJust $ fgGExprFromKey gk fg
+          g = exprOfGExpr g'
+          dfdg = dualPerturbation $ applyUnary op (Dual g 1)
+      getSensitivities args g' (sens*dfdg)
+getSensitivities args (GBinary _ op gk hk) sens = do
+  symSetG <- lookupSymSet gk
+  symSetH <- lookupSymSet hk
+  
+  fg <- get
+  let g' = fromJust $ fgGExprFromKey gk fg
+      h' = fromJust $ fgGExprFromKey hk fg
+      g = exprOfGExpr g'
+      h = exprOfGExpr h'
+      dfdg = dualPerturbation $ applyBinary op (Dual g 1) (Dual h 0)
+      dfdh = dualPerturbation $ applyBinary op (Dual g 0) (Dual h 1)
+  
+  gsens <- case HS.size (HS.intersection args symSetG) of
+                0 -> return HM.empty
+                _ -> getSensitivities args g' (sens*dfdg)
+  hsens <- case HS.size (HS.intersection args symSetH) of
+                0 -> return HM.empty
+                _ -> getSensitivities args h' (sens*dfdh)
+  unionWithPlus gsens hsens
+getSensitivities args (GDot _ gk hk) sens = do
+  symSetG <- lookupSymSet gk
+  symSetH <- lookupSymSet hk
+  
+  fg <- get
+  let g' = fromJust $ fgGExprFromKey gk fg
+      h' = fromJust $ fgGExprFromKey hk fg
+      g = exprOfGExpr g'
+      h = exprOfGExpr h'
+      dfdg = h
+      dfdh = g
+  
+  gsens <- case HS.size (HS.intersection args symSetG) of
+                0 -> return HM.empty
+                _ -> getSensitivities args g' (sens*dfdg)
+  hsens <- case HS.size (HS.intersection args symSetH) of
+                0 -> return HM.empty
+                _ -> getSensitivities args h' (sens*dfdh)
+  unionWithPlus gsens hsens
+getSensitivities args (GScale _ gk hk) sens = do
+  symSetG <- lookupSymSet gk
+  symSetH <- lookupSymSet hk
+  
+  fg <- get
+  let g' = fromJust $ fgGExprFromKey gk fg
+      h' = fromJust $ fgGExprFromKey hk fg
+      g = exprOfGExpr g'
+      h = exprOfGExpr h'
+      dfdg = h
+      dfdh = g
+  
+  gsens <- case HS.size (HS.intersection args symSetG) of
+                0 -> return HM.empty
+                _ -> getSensitivities args g' (sens*dfdg)
+  hsens <- case HS.size (HS.intersection args symSetH) of
+                0 -> return HM.empty
+                _ -> getSensitivities args h' (sens*dfdh)
+  unionWithPlus gsens hsens
+  
+
+
 
 ---------------------- heterogenous inputs/outputs ------------------
 data a :* b = a :* b deriving Show
@@ -132,7 +244,7 @@ class HList a where
   type NumT a
   type DimT a
 --  mkNodes :: (NumT a ~ b) => a -> State (FunGraph b c d) (a,[Key])
-  mkNodes :: a -> State (FunGraph (NumT a) b c) (a,[Key])
+  mkNodes :: a -> StateT (FunGraph (NumT a) b c) Identity (a,[Key])
   getHDim :: a -> DimT a
 
 instance (HList a, HList b, NumT a ~ NumT b) => HList (a :* b) where
@@ -152,30 +264,30 @@ instance (Shape sh, Hashable a, Unbox a, Eq a, Floating a) => HList (Expr sh a) 
     return (expr', [k])
   getHDim = dim
   
-inputs :: HList b => b -> State (FunGraph (NumT b) (DimT b) c) b
+inputs :: HList b => b -> StateT (FunGraph (NumT b) (DimT b) c) Identity b
 inputs exprs = do
   (exprs', keys) <- mkNodes exprs
   FunGraph hm im _ outs <- get
   put (FunGraph hm im (getHDim exprs, keys) outs)
   return exprs'
 
-outputs :: HList c => c -> State (FunGraph (NumT c) b (DimT c)) c
+outputs :: HList c => c -> StateT (FunGraph (NumT c) b (DimT c)) Identity c
 outputs exprs = do
   (exprs',keys) <- mkNodes exprs
   FunGraph hm im ins _ <- get
   put (FunGraph hm im ins (getHDim exprs,keys))
   return exprs'
 
-inputs_ :: HList b => b -> State (FunGraph (NumT b) (DimT b) c) ()
+inputs_ :: HList b => b -> StateT (FunGraph (NumT b) (DimT b) c) Identity ()
 inputs_ exprs = do
   _ <- inputs exprs
   return ()
 
-outputs_ :: HList c => c -> State (FunGraph (NumT c) b (DimT c)) ()
+outputs_ :: HList c => c -> StateT (FunGraph (NumT c) b (DimT c)) Identity ()
 outputs_ exprs = do
   _ <- outputs exprs
   return ()
 
 ---------------- utility function -----------------
-makeFun :: State (FunGraph a b c) d -> (d, FunGraph a b c)
+makeFun :: StateT (FunGraph a b c) Identity d -> (d, FunGraph a b c)
 makeFun f = runState f emptyFunGraph
