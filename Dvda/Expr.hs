@@ -6,6 +6,7 @@
 {-# Language FlexibleContexts #-}
 
 module Dvda.Expr ( Expr(..)
+                 , FromGExpr
                  , sym
                  , vsym
                  , msym
@@ -19,19 +20,39 @@ module Dvda.Expr ( Expr(..)
                  , hess
                  , dim
                  , exprOfGExpr
-                 , Dot(..)
                  ) where
 
-import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape, shapeOfList)
+import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(rank), shapeOfList)
 import qualified Data.Vector.Unboxed as V
+import Data.IntMap ( Key )
 
+import Dvda.Dot ( Dot(..), dotDims )
 import Dvda.BinUn
 import Dvda.GExpr
 import Dvda.HomoDim
-import Dvda.Dot
 
 showShapeR :: Shape sh => sh -> String
 showShapeR = show . reverse . listOfShape
+
+class Shape sh => FromGExpr sh where
+  fromMM :: HomoDim -> HomoDim -> Key -> Key -> Expr sh a
+  fromMV :: HomoDim -> HomoDim -> Key -> Key -> Expr sh a
+  fromVM :: HomoDim -> HomoDim -> Key -> Key -> Expr sh a
+  fromVV :: HomoDim -> HomoDim -> Key -> Key -> Expr sh a
+  fromMM shx shy = error $ "sorry, no fromMM instance for: " ++ show shx ++ ", " ++ show shy
+  fromMV shx shy = error $ "sorry, no fromMV instance for: " ++ show shx ++ ", " ++ show shy
+  fromVM shx shy = error $ "sorry, no fromVM instance for: " ++ show shx ++ ", " ++ show shy
+  fromVV shx shy = error $ "sorry, no fromVV instance for: " ++ show shx ++ ", " ++ show shy
+
+instance FromGExpr DIM2 where
+  fromMM shx shy kx ky = EDot (ERef (shapeOfHomo shx :: DIM2) kx) (ERef (shapeOfHomo shy :: DIM2) ky)
+
+instance FromGExpr DIM1 where
+  fromMV shx shy kx ky = EDot (ERef (shapeOfHomo shx :: DIM2) kx) (ERef (shapeOfHomo shy :: DIM1) ky)
+  fromVM shx shy kx ky = EDot (ERef (shapeOfHomo shx :: DIM1) kx) (ERef (shapeOfHomo shy :: DIM2) ky)
+
+instance FromGExpr DIM0 where
+  fromVV shx shy kx ky = EDot (ERef (shapeOfHomo shx :: DIM1) kx) (ERef (shapeOfHomo shy :: DIM1) ky)
 
 dim :: Expr sh a -> sh
 dim (ESym sh _) = sh
@@ -47,7 +68,7 @@ dim (EDeriv _ _) = Z
 dim (EGrad _ args) = dim args
 dim (EJacob x args) = Z :. (head $ listOfShape (dim x)) :. (head $ listOfShape (dim args))
 
-exprOfGExpr :: (Shape sh, V.Unbox a) => GExpr a -> Expr sh a
+exprOfGExpr :: (Shape sh, V.Unbox a, FromGExpr sh) => GExpr a -> Expr sh a
 exprOfGExpr (GBinary sh' op kx ky) = EBinary op (ERef sh kx) (ERef sh ky)
   where
     sh = shapeOfHomo sh'
@@ -56,7 +77,12 @@ exprOfGExpr (GSym sh name) = ESym (shapeOfHomo sh) name
 exprOfGExpr (GSingleton sh a) = ESingleton (shapeOfHomo sh) a
 exprOfGExpr (GScale sh kx ky) = EScale (ERef Z kx) (ERef (shapeOfHomo sh) ky)
 exprOfGExpr (GConst sh v) = EConst (shapeOfHomo sh) v
---exprOfGExpr (GDot sh kx ky) = EDot sh (ERef shx kx) (ERef shy ky)
+exprOfGExpr (GDot shx shy kx ky) = case (rank shx, rank shy) of
+  (2,2) -> fromMM shx shy kx ky
+  (2,1) -> fromMV shx shy kx ky
+  (1,2) -> fromVM shx shy kx ky
+  (1,1) -> fromVV shx shy kx ky
+  nm    -> error $ "can't convert GDot of rank: " ++ show nm ++ " to Expr"
 
 data Expr sh a where
   ESym :: sh -> String -> Expr sh a
@@ -66,12 +92,12 @@ data Expr sh a where
   EUnary :: UnOp -> Expr sh a -> Expr sh a
   EBinary :: BinOp -> Expr sh a -> Expr sh a -> Expr sh a
   EScale :: Expr DIM0 a -> Expr sh a -> Expr sh a
-  EDot :: (Dot sh1 sh2, sh ~ DotT sh1 sh2) => Expr sh1 a -> Expr sh2 a -> Expr sh a
+  EDot :: Dot sh1 sh2 => Expr sh1 a -> Expr sh2 a -> Expr (DotT sh1 sh2) a
   ERef :: sh -> Int -> Expr sh a
 
-  EDeriv :: (sh ~ DIM0) => Expr DIM0 a -> Expr DIM0 a -> Expr sh a
-  EGrad  :: (sh ~ DIM1) => Expr DIM0 a -> Expr DIM1 a -> Expr sh a
-  EJacob :: (sh ~ DIM2) => Expr DIM1 a -> Expr DIM1 a -> Expr sh a
+  EDeriv :: sh ~ DIM0 => Expr DIM0 a -> Expr DIM0 a -> Expr sh a
+  EGrad  :: sh ~ DIM1 => Expr DIM0 a -> Expr DIM1 a -> Expr sh a
+  EJacob :: sh ~ DIM2 => Expr DIM1 a -> Expr DIM1 a -> Expr sh a
 
 isVal :: Eq a => a -> Expr sh a -> Bool
 isVal x (EDimensionless y) = x == y

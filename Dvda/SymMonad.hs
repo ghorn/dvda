@@ -33,9 +33,9 @@ import Data.IntMap ( Key )
 import Dvda.Dual
 import Dvda.BinUn
 
-import Dvda.Graph ( FunGraph(..), emptyFunGraph, fgReverseLookup, fgGExprFromKey, exprOfGExpr )
+import Dvda.Graph ( FunGraph(..), emptyFunGraph, fgReverseLookup, fgGExprFromKey )
 import Dvda.GExpr ( GExpr(..), gdim )
-import Dvda.Expr ( Expr(..), Dot(..), dim )
+import Dvda.Expr ( Expr(..), FromGExpr, dim, exprOfGExpr )
 import Dvda.HomoDim
 
 -- | take all sub expressions of an Expr and turn them into nodes
@@ -63,10 +63,9 @@ node' (EScale x y) = do
 node' (EDot x y) = do
   xk <- node' x
   yk <- node' y
-  let --shx = homoOfShape $ dim x
-      --shy = homoOfShape $ dim x
-      sh = homoOfShape $ dotDims (dim x) (dim y)
-  insert $ GDot sh xk yk
+  let shx = homoOfShape $ dim x
+      shy = homoOfShape $ dim y
+  insert $ GDot shx shy xk yk
 node' (EDeriv x' arg') = do
   x <- node x'
   arg <- node arg'
@@ -92,7 +91,7 @@ insert gexpr = do
         where
           (_,symMapX) = fromJust $ fgReverseLookup xk fg
           (_,symMapY) = fromJust $ fgReverseLookup yk fg
-      symSet (GDot _ xk yk) = HS.union symMapX symMapY
+      symSet (GDot _ _ xk yk) = HS.union symMapX symMapY
         where
           (_,symMapX) = fromJust $ fgReverseLookup xk fg
           (_,symMapY) = fromJust $ fgReverseLookup yk fg
@@ -107,7 +106,7 @@ insert gexpr = do
                   return k
 
 
-gexprOfExpr :: (Eq a, Floating a, Hashable a, Unbox a, Shape sh) =>
+gexprOfExpr :: (Eq a, Floating a, Hashable a, Unbox a, Shape sh, FromGExpr sh) =>
                Expr sh a -> StateT (FunGraph a b c) Identity (GExpr a)
 gexprOfExpr expr = do
   k <- node' expr
@@ -115,7 +114,7 @@ gexprOfExpr expr = do
   return (fromJust $ fgGExprFromKey k fg)
   
 -- gradient of expression w.r.t. list of args
-rad :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh) => 
+rad :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh, FromGExpr sh) => 
        Expr sh a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [Expr sh a]
 rad expr_ args_ = do
   expr <- gexprOfExpr expr_
@@ -153,7 +152,7 @@ lookupSymSet k = do
   return symSet
 
 
-getSensitivities :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh) => 
+getSensitivities :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh, FromGExpr sh) => 
                      HS.HashSet (GExpr a) -> GExpr a -> Expr sh a ->
                      StateT (FunGraph a b c) Identity (HM.HashMap (GExpr a) Key)
 getSensitivities _ (GSingleton _ _) _ = return HM.empty
@@ -194,7 +193,7 @@ getSensitivities args (GBinary _ op gk hk) sens = do
                 0 -> return HM.empty
                 _ -> getSensitivities args h' (sens*dfdh)
   unionWithPlus gsens hsens
-getSensitivities args (GDot _ gk hk) sens = do
+getSensitivities args (GDot _ _ gk hk) sens = do
   symSetG <- lookupSymSet gk
   symSetH <- lookupSymSet hk
   

@@ -3,7 +3,6 @@
 module Dvda.Graph ( FunGraph(..)
                   , FgNode
                   , SymSet
-                  , exprOfGExpr
                   , emptyFunGraph
                   , fgLookup
                   , fgReverseLookup
@@ -28,7 +27,6 @@ import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 
-import Dvda.Expr ( exprOfGExpr )
 import Dvda.GExpr ( GExpr(..), getChildren )
 
 type SymSet a = HS.HashSet (GExpr a)

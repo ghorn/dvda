@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Dvda.GExpr ( GExpr(..)
-                  , gdim
                   , getChildren
+                  , gdim
                   ) where
 
 import Data.IntMap ( Key )
@@ -12,14 +12,24 @@ import Data.GraphViz ( Labellable, toLabelValue )
 
 import Dvda.BinUn ( BinOp, UnOp, isCommutative )
 import Dvda.HomoDim
+import Dvda.Dot
 
 data GExpr a = GBinary HomoDim BinOp Key Key
              | GUnary HomoDim UnOp Key
              | GSym HomoDim String
              | GSingleton HomoDim a
              | GScale HomoDim Key Key
-             | GDot HomoDim Key Key
+             | GDot HomoDim HomoDim Key Key
              | GConst HomoDim (V.Vector a) deriving (Show, Eq)
+
+gdim :: GExpr a -> HomoDim
+gdim (GBinary sh _ _ _) = sh
+gdim (GUnary sh _ _) = sh
+gdim (GSym sh _) = sh
+gdim (GSingleton sh _) = sh
+gdim (GScale sh _ _) = sh
+gdim (GDot shx shy _ _) = dotDims shx shy
+gdim (GConst sh _) = sh
 
 instance (V.Unbox a, Hashable a) => Hashable (GExpr a) where
   -- if the binary operator is commutative then always put the lesser hash first
@@ -36,7 +46,7 @@ instance (V.Unbox a, Hashable a) => Hashable (GExpr a) where
   hash (GSym sh name)     = 26 `combine` hash sh `combine` hash name
   hash (GSingleton sh x)  = 27 `combine` hash sh `combine` hash x
   hash (GScale _ k1 k2)   = 28 `combine` hash k1 `combine` hash k2
-  hash (GDot _ k1 k2)     = 29 `combine` hash k1 `combine` hash k2
+  hash (GDot _ _ k1 k2)   = 29 `combine` hash k1 `combine` hash k2
   hash (GConst sh v)      = V.foldl (\acc x -> acc `combine` hash x) (30 `combine` hash sh) v
 
 
@@ -47,18 +57,9 @@ instance Show a => Labellable (GExpr a) where
   toLabelValue (GSym (HomoDim sh) name) = toLabelValue $ name ++ "{" ++ (tail . init . show . reverse) sh ++ "}"
   toLabelValue (GSingleton _ x)   = toLabelValue $ show x
   toLabelValue (GScale _ _ _)     = toLabelValue "scale"
-  toLabelValue (GDot _ _ _)       = toLabelValue "dot"
+  toLabelValue (GDot _ _ _ _)     = toLabelValue "dot"
   toLabelValue (GConst _ _)       = toLabelValue "const"
 
-
-gdim :: GExpr a -> HomoDim
-gdim (GBinary sh _ _ _) = sh
-gdim (GUnary sh _ _) = sh
-gdim (GSym sh _) = sh
-gdim (GSingleton sh _) = sh
-gdim (GScale sh _ _) = sh
-gdim (GDot sh _ _) = sh
-gdim (GConst sh _) = sh
 
 getChildren :: GExpr a -> [Int]
 getChildren (GBinary _ _ k1 k2) = [k1,k2]
@@ -66,5 +67,5 @@ getChildren (GUnary _ _ k) = [k]
 getChildren (GSym _ _ ) = []
 getChildren (GSingleton _ _) = []
 getChildren (GScale _ k1 k2) = [k1,k2]
-getChildren (GDot _ k1 k2) = [k1,k2]
+getChildren (GDot _ _ k1 k2) = [k1,k2]
 getChildren (GConst _ _) = []
