@@ -82,6 +82,7 @@ Library
 
   Ghc-options:       -O2 -Wall
 --  Ghc-options:       -O2 -Wall -threaded
+  GHC-Prof-Options: -prof -fprof-auto
 
 
 Executable stressTest
@@ -94,4 +95,4 @@ Executable stressTest
 
   Ghc-Options: -O2
 
-  GHC-Prof-Options: -auto-all -caf-all -rtsopts
+  GHC-Prof-Options: -prof -fprof-auto

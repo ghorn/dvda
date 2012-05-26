@@ -1,8 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language GADTs #-}
-{-# Language FlexibleContexts #-}
 {-# Language TypeOperators #-}
-{-# Language TypeFamilies #-}
 
 module Dvda.Examples ( exampleFun
                      , run
@@ -84,7 +81,10 @@ showoff = do
             z' = sym "z"
 
             f0 x y z = (z + x*y)*log(cos x / tanh y)**(z/exp y)
-            f = f0 (f0 x' y' z') (f0 z' y' x') (f0 y' x' z')
+            fx0 = f0 (f0 x' y' z') (f0 z' y' x') (f0 y' x' z')
+            fy0 = f0 (f0 z' x' y') (f0 x' z' y') (f0 z' z' y')
+            fz0 = f0 (f0 x' y' z') (f0 x' y' x') (f0 y' x' y')
+            f = f0 fx0 fy0 fz0
             
             fx = diff f x'
             fy = diff f y'
@@ -94,4 +94,5 @@ showoff = do
         outputs_ (f :* fx :* fy :* fz)
 
   putStrLn $ showCollisions gr
-  previewGraph gr
+--  putStrLn $ funGraphSummary' gr
+--  previewGraph gr
