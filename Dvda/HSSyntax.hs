@@ -1,20 +1,17 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language GADTs #-}
-{-# Language FlexibleContexts #-}
-{-# Language TypeOperators #-}
-{-# Language TypeFamilies #-}
 
-module Dvda.Codegen.HSSyntax ( writeHSSource
-                             ) where
+module Dvda.HSSyntax ( writeHSSource
+                     ) where
 
+import Data.IntMap ( Key )
+import Data.List ( intersperse )
 import qualified Data.Vector.Unboxed as V
 import qualified Data.IntMap as IM
---import Data.Maybe ( fromJust )
-import Data.List ( intersperse )
 import qualified Data.Text.Lazy as T
 
-import Dvda.Graph
-import Dvda.BinUn
+import Dvda.GExpr ( GExpr(..) )
+import Dvda.Graph ( FunGraph(..) )
+import Dvda.BinUn ( BinOp(..), UnOp(..) )
 import qualified Dvda.Config as Config
 
 
@@ -51,11 +48,11 @@ hUnary ATanh  = "atanh"
 hUnary ACosh  = "acosh"
 
 pretty :: (Show a, V.Unbox a) => (Int, GExpr a) -> String
-pretty (_, (GBinary op kx ky)) = hBinary op ++ " " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
-pretty (_, (GUnary op kx)) = hUnary op ++ " " ++ Config.nameHSVar kx
+pretty (_, (GBinary _ op kx ky)) = hBinary op ++ " " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
+pretty (_, (GUnary _ op kx)) = hUnary op ++ " " ++ Config.nameHSVar kx
 pretty (_, (GSingleton _ x)) = show x
-pretty (_, (GScale kx ky)) = "scale " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
-pretty (_, (GDot kx ky)) = "dot " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
+pretty (_, (GScale _ kx ky)) = "scale " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
+pretty (_, (GDot _ _ kx ky)) = "dot " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
 --pretty (k, (GConst _ vec)) = Config.nameHSConst k
 pretty (_, (GConst _ vec)) = show vec -- Config.nameHSConst k
 pretty (_, (GSym _ _)) = error "GSym shouldn't be handled here"

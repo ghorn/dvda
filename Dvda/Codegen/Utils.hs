@@ -62,5 +62,3 @@ shortName full
     maxN = firstN + lastN
 
     (name, extension) = break (== '.') $ reverse $ takeWhile (/= '/') (reverse full)
-
-

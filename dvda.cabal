@@ -12,20 +12,22 @@ Cabal-version:       >= 1.6
 Description: {
 DVDA Verifiably Differentiates Algorithmically
 .
-This library provides a symbolic type `Numeric.Dvda.Expr.Expr` which is
+This library provides a symbolic type `Dvda.Expr.Expr` which is
 manipulated mathematically through its Num\/Fractional\/Floating instances.
-Expr can be a scalar, vector, or matrix. For ease of writing equations,
-binary operations (adding\/multiplying\/etc) on a (scalar, vector) or (scalar, matrix)
-automatically operates elementwise.
+Expr can be a scalar, vector, or matrix. Binary operations (adding\/multiplying\/etc)
+are all elementwise.
 .
-Trying to add a vector to a matrix will cause a runtime exception. Dimensions are 
-checked at runtime when adding\/multiplying\/etc vector to vector or matrix to matrix.
+Matrix/vector/scalar compatability is enforced at compile time
 .
 Automatic differentiation functions can be called on `Numeric.Dvda.Expr.Expr`s.
 .
 C-code can be automatically generated, compiled, linked, and called at runtime.
 .
 Pretty graphviz plots!
+.
+If the runtime JIT stuff works in terminal ghci but not emacs haskell-mode, you may need to add
+`(setenv "PATH" (concatenate 'string (getenv "PATH") ":/usr/local/bin"))`
+to your .emacs file
 }
 
 source-repository head
@@ -40,19 +42,22 @@ Flag stressTest
 Library
   Exposed-modules:   Dvda
                      Dvda.BinUn
-                     Dvda.Expr
-                     Dvda.Graph
-                     Dvda.SymMonad
+                     Dvda.Config
+                     Dvda.Dot
                      Dvda.Dual
                      Dvda.Examples
-                     Dvda.Config
+                     Dvda.Expr
+                     Dvda.GExpr
+                     Dvda.Graph
+                     Dvda.HSBuilder
+                     Dvda.HSSyntax
+                     Dvda.HomoDim
+                     Dvda.SymMonad
 --                     Dvda.CFunction
-                     Dvda.Codegen.CBuilder
+--                     Dvda.Codegen.CBuilder
 --                     Dvda.Codegen.CCallWrapper
-                     Dvda.Codegen.CSyntax
-                     Dvda.Codegen.Utils
-                     Dvda.Codegen.HSSyntax
-                     Dvda.Codegen.HSBuilder
+--                     Dvda.Codegen.CSyntax
+--                     Dvda.Codegen.Utils
 
   Other-modules:     
 
@@ -69,7 +74,8 @@ Library
                      process >= 1.1 && < 1.2,
                      text >= 0.11 && < 0.12,
                      transformers >= 0.2 && < 0.3,
-                     plugins >= 1.5 && < 1.6
+                     plugins >= 1.5 && < 1.6,
+                     deepseq >= 1.3 && < 1.4
 --                     unix
 --                     text,
 --                     QuickCheck,
