@@ -70,6 +70,11 @@ node' (EDeriv x' arg') = do
   arg <- node arg'
   outs <- rad x [arg]
   node' (head outs)
+node' (EGrad x' arg') = do
+  x <- node x'
+  arg <- node arg'
+  outs <- rad x [arg]
+  node' (head outs)
 
 
 -- | Try to insert the GExpr into the hashmap performing CSE.
@@ -113,8 +118,8 @@ gexprOfExpr expr = do
   return (fromJust $ fgGExprFromKey k fg)
   
 -- gradient of expression w.r.t. list of args
-rad :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh, FromGExpr sh) => 
-       Expr sh a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [Expr sh a]
+rad :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh, FromGExpr sh, Shape sh0, FromGExpr sh0) => 
+       Expr sh0 a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [Expr sh a]
 rad expr_ args_ = do
   expr <- gexprOfExpr expr_
   args <- mapM gexprOfExpr args_
