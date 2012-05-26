@@ -56,9 +56,9 @@ instance Show a => Labellable (GExpr a) where
   toLabelValue (GSym (HomoDim []) name) = toLabelValue name
   toLabelValue (GSym (HomoDim sh) name) = toLabelValue $ name ++ "{" ++ (tail . init . show . reverse) sh ++ "}"
   toLabelValue (GSingleton _ x)   = toLabelValue $ show x
-  toLabelValue (GScale _ _ _)     = toLabelValue "scale"
-  toLabelValue (GDot _ _ _ _)     = toLabelValue "dot"
-  toLabelValue (GConst _ _)       = toLabelValue "const"
+  toLabelValue (GScale {})        = toLabelValue "scale"
+  toLabelValue (GDot {})          = toLabelValue "dot"
+  toLabelValue (GConst {})        = toLabelValue "const"
 
 
 getChildren :: GExpr a -> [Int]

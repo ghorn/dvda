@@ -81,15 +81,15 @@ insert gexpr = do
       symSet (GSingleton _ _)    = HS.empty
       symSet (GConst _ _)        = HS.empty
       symSet (GUnary _ _ k)      = snd $ fromJust $ fgReverseLookup k fg
-      symSet (GBinary _ _ xk yk) = HS.union symMapX symMapY
+      symSet (GBinary _ _ xk yk) = symMapX `HS.union` symMapY
         where
           (_,symMapX) = fromJust $ fgReverseLookup xk fg
           (_,symMapY) = fromJust $ fgReverseLookup yk fg
-      symSet (GScale _ xk yk) = HS.union symMapX symMapY
+      symSet (GScale _ xk yk) = symMapX `HS.union` symMapY
         where
           (_,symMapX) = fromJust $ fgReverseLookup xk fg
           (_,symMapY) = fromJust $ fgReverseLookup yk fg
-      symSet (GDot _ _ xk yk) = HS.union symMapX symMapY
+      symSet (GDot _ _ xk yk) = symMapX `HS.union` symMapY
         where
           (_,symMapX) = fromJust $ fgReverseLookup xk fg
           (_,symMapY) = fromJust $ fgReverseLookup yk fg
@@ -122,7 +122,7 @@ rad expr_ args_ = do
   -- order inputs requested by user
   let orderedSensitivities = map (\x -> fromJust $ HM.lookup x sensitivities) args
       argDims = map dim args_
-  return $ zipWith (\sh k -> ERef sh k) argDims orderedSensitivities
+  return $ zipWith ERef argDims orderedSensitivities
 
 
 -- combine two (GExpr, Key) hashmaps
@@ -135,7 +135,7 @@ unionWithPlus xs ys = foldM addCommon union0 commonGExprs
     -- the gexprs that occur in both maps
     commonGExprs = HM.keys $ HM.intersection xs ys
     -- the initial union that needs conflicts fixed
-    union0 = HM.union xs ys
+    union0 = xs `HM.union` ys
     addCommon hm commonGExpr = do
       let xsensk = fromJust $ HM.lookup commonGExpr xs
           ysensk = fromJust $ HM.lookup commonGExpr ys
@@ -155,17 +155,16 @@ getSensitivities :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh, FromGExpr 
                      StateT (FunGraph a b c) Identity (HM.HashMap (GExpr a) Key)
 getSensitivities _ (GSingleton _ _) _ = return HM.empty
 getSensitivities _ (GConst _ _) _ = return HM.empty
-getSensitivities args primal@(GSym _ _) sens = case HS.member primal args of
+getSensitivities args primal@(GSym _ _) sens = if HS.member primal args then do
+  k <- node' sens
+  return $ HM.fromList [(primal, k)]
   -- don't backprop if there aren't any interesting symbols farther in the tree
-  False -> return HM.empty
-  True -> do
-    k <- node' sens
-    return $ HM.fromList [(primal, k)]
+  else return HM.empty
 getSensitivities args (GUnary _ op gk) sens = do
   symSetG <- lookupSymSet gk
   case HS.size (HS.intersection args symSetG) of
     -- don't backprop if there aren't any interesting symbols farther in the tree
-    0 -> return $ HM.empty
+    0 -> return HM.empty
     _ -> do
       fg <- get
       let g' = fromJust $ fgGExprFromKey gk fg
@@ -246,12 +245,12 @@ class HList a where
 
 instance (HList a, HList b, NumT a ~ NumT b) => HList (a :* b) where
   type NumT (a :* b) = NumT a
-  type DimT (a :* b) = (DimT a) :* (DimT b)
+  type DimT (a :* b) = DimT a :* DimT b
   mkNodes (x :* y) = do
     (exs,kxs) <- mkNodes x
     (eys,kys) <- mkNodes y
     return (exs :* eys, kxs++kys)
-  getHDim (x :* y) = (getHDim x) :* (getHDim y)
+  getHDim (x :* y) = getHDim x :* getHDim y
 
 instance (Shape sh, Hashable a, Unbox a, Eq a, Floating a) => HList (Expr sh a) where
   type NumT (Expr sh a) = a

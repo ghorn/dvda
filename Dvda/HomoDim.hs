@@ -23,7 +23,7 @@ instance Hashable HomoDim where
 instance Shape HomoDim where
   listOfShape (HomoDim xs) = xs
   shapeOfList = HomoDim
-  deepSeq xs y = (listOfShape xs) `deepseq` y
+  deepSeq xs y = listOfShape xs `deepseq` y
   rank = length . listOfShape
   size = product . listOfShape
   zeroDim = shapeOfList []

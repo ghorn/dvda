@@ -77,7 +77,7 @@ funGraphSummary' (FunGraph hm im (b,bkeys) (c,ckeys)) =
                  ]
 
 collisions :: (Hashable a, V.Unbox a) => FunGraph a b c -> (Int, Int, Double)
-collisions (FunGraph gr _ _ _) = (numCollisions, numTotal, (fromIntegral numCollisions)/(fromIntegral numTotal))
+collisions (FunGraph gr _ _ _) = (numCollisions, numTotal, fromIntegral numCollisions / fromIntegral numTotal)
   where
     allHashes = sort $ map (hash . fst) $ HM.toList gr
     numTotal = length allHashes

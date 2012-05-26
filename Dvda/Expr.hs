@@ -66,7 +66,7 @@ dim (EDot x y) = dotDims (dim x) (dim y)
 dim (ERef sh _) = sh
 dim (EDeriv _ _) = Z
 dim (EGrad _ args) = dim args
-dim (EJacob x args) = Z :. (head $ listOfShape (dim x)) :. (head $ listOfShape (dim args))
+dim (EJacob x args) = Z :. head (listOfShape (dim x)) :. head (listOfShape (dim args))
 
 exprOfGExpr :: (Shape sh, V.Unbox a, FromGExpr sh) => GExpr a -> Expr sh a
 exprOfGExpr (GBinary sh' op kx ky) = EBinary op (ERef sh kx) (ERef sh ky)

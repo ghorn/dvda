@@ -18,7 +18,7 @@ instance Num a => Num (Dual a) where
   (Dual x x') + (Dual y y') = Dual (x + y) (x' + y')
   (Dual x x') - (Dual y y') = Dual (x - y) (x' - y')
   negate (Dual x x') = Dual (-x) (-x')
-  abs (Dual x x') = Dual (abs x) ((signum x)*x')
+  abs (Dual x x') = Dual (abs x) (signum x * x')
   signum (Dual x _) = Dual (signum x) 0 -- technically this should be a dirac delta
   fromInteger x = Dual (fromInteger x) 0
   
