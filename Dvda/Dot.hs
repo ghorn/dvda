@@ -11,6 +11,7 @@ import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape, shapeO
 
 import Dvda.HomoDim ( HomoDim(..), homoOfShape ) 
 
+
 class (Shape sh1, Shape sh2, Shape (DotT sh1 sh2)) => Dot sh1 sh2 where
   type DotT sh1 sh2
   dotDims :: sh1 -> sh2 -> DotT sh1 sh2

@@ -27,9 +27,9 @@ import qualified Data.Vector.Unboxed as V
 import Data.IntMap ( Key )
 
 import Dvda.Dot ( Dot(..), dotDims )
-import Dvda.BinUn
-import Dvda.GExpr
-import Dvda.HomoDim
+import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary )
+import Dvda.GExpr ( GExpr(..) )
+import Dvda.HomoDim ( HomoDim, shapeOfHomo )
 
 showShapeR :: Shape sh => sh -> String
 showShapeR = show . reverse . listOfShape

@@ -7,7 +7,7 @@
 module Dvda.Dual ( Dual(..)
                  ) where
 
-import Data.Ratio(numerator, denominator)
+import Data.Ratio ( numerator, denominator )
 
 data Dual a = Dual { dualPrimal :: a
                    , dualPerturbation :: a

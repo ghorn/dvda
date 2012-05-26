@@ -11,9 +11,9 @@ module Dvda.BinUn ( BinOp(..)
                   , isCommutative
                   ) where
 
-import Data.Hashable(Hashable,hash)
+import Data.Hashable ( Hashable, hash )
 
-import Dvda.Dual
+import Dvda.Dual ( Dual(..), dualPerturbation )
 
 data UnOp = Abs
           | Neg

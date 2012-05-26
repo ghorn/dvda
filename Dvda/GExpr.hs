@@ -6,13 +6,13 @@ module Dvda.GExpr ( GExpr(..)
                   ) where
 
 import Data.IntMap ( Key )
-import qualified Data.Vector.Unboxed as V
 import Data.Hashable ( Hashable, hash, combine )
 import Data.GraphViz ( Labellable, toLabelValue )
+import qualified Data.Vector.Unboxed as V
 
 import Dvda.BinUn ( BinOp, UnOp, isCommutative )
-import Dvda.HomoDim
-import Dvda.Dot
+import Dvda.HomoDim ( HomoDim(..) )
+import Dvda.Dot ( dotDims )
 
 data GExpr a = GBinary HomoDim BinOp Key Key
              | GUnary HomoDim UnOp Key

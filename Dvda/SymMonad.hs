@@ -24,19 +24,17 @@ import Data.Array.Repa ( Shape )
 import Data.Hashable ( Hashable )
 import Data.Vector.Unboxed ( Unbox )
 import Data.Maybe ( fromJust )
-
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import qualified Data.IntMap as IM
 import Data.IntMap ( Key )
 
-import Dvda.Dual
-import Dvda.BinUn
-
+import Dvda.Dual ( Dual(..), dualPerturbation )
+import Dvda.BinUn ( BinOp(..), applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), emptyFunGraph, fgReverseLookup, fgGExprFromKey )
 import Dvda.GExpr ( GExpr(..), gdim )
 import Dvda.Expr ( Expr(..), FromGExpr, dim, exprOfGExpr )
-import Dvda.HomoDim
+import Dvda.HomoDim ( homoOfShape )
 
 -- | take all sub expressions of an Expr and turn them into nodes
 --   return an Expr that is just a ref
