@@ -188,6 +188,7 @@ instance (Shape sh, Num a, Eq a) => Num (Expr sh a) where
   abs = makeUnary Abs abs
   signum = makeUnary Signum signum
   fromInteger = EDimensionless . fromInteger
+  negate = makeUnary Neg negate
 
 instance (Shape sh, Fractional a, Eq a) => Fractional (Expr sh a) where
   (/) = makeBinary Div (/)
