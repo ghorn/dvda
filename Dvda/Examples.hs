@@ -7,6 +7,7 @@
 module Dvda.Examples ( exampleFun
                      , run
                      , run'
+                     , showoff
                      ) where
 
 import Control.Monad.State (State)
@@ -16,7 +17,6 @@ import Dvda.SymMonad
 import Dvda.Expr
 import Dvda.Graph
 --import Dvda.CFunction
-
 
 exampleFun :: State (FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)) ()
 exampleFun = do
@@ -73,4 +73,25 @@ run = do
   putStrLn $ funGraphSummary gr
   putStrLn "-------------------------------------------"
   putStrLn $ funGraphSummary' gr
+  previewGraph gr
+
+showoff :: IO ()
+showoff = do
+  let gr :: FunGraph Double (DIM0 :* DIM0 :* DIM0) (DIM0 :* DIM0 :* DIM0 :* DIM0)
+      gr@(FunGraph {}) = snd $ makeFun $ do
+        let x' = sym "x"
+            y' = sym "y"
+            z' = sym "z"
+
+            f0 x y z = (z + x*y)*log(cos x / tanh y)**(z/exp y)
+            f = f0 (f0 x' y' z') (f0 z' y' x') (f0 y' x' z')
+            
+            fx = diff f x'
+            fy = diff f y'
+            fz = diff f z'
+
+        inputs_ (x' :* y' :* z')
+        outputs_ (f :* fx :* fy :* fz)
+
+  putStrLn $ showCollisions gr
   previewGraph gr

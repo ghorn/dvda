@@ -17,7 +17,7 @@ module Dvda.SymMonad ( (:*)(..)
                      , getSensitivities
                      ) where
 
-import Control.Monad ( foldM )
+import Control.Monad ( foldM, zipWithM )
 import Control.Monad.State ( MonadState, StateT, get, put, liftM, runState )
 import Data.Functor.Identity ( Identity )
 import Data.Array.Repa ( Shape )
@@ -28,6 +28,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import qualified Data.IntMap as IM
 import Data.IntMap ( Key )
+import Debug.Trace ( trace )
 
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( BinOp(..), applyUnary, applyBinary )
@@ -120,8 +121,12 @@ rad expr_ args_ = do
   let argSet = HS.fromList args
   sensitivities <- getSensitivities argSet expr (ESingleton (dim expr_) 1)
   -- order inputs requested by user
-  let orderedSensitivities = map (\x -> fromJust $ HM.lookup x sensitivities) args
+  let getSens x argDim = case HM.lookup x sensitivities of
+        Just sens -> return sens
+        Nothing -> trace "WARNING: taking deriviative df/dx where f is not a function of x (inserting 0 in graph)" $
+                   node' (ESingleton argDim 0)
       argDims = map dim args_
+  orderedSensitivities <- zipWithM getSens args argDims
   return $ zipWith ERef argDims orderedSensitivities
 
 
