@@ -95,9 +95,9 @@ data Expr sh a where
   EDot :: Dot sh1 sh2 => Expr sh1 a -> Expr sh2 a -> Expr (DotT sh1 sh2) a
   ERef :: sh -> Int -> Expr sh a
 
-  EDeriv :: sh ~ DIM0 => Expr DIM0 a -> Expr DIM0 a -> Expr sh a
-  EGrad  :: sh ~ DIM1 => Expr DIM0 a -> Expr DIM1 a -> Expr sh a
-  EJacob :: sh ~ DIM2 => Expr DIM1 a -> Expr DIM1 a -> Expr sh a
+  EDeriv :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
+  EGrad  :: Expr DIM0 a -> Expr DIM1 a -> Expr DIM1 a
+  EJacob :: Expr DIM1 a -> Expr DIM1 a -> Expr DIM2 a
 
 isVal :: Eq a => a -> Expr sh a -> Bool
 isVal x (EDimensionless y) = x == y
