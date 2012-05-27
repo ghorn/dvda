@@ -8,7 +8,6 @@ module Dvda.Examples ( exampleFun
                      ) where
 
 import Control.Monad.State (State)
-import Data.Array.Repa (DIM0,DIM1,DIM2)
 
 import Dvda
 import Dvda.Graph ( FunGraph(..) )

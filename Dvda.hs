@@ -36,6 +36,10 @@ module Dvda ( -- * primitives
               -- * Heterogenous inputs/outputs
             , (:*)(..)
             , Exprs
+              -- * re-export from repa
+            , DIM0
+            , DIM1
+            , DIM2
             ) where
 
 import Dvda.Expr
@@ -43,4 +47,5 @@ import Dvda.Graph
 import Dvda.HSBuilder
 import Dvda.SymMonad
 
+import Data.Array.Repa (DIM0,DIM1,DIM2)
 
