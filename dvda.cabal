@@ -5,25 +5,25 @@ License-file:        LICENSE
 Author:              Greg Horn
 Maintainer:          gregmainland@gmail.edu
 Stability:           Experimental
-Category:            Math
+Category:            Numerical, Math
 Build-type:          Simple
 Synopsis:            Efficient automatic differentiation
 Cabal-version:       >= 1.6
 Description: {
-DVDA Verifiably Differentiates Algorithmically
+dvda == DVDA Verifiably Differentiates Algorithmically
 .
 This library provides a symbolic type `Dvda.Expr` which is
 manipulated mathematically through its Num\/Fractional\/Floating instances.
 Expr can be a scalar, vector, or matrix. Binary operations (adding\/multiplying\/etc)
 are all elementwise.
 .
-Matrix/vector/scalar compatability is enforced at compile time
+Matrix/vector/scalar safety is enforced at compile time
 .
 
 Efficient derivatives can be computed. Internally reverse automatic differentiation
 is performed including efficient common subexpression elimination.
 .
-Function graphs can be JIT compiled into efficienty functions using "buildHSFunction".
+Function graphs can be JIT compiled into efficient functions using "buildHSFunction".
 This is the intended way to use this library.
 .
 Pretty graphviz plots!
