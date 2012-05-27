@@ -7,27 +7,29 @@ Maintainer:          gregmainland@gmail.edu
 Stability:           Experimental
 Category:            Math
 Build-type:          Simple
-Synopsis:            Automatic differentiation on symbolic expression trees.
+Synopsis:            Efficient automatic differentiation
 Cabal-version:       >= 1.6
 Description: {
 DVDA Verifiably Differentiates Algorithmically
 .
-This library provides a symbolic type `Dvda.Expr.Expr` which is
+This library provides a symbolic type `Dvda.Expr` which is
 manipulated mathematically through its Num\/Fractional\/Floating instances.
 Expr can be a scalar, vector, or matrix. Binary operations (adding\/multiplying\/etc)
 are all elementwise.
 .
 Matrix/vector/scalar compatability is enforced at compile time
 .
-Automatic differentiation functions can be called on `Numeric.Dvda.Expr.Expr`s.
+
+Efficient derivatives can be computed. Internally reverse automatic differentiation
+is performed including efficient common subexpression elimination.
 .
-C-code can be automatically generated, compiled, linked, and called at runtime.
+Function graphs can be JIT compiled into efficienty functions using "buildHSFunction".
+This is the intended way to use this library.
 .
 Pretty graphviz plots!
 .
 If the runtime JIT stuff works in terminal ghci but not emacs haskell-mode, you may need to add
-`(setenv "PATH" (concatenate 'string (getenv "PATH") ":/usr/local/bin"))`
-to your .emacs file
+`(setenv "PATH" (concatenate 'string (getenv "PATH") ":/usr/local/bin"))` to your .emacs file
 }
 
 source-repository head
@@ -85,14 +87,14 @@ Library
   GHC-Prof-Options: -prof -fprof-auto
 
 
-Executable stressTest
-  if flag(stressTest)
-     Buildable: True
-  else
-     Buildable: False
-
-  Main-Is:           StressTest.hs
-
-  Ghc-Options: -O2
-
-  GHC-Prof-Options: -prof -fprof-auto
+-- Executable stressTest
+--   if flag(stressTest)
+--      Buildable: True
+--   else
+--      Buildable: False
+-- 
+--   Main-Is:           StressTest.hs
+-- 
+--   Ghc-Options: -O2
+-- 
+--   GHC-Prof-Options: -prof -fprof-auto

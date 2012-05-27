@@ -10,9 +10,8 @@ module Dvda.Examples ( exampleFun
 import Control.Monad.State (State)
 import Data.Array.Repa (DIM0,DIM1,DIM2)
 
-import Dvda.SymMonad
-import Dvda.Expr
-import Dvda.Graph
+import Dvda
+import Dvda.Graph ( FunGraph(..) )
 
 exampleFun :: State (FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)) ()
 exampleFun = do

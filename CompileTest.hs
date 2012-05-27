@@ -6,11 +6,7 @@
 
 import Data.Array.Repa (DIM0,DIM1,DIM2)
 
-import Dvda.SymMonad ( (:*)(..), makeFunGraph, runFunGraph, inputs_, outputs_, node )
-import Dvda.Expr
-import Dvda.Graph
-import Dvda.HSBuilder
---import Dvda.Codegen.CBuilder
+import Dvda
 
 gr' :: FunGraph Double (DIM0 :* DIM0 :* DIM0) (DIM0 :* DIM0 :* DIM0 :* DIM0)
 gr' = makeFunGraph (x' :* y' :* z') (f :* fx :* fy :* fz)

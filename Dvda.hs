@@ -7,14 +7,40 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-module Dvda ( -- * Core API
-              module Dvda.SymMonad
-              -- * Tensor Expression
-            , module Dvda.Expr
-              -- * Differentiation rules
-            , module Dvda.Dual
+module Dvda ( -- * primitives
+              sym
+            , vsym
+            , msym
+            , vec
+            , mat
+              -- * operations
+            , scale
+            , dot
+            , diff
+              -- * symbolic expression type
+            , Expr
+              -- * construct FunGraphs
+            , FunGraph
+            , makeFunGraph
+            , runFunGraph
+            , inputs_
+            , outputs_
+            , node
+              -- * show/summarize FunGraphs
+            , funGraphSummary
+            , funGraphSummary'
+            , showCollisions
+            , previewGraph
+              -- * compile and link function
+            , buildHSFunction
+              -- * Heterogenous inputs/outputs
+            , (:*)(..)
+            , Exprs
             ) where
 
-import Dvda.SymMonad
 import Dvda.Expr
-import Dvda.Dual
+import Dvda.Graph
+import Dvda.HSBuilder
+import Dvda.SymMonad
+
+
