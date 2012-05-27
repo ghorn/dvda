@@ -26,31 +26,36 @@ import Control.Monad.State ( MonadState, StateT, get, put, liftM, runState )
 import Data.Functor.Identity ( Identity )
 import Data.Array.Repa ( Shape, Z, (:.) )
 import Data.Hashable ( Hashable )
-import Data.Vector.Unboxed ( Unbox )
 import Data.Maybe ( fromJust )
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import qualified Data.IntMap as IM
 import Data.IntMap ( Key )
+import Numeric.LinearAlgebra ( Element, Vector )
+import qualified Numeric.LinearAlgebra as LA
 import Debug.Trace ( trace )
 
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( BinOp(..), applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), emptyFunGraph, fgReverseLookup, fgGExprFromKey )
 import Dvda.GExpr ( GExpr(..), gdim )
-import Dvda.Expr ( Expr(..), FromGExpr, dim, exprOfGExpr )
+import Dvda.Expr ( Expr(..), Const(..), FromGExpr, dim, exprOfGExpr )
 import Dvda.HomoDim ( homoOfShape )
 
 -- | take all sub expressions of an Expr and turn them into nodes
 --   return an Expr that is just a ref
-node :: (Shape sh, Hashable a, Unbox a, Floating a, Eq a) => Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
+node :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, Shape sh) => 
+        Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
 node expr = liftM (ERef (dim expr)) (node' expr)
             
-node' :: (Shape sh, Hashable a, Unbox a, Floating a, Eq a) => Expr sh a -> StateT (FunGraph a b c) Identity Key
+node' :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, Shape sh) => 
+         Expr sh a -> StateT (FunGraph a b c) Identity Key
 node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
 node' (ERef _ k) = return k
 node' (ESym sh name) = insert $ GSym (homoOfShape sh) name
-node' (EConst sh x) = insert $ GConst (homoOfShape sh) x
+node' (EConst (CMat    sh x)) = insert $ GMat    (homoOfShape sh) x
+node' (EConst (CVec    sh x)) = insert $ GVec    (homoOfShape sh) x
+node' (EConst (CTensor sh x)) = insert $ GTensor (homoOfShape sh) x
 node' (ESingleton sh x) = insert $ GSingleton (homoOfShape sh) x
 node' (EUnary op x) = do
   xk <- node' x
@@ -84,12 +89,14 @@ node' (EGrad x' arg') = do
 -- | Try to insert the GExpr into the hashmap performing CSE.
 --   If the GExpr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
-insert :: (Hashable a, Unbox a, Floating a, Eq a) => GExpr a -> StateT (FunGraph a b c) Identity Key
+insert :: (Hashable a, Eq a, Num (Vector a), LA.Container Vector a) => GExpr a -> StateT (FunGraph a b c) Identity Key
 insert gexpr = do
   fg <- get
   let symSet (GSym _ _)          = HS.singleton gexpr
       symSet (GSingleton _ _)    = HS.empty
-      symSet (GConst _ _)        = HS.empty
+      symSet (GVec _ _)          = HS.empty
+      symSet (GMat _ _)          = HS.empty
+      symSet (GTensor _ _)       = HS.empty
       symSet (GUnary _ _ k)      = snd $ fromJust $ fgReverseLookup k fg
       symSet (GBinary _ _ xk yk) = symMapX `HS.union` symMapY
         where
@@ -114,7 +121,7 @@ insert gexpr = do
                   return k
 
 
-gexprOfExpr :: (Eq a, Floating a, Hashable a, Unbox a, Shape sh, FromGExpr sh) =>
+gexprOfExpr :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, Shape sh, FromGExpr sh) =>
                Expr sh a -> StateT (FunGraph a b c) Identity (GExpr a)
 gexprOfExpr expr = do
   k <- node' expr
@@ -122,7 +129,7 @@ gexprOfExpr expr = do
   return (fromJust $ fgGExprFromKey k fg)
   
 -- gradient of expression w.r.t. list of args
-rad :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh, FromGExpr sh, Shape sh0, FromGExpr sh0) => 
+rad :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, Shape sh, Shape sh0, FromGExpr sh, FromGExpr sh0) => 
        Expr sh0 a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [Expr sh a]
 rad expr_ args_ = do
   expr <- gexprOfExpr expr_
@@ -141,7 +148,7 @@ rad expr_ args_ = do
 
 -- combine two (GExpr, Key) hashmaps
 -- if there is a conflict, add the two GExprs together
-unionWithPlus :: (Eq a, Floating a, Hashable a, Unbox a) =>
+unionWithPlus :: (Hashable a, Eq a, Num (Vector a), LA.Container Vector a) => 
                  HM.HashMap (GExpr a) Key -> HM.HashMap (GExpr a) Key ->
                  StateT (FunGraph a b c) Identity (HM.HashMap (GExpr a) Key)
 unionWithPlus xs ys = foldM addCommon union0 commonGExprs
@@ -157,18 +164,20 @@ unionWithPlus xs ys = foldM addCommon union0 commonGExprs
       return (HM.insert commonGExpr k hm)
               
 
-lookupSymSet :: (Eq a, Hashable a, Unbox a) => Key -> StateT (FunGraph a b c) Identity (HS.HashSet (GExpr a))
+lookupSymSet :: (Eq a, Hashable a, Element a) => Key -> StateT (FunGraph a b c) Identity (HS.HashSet (GExpr a))
 lookupSymSet k = do
   fg <- get
   let (_,symSet) = fromJust $ fgReverseLookup k fg
   return symSet
 
 
-getSensitivities :: (Eq a, Hashable a, Unbox a, Floating a, Shape sh, FromGExpr sh) => 
+getSensitivities :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, Shape sh, FromGExpr sh) =>
                      HS.HashSet (GExpr a) -> GExpr a -> Expr sh a ->
                      StateT (FunGraph a b c) Identity (HM.HashMap (GExpr a) Key)
 getSensitivities _ (GSingleton _ _) _ = return HM.empty
-getSensitivities _ (GConst _ _) _ = return HM.empty
+getSensitivities _ (GVec _ _) _ = return HM.empty
+getSensitivities _ (GMat _ _) _ = return HM.empty
+getSensitivities _ (GTensor _ _) _ = return HM.empty
 getSensitivities args primal@(GSym _ _) sens = if HS.member primal args then do
   k <- node' sens
   return $ HM.fromList [(primal, k)]
@@ -266,7 +275,8 @@ instance (HList a, HList b, NumT a ~ NumT b) => HList (a :* b) where
     return (exs :* eys, kxs++kys)
   getHDim (x :* y) = getHDim x :* getHDim y
 
-instance (Shape sh, Hashable a, Unbox a, Eq a, Floating a) => HList (Expr sh a) where
+instance (Shape sh, Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) => 
+         HList (Expr sh a) where
   type NumT (Expr sh a) = a
   type DimT (Expr sh a) = sh
   mkNodes expr = do
@@ -316,7 +326,7 @@ instance Shape sh => ExprList (sh :. Int) a where
 runFunGraph :: StateT (FunGraph a b c) Identity d -> FunGraph a b c
 runFunGraph f = snd $ runState f emptyFunGraph
 
---makeFunGraph :: (HList c, HList b, NumT b ~ NumT c, NumT b ~ a, Eq a, Floating a, Hashable a, Unbox a) =>
+--makeFunGraph :: (HList c, HList b, NumT b ~ NumT c, NumT b ~ a, Eq a, Floating a, Hashable a) =>
 makeFunGraph :: (HList c, HList b, NumT b ~ NumT c, NumT b ~ a) =>
                 b -> c -> FunGraph a (DimT b) (DimT c)
 makeFunGraph ins outs = runFunGraph $ do

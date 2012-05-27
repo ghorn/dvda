@@ -8,11 +8,11 @@ module Dvda.HSBuilder ( buildHSFunction
                       ) where
 
 import qualified Data.Hashable as H
-import qualified Data.Vector.Unboxed as V
 import System.Directory
 import Control.Monad(when)
 import qualified System.Plugins.Make as Make
 import qualified System.Plugins.Load as Load
+import Numeric.LinearAlgebra ( Element )
 --import System.Process( runCommand, waitForProcess )
 --import System.Exit( ExitCode(ExitSuccess) )
 
@@ -23,7 +23,7 @@ import qualified Dvda.Config as Config
 
 
 -- | make source functions
-buildHSFunction :: (H.Hashable a, Show a, V.Unbox a, Show b, Show c) =>
+buildHSFunction :: (H.Hashable a, Show a, Element a, Show b, Show c) =>
                    FunGraph a b c -> IO (Exprs b Double -> Exprs c Double)
 buildHSFunction fg = do
   -- source and hash

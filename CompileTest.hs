@@ -46,7 +46,7 @@ main = do
   fun <- buildHSFunction gr
   let x = 0
       y = vec [0,1,2]
-      z = mat (2,3) [0,1,2,3,4,5]
+      z = mat (2,3) [[0,1,2],[3,4,5]]
       answer = fun (x :* y :* z)
   
   print answer

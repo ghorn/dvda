@@ -5,9 +5,9 @@ module Dvda.HSSyntax ( writeHSSource
 
 import Data.IntMap ( Key )
 import Data.List ( intersperse )
-import qualified Data.Vector.Unboxed as V
 import qualified Data.IntMap as IM
 import qualified Data.Text.Lazy as T
+import Numeric.LinearAlgebra ( Element )
 
 import Dvda.GExpr ( GExpr(..) )
 import Dvda.Graph ( FunGraph(..) )
@@ -47,21 +47,23 @@ hUnary ASinh  = "asinh"
 hUnary ATanh  = "atanh"
 hUnary ACosh  = "acosh"
 
-pretty :: (Show a, V.Unbox a) => (Int, GExpr a) -> String
+pretty :: (Show a, Element a) => (Int, GExpr a) -> String
 pretty (_, (GBinary _ op kx ky)) = hBinary op ++ " " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
 pretty (_, (GUnary _ op kx)) = hUnary op ++ " " ++ Config.nameHSVar kx
 pretty (_, (GSingleton _ x)) = show x
 pretty (_, (GScale _ kx ky)) = "scale " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
 pretty (_, (GDot _ _ kx ky)) = "dot " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
 --pretty (k, (GConst _ vec)) = Config.nameHSConst k
-pretty (_, (GConst _ vec)) = show vec -- Config.nameHSConst k
+pretty (_, (GTensor _ x)) = show x -- Config.nameHSConst k
+pretty (_, (GVec _ x)) = show x -- Config.nameHSConst k
+pretty (_, (GMat _ x)) = show x -- Config.nameHSConst k
 pretty (_, (GSym _ _)) = error "GSym shouldn't be handled here"
 
-writeAssignment :: (Show a, V.Unbox a) => (Key, GExpr a) -> String
+writeAssignment :: (Show a, Element a) => (Key, GExpr a) -> String
 writeAssignment (k, gexpr@(GSym _ _)) = "-- " ++ Config.nameHSVar k ++ ": " ++ show gexpr
 writeAssignment (k, gexpr) = sassign k ++ pretty (k,gexpr) ++ " -- " ++ show gexpr
 
-writeHSSource :: (V.Unbox a, Show a, Show b, Show c) => FunGraph a b c -> String -> String
+writeHSSource :: (Show a, Show b, Show c, Element a) => FunGraph a b c -> String -> String
 writeHSSource (FunGraph _ im (insT,ins) (outsT,outs)) hash =
   init $ unlines $
   [ "-- {-# OPTIONS_GHC -Wall #-}"
