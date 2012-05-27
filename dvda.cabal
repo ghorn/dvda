@@ -30,6 +30,8 @@ Pretty graphviz plots!
 .
 If the runtime JIT stuff works in terminal ghci but not emacs haskell-mode, you may need to add
 `(setenv "PATH" (concatenate 'string (getenv "PATH") ":/usr/local/bin"))` to your .emacs file
+.
+To get started look in `Dvda.Examples` or CompileTest.hs in the github repo
 }
 
 source-repository head
@@ -82,7 +84,7 @@ Library
 --                     text,
 --                     QuickCheck,
 
-  Ghc-options:       -O2 -Wall
+  Ghc-options:       -Wall
 --  Ghc-options:       -O2 -Wall -threaded
   GHC-Prof-Options: -prof -fprof-auto
 
