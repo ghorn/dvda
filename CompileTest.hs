@@ -6,21 +6,35 @@
 
 import Data.Array.Repa (DIM0,DIM1,DIM2)
 
-import Dvda.SymMonad ( (:*)(..), makeFun, inputs_, outputs_, node )
+import Dvda.SymMonad ( (:*)(..), makeFunGraph, runFunGraph, inputs_, outputs_, node )
 import Dvda.Expr
 import Dvda.Graph
 import Dvda.HSBuilder
 --import Dvda.Codegen.CBuilder
 
+gr' :: FunGraph Double (DIM0 :* DIM0 :* DIM0) (DIM0 :* DIM0 :* DIM0 :* DIM0)
+gr' = makeFunGraph (x' :* y' :* z') (f :* fx :* fy :* fz)
+  where
+    x' = sym "x"
+    y' = sym "y"
+    z' = sym "z"
+
+    f0 x y z = (z + x*y)*log(cos x / tanh y)**(z/exp y)
+    fx0 = f0 (f0 x' y' z') (f0 z' y' x') (f0 y' x' z')
+    fy0 = f0 (f0 z' x' y') (f0 x' z' y') (f0 z' z' y')
+    fz0 = f0 (f0 x' y' z') (f0 x' y' x') (f0 y' x' y')
+    f = f0 fx0 fy0 fz0
+    
+    fx = diff f x'
+    fy = diff f y'
+    fz = diff f z'
+
 
 gr :: FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)
---gr :: FunGraph Double (DIM0 :* DIM0 :* DIM0) (DIM0 :* DIM0 :* DIM0)
-gr = snd $ makeFun $ do
+gr = runFunGraph $ do
   let x = sym "x"
       y = vsym 3 "y"
---      y = sym "y"
       z = msym (2,3) "Z"
---      z = sym "Z"
   inputs_ (x :* y :* z)
   
   z1 <- node $ (scale x z)**3
@@ -31,8 +45,8 @@ gr = snd $ makeFun $ do
   
   outputs_ (z1 :* z2 :* z3)
 
-main' :: IO ()
-main' = do
+main :: IO ()
+main = do
   fun <- buildHSFunction gr
   let x = 0
       y = vec [0,1,2]
@@ -41,14 +55,11 @@ main' = do
   
   print answer
 
+main' :: IO ()
+main' = do
+  fun <- buildHSFunction gr'
+  let x = 0
+      y = 3
+      z = 6
 
--- main :: IO ()
--- main = do
---   fun <- buildCFunction gr
---   print fun
--- --  let x = 0
--- --      y = vec [0,1,2::Double]
--- --      z = mat (2,3) [0,1,2,3,4,5]
--- --      answer = fun (x :* y :* z)
--- --      
--- --  print answer
+  print $ fun (x :* y :* z)

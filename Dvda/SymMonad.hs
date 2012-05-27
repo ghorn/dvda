@@ -15,7 +15,8 @@ module Dvda.SymMonad ( (:*)(..)
                      , inputs_
                      , outputs
                      , outputs_
-                     , makeFun
+                     , makeFunGraph
+                     , runFunGraph
                      , rad
                      , getSensitivities
                      ) where
@@ -312,5 +313,12 @@ instance Shape sh => ExprList (sh :. Int) a where
 
 
 ---------------- utility function -----------------
-makeFun :: StateT (FunGraph a b c) Identity d -> (d, FunGraph a b c)
-makeFun f = runState f emptyFunGraph
+runFunGraph :: StateT (FunGraph a b c) Identity d -> FunGraph a b c
+runFunGraph f = snd $ runState f emptyFunGraph
+
+--makeFunGraph :: (HList c, HList b, NumT b ~ NumT c, NumT b ~ a, Eq a, Floating a, Hashable a, Unbox a) =>
+makeFunGraph :: (HList c, HList b, NumT b ~ NumT c, NumT b ~ a) =>
+                b -> c -> FunGraph a (DimT b) (DimT c)
+makeFunGraph ins outs = runFunGraph $ do
+  inputs_ ins
+  outputs_ outs
