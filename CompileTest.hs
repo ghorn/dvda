@@ -31,16 +31,12 @@ gr = snd $ makeFun $ do
   
   outputs_ (z1 :* z2 :* z3)
 
-fun' :: IO ( (Expr DIM0 Double :* Expr DIM1 Double :* Expr DIM2 Double) ->
-             (Expr DIM2 Double :* Expr DIM1 Double :* Expr DIM0 Double) )
-fun' = buildHSFunction gr
-
 main' :: IO ()
 main' = do
-  fun <- fun' -- buildHSFunction gr
-  let x = 0 :: Expr DIM0 Double
-      y = vec [0,1,2] :: Expr DIM1 Double -- ::Double]
-      z = mat (2,3) [0,1,2,3,4,5] :: Expr DIM2 Double
+  fun <- buildHSFunction gr
+  let x = 0
+      y = vec [0,1,2]
+      z = mat (2,3) [0,1,2,3,4,5]
       answer = fun (x :* y :* z)
   
   print answer

@@ -3,9 +3,12 @@
 {-# Language FlexibleContexts #-}
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
+{-# Language MultiParamTypeClasses #-}
+{-# Language FlexibleInstances #-}
 
 module Dvda.SymMonad ( (:*)(..)
                      , HList(..)
+                     , Exprs
                      , node
                      , node'
                      , inputs
@@ -20,7 +23,7 @@ module Dvda.SymMonad ( (:*)(..)
 import Control.Monad ( foldM, zipWithM )
 import Control.Monad.State ( MonadState, StateT, get, put, liftM, runState )
 import Data.Functor.Identity ( Identity )
-import Data.Array.Repa ( Shape )
+import Data.Array.Repa ( Shape, Z, (:.) )
 import Data.Hashable ( Hashable )
 import Data.Vector.Unboxed ( Unbox )
 import Data.Maybe ( fromJust )
@@ -293,6 +296,20 @@ outputs_ :: HList c => c -> StateT (FunGraph (NumT c) b (DimT c)) Identity ()
 outputs_ exprs = do
   _ <- outputs exprs
   return ()
+
+--------------------------------------------------------------
+class ExprList sh a where
+  type Exprs sh a
+  
+instance (ExprList sh0 a, ExprList sh1 a) => ExprList (sh0 :* sh1) a where
+  type Exprs (sh0 :* sh1) a = (Exprs sh0 a) :* (Exprs sh1 a)
+      
+instance ExprList Z a where
+  type Exprs Z a = Expr Z a
+
+instance Shape sh => ExprList (sh :. Int) a where
+  type Exprs (sh :. Int) a = Expr (sh :. Int) a
+
 
 ---------------- utility function -----------------
 makeFun :: StateT (FunGraph a b c) Identity d -> (d, FunGraph a b c)
