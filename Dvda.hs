@@ -33,6 +33,8 @@ module Dvda ( -- * primitives
             , previewGraph
               -- * compile and link function
             , buildHSFunction
+            , buildHSFunctionPure
+            , buildHSFunctionFromGraph
               -- * Heterogenous inputs/outputs
             , (:*)(..)
             , Exprs
@@ -40,6 +42,7 @@ module Dvda ( -- * primitives
             , DIM0
             , DIM1
             , DIM2
+            , Z(..)
             ) where
 
 import Dvda.Expr
@@ -47,5 +50,5 @@ import Dvda.Graph
 import Dvda.HSBuilder
 import Dvda.SymMonad
 
-import Data.Array.Repa (DIM0,DIM1,DIM2)
+import Data.Array.Repa (DIM0,DIM1,DIM2,Z(..))
 

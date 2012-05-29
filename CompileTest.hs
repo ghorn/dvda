@@ -20,7 +20,7 @@ main = do
       y' = vsym 3 "y"
       z' = msym (2,3) "Z"
   
-  fun <- buildHSFunction fun0 (x' :* y' :* z')
+  fun <- buildHSFunctionPure fun0 (x' :* y' :* z')
   let x = 0
       y = vec [0,1,2]
       z = mat (2,3) [[0,1,2],[3,4,5]]
@@ -44,7 +44,7 @@ fun1 (x :* y :* z) = f :* fx :* fy :* fz
 
 main' :: IO ()
 main' = do
-  fun <- buildHSFunction fun1 (sym "x" :* sym "y" :* sym "z")
+  fun <- buildHSFunctionPure fun1 (sym "x" :* sym "y" :* sym "z")
   let x = 0
       y = 3
       z = 6

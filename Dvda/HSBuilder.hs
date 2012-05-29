@@ -5,6 +5,7 @@
 {-# Language TypeFamilies #-}
 
 module Dvda.HSBuilder ( buildHSFunction
+                      , buildHSFunctionPure
                       , buildHSFunctionFromGraph
                       ) where
 
@@ -23,14 +24,21 @@ import Dvda.SymMonad ( Exprs, HList(..), makeFunGraph )
 import qualified Dvda.Config as Config
 
 
--- | make source functions
-buildHSFunction :: (Show (DimT b), Show (DimT c), Show (NumT b), Element (NumT b), H.Hashable (NumT b),
-                    HList b, HList c,  NumT c ~ NumT b) =>
-                   (b -> c) -> b -> IO (Exprs (DimT b) Double -> Exprs (DimT c) Double)
-buildHSFunction fg xs = buildHSFunctionFromGraph $ makeFunGraph xs (fg xs)
+-- | take in a pure function and symbolic inputs, return JIT compiled function
+buildHSFunctionPure :: (Show (DimT b), Show (DimT c), Show (NumT b), Element (NumT b), H.Hashable (NumT b),
+                        HList b, HList c,  NumT c ~ NumT b) =>
+                       (b -> c) -> b -> IO (Exprs (DimT b) Double -> Exprs (DimT c) Double)
+buildHSFunctionPure fg xs = buildHSFunction xs (fg xs)
 
 
--- | make source functions
+-- | take in symbolic inputs and outputs, return JIT compiled function
+buildHSFunction :: (Show (DimT c), Show (DimT b), Show (NumT b), H.Hashable (NumT b),
+                    Element (NumT b), HList b, HList c, NumT c ~ NumT b) =>
+                   b -> c -> IO (Exprs (DimT b) Double -> Exprs (DimT c) Double)
+buildHSFunction inputs outputs = buildHSFunctionFromGraph $ makeFunGraph inputs outputs
+
+
+-- | take in FunGraph, return JIT compiled function
 buildHSFunctionFromGraph :: (H.Hashable a, Show a, Element a, Show b, Show c) =>
                             FunGraph a b c -> IO (Exprs b Double -> Exprs c Double)
 buildHSFunctionFromGraph fg = do
