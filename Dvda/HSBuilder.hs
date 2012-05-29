@@ -5,6 +5,7 @@
 {-# Language TypeFamilies #-}
 
 module Dvda.HSBuilder ( buildHSFunction
+                      , buildHSFunctionFromGraph
                       ) where
 
 import qualified Data.Hashable as H
@@ -18,14 +19,21 @@ import Numeric.LinearAlgebra ( Element )
 
 import Dvda.HSSyntax ( writeHSSource )
 import Dvda.Graph ( FunGraph(..) )
-import Dvda.SymMonad ( Exprs )
+import Dvda.SymMonad ( Exprs, HList(..), makeFunGraph )
 import qualified Dvda.Config as Config
 
 
 -- | make source functions
-buildHSFunction :: (H.Hashable a, Show a, Element a, Show b, Show c) =>
-                   FunGraph a b c -> IO (Exprs b Double -> Exprs c Double)
-buildHSFunction fg = do
+buildHSFunction :: (Show (DimT b), Show (DimT c), Show (NumT b), Element (NumT b), H.Hashable (NumT b),
+                    HList b, HList c,  NumT c ~ NumT b) =>
+                   (b -> c) -> b -> IO (Exprs (DimT b) Double -> Exprs (DimT c) Double)
+buildHSFunction fg xs = buildHSFunctionFromGraph $ makeFunGraph xs (fg xs)
+
+
+-- | make source functions
+buildHSFunctionFromGraph :: (H.Hashable a, Show a, Element a, Show b, Show c) =>
+                            FunGraph a b c -> IO (Exprs b Double -> Exprs c Double)
+buildHSFunctionFromGraph fg = do
   -- source and hash
   let hash = show $ abs $ H.hash fg
       source = writeHSSource fg hash 
