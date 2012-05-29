@@ -15,32 +15,30 @@ import Control.Monad(when)
 import qualified System.Plugins.Make as Make
 import qualified System.Plugins.Load as Load
 import Numeric.LinearAlgebra ( Element )
---import System.Process( runCommand, waitForProcess )
---import System.Exit( ExitCode(ExitSuccess) )
 
 import Dvda.HSSyntax ( writeHSSource )
 import Dvda.Graph ( FunGraph(..) )
-import Dvda.SymMonad ( Exprs, HList(..), makeFunGraph )
+import Dvda.SymMonad ( MkIO(..), makeFunGraph )
 import qualified Dvda.Config as Config
 
 
 -- | take in a pure function and symbolic inputs, return JIT compiled function
-buildHSFunctionPure :: (Show (DimT b), Show (DimT c), Show (NumT b), Element (NumT b), H.Hashable (NumT b),
-                        HList b, HList c,  NumT c ~ NumT b) =>
-                       (b -> c) -> b -> IO (Exprs (DimT b) Double -> Exprs (DimT c) Double)
+buildHSFunctionPure :: (Show (NumT c), Element (NumT c), H.Hashable (NumT c), MkIO c,
+                        MkIO b, NumT b ~ NumT c) =>
+                       (b -> c) -> b -> IO (GenT b -> GenT c)
 buildHSFunctionPure fg xs = buildHSFunction xs (fg xs)
 
 
 -- | take in symbolic inputs and outputs, return JIT compiled function
-buildHSFunction :: (Show (DimT c), Show (DimT b), Show (NumT b), H.Hashable (NumT b),
-                    Element (NumT b), HList b, HList c, NumT c ~ NumT b) =>
-                   b -> c -> IO (Exprs (DimT b) Double -> Exprs (DimT c) Double)
+buildHSFunction :: (Show (NumT b), Element (NumT b), H.Hashable (NumT b), MkIO b,
+                    MkIO c, NumT c ~ NumT b) =>
+                   b -> c -> IO (GenT b -> GenT c)
 buildHSFunction inputs outputs = buildHSFunctionFromGraph $ makeFunGraph inputs outputs
 
 
 -- | take in FunGraph, return JIT compiled function
-buildHSFunctionFromGraph :: (H.Hashable a, Show a, Element a, Show b, Show c) =>
-                            FunGraph a b c -> IO (Exprs b Double -> Exprs c Double)
+buildHSFunctionFromGraph :: (Show a, Element a, H.Hashable a, MkIO c, MkIO b) =>
+                            FunGraph a b c -> IO (GenT b -> GenT c)
 buildHSFunctionFromGraph fg = do
   -- source and hash
   let hash = show $ abs $ H.hash fg
@@ -98,35 +96,3 @@ loadWithPlugins objpath hash = do
                                                  error "Load Failure"
                   (Load.LoadSuccess _ fun) -> do putStrLn "load success!"
                                                  return fun
-
--- -- | take in name of source and future object, compile object
--- makeWithProcess :: FilePath -> FilePath -> IO FilePath
--- makeWithProcess srcname objname = do
---   -- compile new object
---   let compileString = Config.ghcString srcname objname
---       displayString = Config.ghcString (shortName srcname) (shortName objname)
--- 
---   -- print compilation string
---   when Config.spewGccCall $ putStrLn displayString
---   
---   -- run compilation string
---   p <- runCommand compileString
---   
---   -- check for errors
---   exitCode <- waitForProcess p
---   when (exitCode /= ExitSuccess) $ error $ "failed compiling " ++ srcname
---   
---   return objname
--- 
--- 
--- -- | shorten path name for display purposes
--- shortName :: String -> String
--- shortName full
---   | length name <= maxN = name ++ extension
---   | otherwise           = take firstN name ++ "..." ++ drop (length name - lastN) name ++ extension
---   where
---     firstN = 20
---     lastN  = 10
---     maxN = firstN + lastN
--- 
---     (name, extension) = break (== '.') $ reverse $ takeWhile (/= '/') (reverse full)

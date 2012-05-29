@@ -7,13 +7,18 @@ module Dvda.Examples ( run
                      ) where
 
 import Control.Monad.State (State)
+import Data.Array.Repa.Index
 
 import Dvda
 import Dvda.Graph ( FunGraph(..) )
 
-exampleFunGraph :: State (FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)) ()
+exampleFunGraph :: State (FunGraph
+                          Double
+                          (Exprs (DIM0 :* DIM1 :* DIM2) Double)
+                          (Exprs (DIM2 :* DIM1 :* DIM0) Double))
+                   ()
 exampleFunGraph = do
-  let x = sym "x"
+  let x = sym "x" :: Expr DIM0 Double
       y = vsym 5 "y"
       z = msym (3,5) "Z"
   inputs_ (x :* y :* z)
@@ -31,9 +36,13 @@ pureFun (x :* y :* z) = z1 :* z2 :* z3
     z2 = (dot z y)**2
     z3 = diff ((x*x/2)**x) x
 
-exampleFunGraph' :: State (FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)) ()
+exampleFunGraph' :: State (FunGraph
+                           Double
+                           (Exprs (DIM0 :* DIM1 :* DIM2) Double)
+                           (Exprs (DIM2 :* DIM1 :* DIM0) Double))
+                    ()
 exampleFunGraph' = do
-  let x = sym "x"
+  let x = sym "x" :: Expr DIM0 Double
       y = vsym 5 "y"
       z = msym (3,5) "Z"
       
@@ -44,8 +53,7 @@ exampleFunGraph' = do
 
 run' :: IO ()
 run' = do
-  let gr :: FunGraph Double (DIM0 :* DIM1 :* DIM2) (DIM2 :* DIM1 :* DIM0)
-      gr@(FunGraph hm im _ _) = runFunGraph exampleFunGraph
+  let gr@(FunGraph hm im _ _) = runFunGraph exampleFunGraph
       (FunGraph hm' im' _ _) = runFunGraph exampleFunGraph'
       
   putStrLn $ funGraphSummary gr
@@ -57,9 +65,8 @@ run' = do
 
 run :: IO ()
 run = do
-  let gr :: FunGraph Double (DIM0 :* DIM0) (DIM0 :* DIM0)
-      gr@( FunGraph _ _ _ _) = runFunGraph $ do
-        let x = sym "x"
+  let gr@( FunGraph _ _ _ _) = runFunGraph $ do
+        let x = sym "x" :: Expr DIM0 Double
             y = sym "y"
             z1 = x * y
             z2 = diff z1 x
@@ -76,10 +83,10 @@ run = do
 
 showoff :: IO ()
 showoff = do
-  let gr :: FunGraph Double (DIM0 :* DIM0 :* DIM0) (DIM0 :* DIM0 :* DIM0 :* DIM0)
+  let gr :: FunGraph Double (Exprs (DIM0 :* DIM0 :* DIM0) Double) (Exprs (DIM0 :* DIM0 :* DIM0 :* DIM0) Double)
       gr = makeFunGraph (x' :* y' :* z') (f :* fx :* fy :* fz)
         where
-          x' = sym "x"
+          x' = sym "x" :: Expr DIM0 Double
           y' = sym "y"
           z' = sym "z"
 

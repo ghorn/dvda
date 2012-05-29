@@ -4,12 +4,12 @@ module Dvda.HSSyntax ( writeHSSource
                      ) where
 
 import Data.IntMap ( Key )
-import Data.List ( intersperse )
 import qualified Data.IntMap as IM
-import qualified Data.Text.Lazy as T
 import Numeric.LinearAlgebra ( Element )
+import Data.Array.Repa ( Shape(rank) )
 
 import Dvda.GExpr ( GExpr(..) )
+import Dvda.SymMonad ( MkIO(..) )
 import Dvda.Graph ( FunGraph(..) )
 import Dvda.BinUn ( BinOp(..), UnOp(..) )
 import qualified Dvda.Config as Config
@@ -51,8 +51,14 @@ pretty :: (Show a, Element a) => (Int, GExpr a) -> String
 pretty (_, (GBinary _ op kx ky)) = hBinary op ++ " " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
 pretty (_, (GUnary _ op kx)) = hUnary op ++ " " ++ Config.nameHSVar kx
 pretty (_, (GSingleton _ x)) = show x
-pretty (_, (GScale _ kx ky)) = "scale " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
-pretty (_, (GDot _ _ kx ky)) = "dot " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
+pretty (_, (GScale _ kx ky)) = "LA.scale " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
+pretty (_, (GDot dx dy kx ky)) = op ++ " " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
+  where
+    op = case (rank dx, rank dy) of (1, 1) -> "(LA.<.>)"
+                                    (2, 2) -> "(LA.mXm)"
+                                    (2, 1) -> "(LA.mXv)"
+                                    (1, 2) -> "(LA.vXm)"
+                                    _ -> error "need moar dottable"
 --pretty (k, (GConst _ vec)) = Config.nameHSConst k
 pretty (_, (GTensor _ x)) = show x -- Config.nameHSConst k
 pretty (_, (GVec _ x)) = show x -- Config.nameHSConst k
@@ -63,8 +69,8 @@ writeAssignment :: (Show a, Element a) => (Key, GExpr a) -> String
 writeAssignment (k, gexpr@(GSym _ _)) = "-- " ++ Config.nameHSVar k ++ ": " ++ show gexpr
 writeAssignment (k, gexpr) = sassign k ++ pretty (k,gexpr) ++ " -- " ++ show gexpr
 
-writeHSSource :: (Show a, Show b, Show c, Element a) => FunGraph a b c -> String -> String
-writeHSSource (FunGraph _ im (insT,ins) (outsT,outs)) hash =
+writeHSSource :: (Show a, Element a, MkIO b, MkIO c) => FunGraph a b c -> String -> String
+writeHSSource (FunGraph _ im (ins,inKeys) (outs,outKeys)) hash =
   init $ unlines $
   [ "-- {-# OPTIONS_GHC -Wall #-}"
   , "{-# Language GADTs #-}"
@@ -74,9 +80,8 @@ writeHSSource (FunGraph _ im (insT,ins) (outsT,outs)) hash =
   , ""
   , "module " ++ Config.nameHSModule hash ++ " ( " ++ Config.nameHSFunction hash ++ " ) where"
   , ""
-  , "import Data.Array.Repa"
-  , "import Data.Vector.Unboxed as V"
   , "import Dvda"
+  , "import qualified Numeric.LinearAlgebra as LA"
   , ""
 --  , "-- constants:"
 --  , constants
@@ -84,67 +89,14 @@ writeHSSource (FunGraph _ im (insT,ins) (outsT,outs)) hash =
 --  , Config.nameHSFunction hash ++ " :: Floating a => " 
 --  , spaces ++ rewriteType (show insT) ++ " -> " 
 --  , spaces ++ rewriteType (show outsT)
-  , Config.nameHSFunction hash ++ " :: " ++ rewriteType (show insT) ++ " ->"
-  , spaces ++ rewriteType (show outsT)
+  , Config.nameHSFunction hash ++ " :: " ++ typeSignature ins ++ " ->"
+  , spaces ++ typeSignature outs
   , Config.nameHSFunction hash ++ " ( " ++ inputs ++ " ) = " ++ outputs
   , "  where"
   , init $ unlines $ map ("    " ++) body 
   ]
     where
       spaces = replicate ((length (Config.nameHSFunction hash)) + 4) ' '
-      inputs  = concat $ intersperse " :* " (map Config.nameHSVar ins)
-      outputs = concat $ intersperse " :* " (map Config.nameHSVar outs)
+      inputs  = fst $ patternMatching ins  (map Config.nameHSVar inKeys)
+      outputs = fst $ patternMatching outs (map Config.nameHSVar outKeys)
       body = map writeAssignment (IM.toList im)
-
-
-intercalate :: String -> [String] -> String
-intercalate _ [] = []
-intercalate _ [x] = x
-intercalate int (x:xs) = (x++int) ++ intercalate int xs
-
-rewriteType :: String -> String
-rewriteType typeString = final
-  where
-    text = T.pack typeString
-    -- "Z :* ((Z :. 5) :* ((Z :. 3) :. 5))"
-    
-    cleaned = T.filter (\x -> not (elem x "() ")) text
-    -- "Z:*Z:.5:*Z:.3:.5"
-    
-    grouped :: [T.Text]
-    grouped = T.splitOn (T.pack ":*") cleaned
-    -- ["Z", "Z:.5", "Z:.3:.5"]
-    
-    
-    grouped' :: [[T.Text]]
-    grouped' = map (T.splitOn (T.pack ":.")) grouped
-    -- [["Z"], ["Z","5"], ["Z","3","5"]]
-
-    counted :: [Int]
-    counted = map (\x -> length x - 1) grouped'
-    -- [0, 1, 2]
-
-    addExpr = map (\x -> "(Expr DIM" ++ show x ++ " Double)")  counted
-    -- ["(Expr DIM0 Double)", "(Expr DIM1 Double)", "(Expr DIM2 Double)"]
-    
-    final = "( " ++ (intercalate " :* " addExpr) ++ " )"
-    -- "( (Expr DIM0 Double) :* (Expr DIM1 Double) :* (Expr DIM2 Double) )"
-
-
--- rewriteType :: String -> String
--- rewriteType typeString = final
---   where
---     text = T.pack typeString
---     -- "Z :* ((Z :. 5) :* ((Z :. 3) :. 5))"
---     
---     cleaned = T.filter (\x -> not (elem x "() ")) text
---     -- "Z:*Z:.5:*Z:.3:.5"
---     
---     grouped = T.splitOn (T.pack ":*") cleaned
---     -- ["Z", "Z:.5", "Z:.3:.5"]
---     
---     addExpr = map (\x -> T.append "(Expr (" (T.append x ") a)"))  grouped
---     -- ["(Expr (Z) a)", "(Expr (Z:.5) a)", "(Expr (Z:.3:.5) a)"]
---     
---     final = "( " ++ T.unpack (T.intercalate " :* " addExpr) ++ " )"
---     -- "( (Expr (Z) a) :* (Expr (Z:.5) a) :* (Expr (Z:.3:.5) a) )"

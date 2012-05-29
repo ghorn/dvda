@@ -6,6 +6,8 @@
 
 import Dvda
 
+import Numeric.LinearAlgebra ( fromList, fromLists )
+
 fun0 :: Exprs (DIM0 :* DIM1 :* DIM2) Double -> Exprs (DIM2 :* DIM1 :* DIM0) Double
 fun0 (x :* y :* z) = z1 :* z2 :* z3
   where
@@ -21,9 +23,9 @@ main = do
       z' = msym (2,3) "Z"
   
   fun <- buildHSFunctionPure fun0 (x' :* y' :* z')
-  let x = 0
-      y = vec [0,1,2]
-      z = mat (2,3) [[0,1,2],[3,4,5]]
+  let x = 0.2
+      y = fromList [0,1,2]
+      z = fromLists [[0,1,2],[3,4,5]]
       answer = fun (x :* y :* z)
   
   print answer
@@ -50,3 +52,21 @@ main' = do
       z = 6
 
   print $ fun (x :* y :* z)
+
+
+newtonSearch :: (Expr DIM0 Double -> Expr DIM0 Double) -> IO (Double -> Double -> (Double, Double, Double, [Double]))
+newtonSearch f_ = do
+  let x = sym "x" :: Expr DIM0 Double
+      y = f_ x
+      y' = diff y x
+      y'' = diff y' x
+  call <- buildHSFunction x (y :* y' :* y'')
+  
+  let newtonSolver xs err = if (abs f') < err || length xs > 10
+                            then (f, f', f'', x1:xs)
+                            else newtonSolver (x1:xs) err
+        where
+          x0 = head xs
+          x1 = x0 - f'/f''
+          (f :* f' :* f'') = call x0
+  return (\err x0 -> newtonSolver [x0] err)
