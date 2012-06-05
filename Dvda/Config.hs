@@ -25,6 +25,8 @@ module Dvda.Config( -- * directory stuff
                   , outputNames
                     -- * ghc stuff
                   , ghcString
+                    -- * symbolic stuff
+                  , simplifyCommutativeOps
                   ) where
 
 import System.Directory
@@ -114,3 +116,8 @@ nameHSSource = (++ ".hs") . nameHSModule
 
 nameHSObject :: String -> String
 nameHSObject = (++ ".o") . nameHSModule
+
+-- | whether e.g. x + y == y + x or not
+simplifyCommutativeOps :: Bool
+simplifyCommutativeOps = True
+

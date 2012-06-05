@@ -25,9 +25,10 @@ import qualified Numeric.LinearAlgebra as LA
 import Foreign.Storable ( Storable )
 import Data.IntMap ( Key )
 import Data.Hashable ( Hashable, hash, combine )
+import Data.List ( sort )
 
--- import Dvda.Dot ( Dot(..), dotDims )
-import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary )
+import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative )
+import Dvda.Config ( simplifyCommutativeOps )
 
 showShapeR :: Shape sh => sh -> String
 showShapeR = show . reverse . listOfShape
@@ -42,7 +43,6 @@ dim (ESingleton sh _) = sh
 dim (EUnary _ x) = dim x
 dim (EBinary _ x1 _) = dim x1
 dim (EScale _ y) = dim y
---dim (EDot x y) = dotDims (dim x) (dim y)
 dim (ERef sh _) = sh
 dim (EDeriv _ _) = Z
 dim (EGrad _ args) = dim args
@@ -88,14 +88,29 @@ data Expr sh a where
   EUnary :: UnOp -> Expr sh a -> Expr sh a
   EBinary :: BinOp -> Expr sh a -> Expr sh a -> Expr sh a
   EScale :: Expr DIM0 a -> Expr sh a -> Expr sh a
---  EDot :: Dot sh1 sh2 => Expr sh1 a -> Expr sh2 a -> Expr (DotT sh1 sh2) a
   ERef :: sh -> Key -> Expr sh a
 
   EDeriv :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
   EGrad  :: Expr DIM0 a -> Expr sh a -> Expr sh a
   EJacob :: Expr DIM1 a -> Expr DIM1 a -> Expr DIM2 a
 
-deriving instance (Shape sh, Eq a, Element a) => Eq (Expr sh a)
+instance (Shape sh, Eq a, Element a) => Eq (Expr sh a) where
+  (==) (ESym sh0 name0) (ESym sh1 name1) = sh0 == sh1 && name0 == name1
+  (==) (EConst c0) (EConst c1) = c0 == c1
+  (==) (EDimensionless x0) (EDimensionless x1) = x0 == x1
+  (==) (ESingleton sh0 x0) (ESingleton sh1 x1) = sh0 == sh1 && x0 == x1
+  (==) (EUnary op0 x0) (EUnary op1 x1) = op0 == op1 && x0 == x1
+  (==) (EScale x0 y0) (EScale x1 y1) = x0 == x1 && y0 == y1
+  (==) (ERef sh0 k0) (ERef sh1 k1) = sh0 == sh1 && k0 == k1
+  (==) (EDeriv x0 y0) (EDeriv x1 y1) = x0 == x1 && y0 == y1
+  (==) (EGrad x0 y0) (EGrad x1 y1) = x0 == x1 && y0 == y1
+  (==) (EJacob x0 y0) (EJacob x1 y1) = x0 == x1 && y0 == y1
+  (==) (EBinary op0 x0 y0) (EBinary op1 x1 y1) = op0 == op1 && commutativeEq
+    where
+      commutativeEq
+        | simplifyCommutativeOps && isCommutative op0 = (x0 == x1 && y0 == y1) || (x0 == y1 && y0 == x1)
+        | otherwise                                   =  x0 == x1 && y0 == y1
+  (==) _ _ = False
 
 instance (Hashable a, Shape sh, Element a) => Hashable (Expr sh a) where
   hash (ESym sh name)     = 27 `combine` hash (listOfShape sh) `combine` hash name
@@ -103,7 +118,13 @@ instance (Hashable a, Shape sh, Element a) => Hashable (Expr sh a) where
   hash (EDimensionless x) = 29 `combine` hash x
   hash (ESingleton sh x)  = 30 `combine` hash (listOfShape sh) `combine` hash x
   hash (EUnary op x)      = 31 `combine` hash op `combine` hash x
-  hash (EBinary op x y)   = 32 `combine` hash op `combine` hash x `combine` hash y
+  hash (EBinary op x y)   = 32 `combine` hash op `combine` hashx `combine` hashy
+    where
+      [hashx,hashy]
+        | simplifyCommutativeOps && isCommutative op = sort unsorted
+        | otherwise                                  = unsorted
+        where
+          unsorted = [hash x, hash y]
   hash (EScale x y)       = 33 `combine` hash x `combine` hash y
   hash (ERef sh k)        = 34 `combine` hash (listOfShape sh) `combine` k
 
@@ -289,9 +310,3 @@ jacob = EJacob
 
 hess :: Expr DIM0 a -> Expr DIM1 a -> Expr DIM2 a
 hess expr args = jacob (grad expr args) args
-
-
-
-
-simplifyCommutativeOps :: Bool
-simplifyCommutativeOps = True
