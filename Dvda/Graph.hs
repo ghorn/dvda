@@ -39,7 +39,7 @@ import Data.Array.Repa ( Shape(rank,listOfShape), DIM0, DIM1, DIM2 )
 import Control.Monad.State ( MonadState, StateT, get, put )
 import Data.Functor.Identity ( Identity )
 
-import Dvda.Expr ( Expr(..) )
+import Dvda.Expr ( Expr(..), Const(..) )
 
 --------------------- dynamic Expr stuff ---------------------------
 data DynamicExpr a = DynamicExpr0 (Expr DIM0 a)
@@ -105,7 +105,6 @@ symSet :: (Eq a, Hashable a, Element a, DvdaDim sh) =>
 symSet _ e@(ESym _ _)          = HS.singleton (makeDynamic e)
 symSet fg (ERef sh k)          = snd $ fromJust $ fgReverseLookup sh k fg
 symSet _ (EDimensionless _)    = HS.empty
-symSet _ (ESingleton _ _)      = HS.empty
 symSet _ (EConst _)            = HS.empty
 symSet fg (EUnary _ x)         = symSet fg x
 symSet fg (EBinary _ x y)      = (symSet fg x) `HS.union` (symSet fg y)
@@ -196,7 +195,6 @@ toFGLGraph (FunGraph hm _ _ _) = mkGraph lnodes ledges
         gc (EUnary _ x) = gc x
         gc (ERef _ k) = [k]
         gc (ESym _ _) = []
-        gc (ESingleton _ _) = []
         gc (EDimensionless _) = []
         gc (EScale x y) = gc x ++ gc y
         gc (EConst _) = []
@@ -216,7 +214,9 @@ tlv (EUnary op _)    = toLabelValue $ show op
 tlv (ESym sh name) 
   | rank sh == 0 = toLabelValue name
   | otherwise    = toLabelValue $ name ++ "{" ++ (tail . init . show . reverse) (listOfShape sh) ++ "}"
-tlv (ESingleton _ x)   = toLabelValue $ show x
 tlv (EScale {})        = toLabelValue "scale"
-tlv (EConst {})        = toLabelValue "const"
+tlv (EConst (CSingleton _ c)) = toLabelValue $ show c
+tlv (EConst (CVec _ _)) = toLabelValue "vec"
+tlv (EConst (CMat _ _)) = toLabelValue "mat"
+tlv (EConst (CTensor _ _)) = toLabelValue "tensor"
 tlv _ = error "don't try to preview one of those, ya goon"

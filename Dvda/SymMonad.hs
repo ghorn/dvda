@@ -35,7 +35,7 @@ import Debug.Trace ( trace )
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
-import Dvda.Expr ( Expr(..), dim )
+import Dvda.Expr ( Expr(..), Const(..), dim )
 
 -- | take all sub expressions of an Expr and turn them into nodes
 --   return an Expr that is just a ref
@@ -49,7 +49,6 @@ node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
 node' (ERef _ k) = return k
 node' e@(ESym _ _) = insert e
 node' e@(EConst _) = insert e
-node' e@(ESingleton _ _) = insert e
 node' (EUnary op x') = do
   x <- node x'
   insert $ EUnary op x
@@ -61,12 +60,6 @@ node' (EScale x' y') = do
   x <- node x'
   y <- node y'
   insert $ EScale x y
---node' (EDot x y) = do
---  xk <- node' x
---  yk <- node' y
---  let shx = homoOfShape $ dim x
---      shy = homoOfShape $ dim y
---  insert $ GDot shx shy xk yk
 node' (EDeriv x_ arg_) = do
   x <- node x_
   arg <- node arg_
@@ -86,12 +79,12 @@ rad expr_ args_ = do
   expr <- node expr_
   args <- mapM node args_
   let argSet = HS.fromList (map makeDynamic args)
-  sensitivities <- getSensitivities argSet expr (ESingleton (dim expr) 1)
+  sensitivities <- getSensitivities argSet expr (EConst (CSingleton (dim expr) 1))
   -- order inputs requested by user
   let getSens x = case HM.lookup (makeDynamic x) sensitivities of
         Just sens -> sens
         Nothing -> trace "WARNING: taking deriviative df/dx where f is not a function of x" $
-                   makeDynamic (ESingleton (dim x) 0)
+                   makeDynamic (EConst (CSingleton (dim x) 0))
       orderedSensitivities = map getSens args
   return orderedSensitivities
 
@@ -139,7 +132,6 @@ getSensitivities _ (EGrad _ _) _ = error "don't call getSensitivities on EGrad"
 getSensitivities _ (EJacob _ _) _ = error "don't call getSensitivities on EJacob"
 getSensitivities _ (EDeriv _ _) _ = error "don't call getSensitivities on EDeriv"
 getSensitivities _ (EDimensionless _) _ = return HM.empty
-getSensitivities _ (ESingleton _ _) _   = return HM.empty
 getSensitivities _ (EConst _) _         = return HM.empty
 getSensitivities args (ERef sh k) sens  = do
   fg <- get

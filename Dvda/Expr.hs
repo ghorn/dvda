@@ -35,11 +35,11 @@ showShapeR = show . reverse . listOfShape
 
 dim :: Expr sh a -> sh
 dim (ESym sh _) = sh
+dim (EConst (CSingleton sh _)) = sh
 dim (EConst (CMat sh _)) = sh
 dim (EConst (CVec sh _)) = sh
 dim (EConst (CTensor sh _)) = sh
 dim (EDimensionless _) = error "EDimensionless doesn't have a dimension, ya goon"
-dim (ESingleton sh _) = sh
 dim (EUnary _ x) = dim x
 dim (EBinary _ x1 _) = dim x1
 dim (EScale _ y) = dim y
@@ -49,42 +49,15 @@ dim (EGrad _ args) = dim args
 dim (EJacob x args) = Z :. head (listOfShape (dim x)) :. head (listOfShape (dim args))
 
 data Const sh a where
+  CSingleton :: sh -> a -> Const sh a
   CVec :: DIM1 -> Vector a -> Const DIM1 a
   CMat :: DIM2 -> Matrix a -> Const DIM2 a
   CTensor :: sh -> Vector a -> Const sh a 
-
-deriving instance (Show sh, Show a, Element a) => Show (Const sh a)
-
-instance (Shape sh, Element a, Eq a) => Eq (Const sh a) where
-  (==) (CVec sh0 v0) (CVec sh1 v1) = sh0 == sh1 && v0 == v1
-  (==) (CMat sh0 m0) (CMat sh1 m1) = sh0 == sh1 && (LA.flatten m0) == (LA.flatten m1)
-  (==) (CTensor sh0 v0) (CTensor sh1 v1) = sh0 == sh1 && v0 == v1
-  (==) _ _ = False
-  
-instance (Hashable a, Shape sh, Element a) => Hashable (Const sh a) where
-  hash (CVec sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (24 `combine` hash (listOfShape sh)) v
-  hash (CMat sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (25 `combine` hash (listOfShape sh)) (LA.flatten v)
-  hash (CTensor sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (26 `combine` hash (listOfShape sh)) v
-
-
-cmap :: (Storable a, Storable b) => (a -> b) -> Const sh a -> Const sh b
-cmap f (CTensor sh x) = CTensor sh (LA.mapVector f x)
-cmap f (CVec    sh x) = CVec    sh (LA.mapVector f x)
-cmap f (CMat    sh x) = CMat    sh (LA.mapMatrix f x)
-
-czipWith :: (Storable c, Element a, Element b) => (a -> b -> c) -> Const sh a -> Const sh b -> Const sh c
-czipWith f (CTensor sh x) (CTensor _ y) = CTensor sh (LA.zipVectorWith f x y)
-czipWith f (CVec    sh x) (CVec    _ y) = CVec    sh (LA.zipVectorWith f x y)
-czipWith f (CMat    sh x) (CMat    _ y) = CMat    sh (LA.reshape (LA.cols x) z)
-  where
-    z = LA.zipVectorWith f (LA.flatten x) (LA.flatten y)
-czipWith _ _ _ = error "don't call czipWith on unlike constructors"
 
 data Expr sh a where
   ESym :: sh -> String -> Expr sh a
   EConst :: Const sh a -> Expr sh a
   EDimensionless :: a -> Expr sh a
-  ESingleton :: sh -> a -> Expr sh a
   EUnary :: UnOp -> Expr sh a -> Expr sh a
   EBinary :: BinOp -> Expr sh a -> Expr sh a -> Expr sh a
   EScale :: Expr DIM0 a -> Expr sh a -> Expr sh a
@@ -94,11 +67,37 @@ data Expr sh a where
   EGrad  :: Expr DIM0 a -> Expr sh a -> Expr sh a
   EJacob :: Expr DIM1 a -> Expr DIM1 a -> Expr DIM2 a
 
+--------------------------------- show instances -----------------------------
+deriving instance (Show sh, Show a, Element a) => Show (Const sh a)
+
+paren :: Show a => a -> String
+paren x = "( "++show x++" )"
+
+instance (Shape sh, Show sh, Show a, Element a) => Show (Expr sh a) where
+  show (EDimensionless x) = show x
+  show (ESym sh name) = name++"{"++showShapeR sh++"}"
+  show (EConst x) = "{" ++ show x ++ "}" 
+  show (EUnary op x) = showUnary x op
+  show (EBinary op x y) = paren x ++ showBinary op ++ paren y
+  show (EScale s x) = paren s ++ "*" ++ paren x
+--  show (EDot _ _) = "EDot ?? ??"
+  show (ERef sh k) = "{ref:" ++ showShapeR sh ++ ":" ++ show k ++ "}"
+  show (EDeriv x y) = "deriv(" ++ show x ++ ", " ++ show y ++ ")"
+  show (EGrad  x y) = "grad("  ++ show x ++ ", " ++ show y ++ ")"
+  show (EJacob x y) = "jacob(" ++ show x ++ ", " ++ show y ++ ")"
+
+--------------------------------- eq instances -------------------------
+instance (Shape sh, Element a, Eq a) => Eq (Const sh a) where
+  (==) (CSingleton sh0 x0) (CSingleton sh1 x1) = sh0 == sh1 && x0 == x1
+  (==) (CVec sh0 v0) (CVec sh1 v1) = sh0 == sh1 && v0 == v1
+  (==) (CMat sh0 m0) (CMat sh1 m1) = sh0 == sh1 && (LA.flatten m0) == (LA.flatten m1)
+  (==) (CTensor sh0 v0) (CTensor sh1 v1) = sh0 == sh1 && v0 == v1
+  (==) _ _ = False
+  
 instance (Shape sh, Eq a, Element a) => Eq (Expr sh a) where
   (==) (ESym sh0 name0) (ESym sh1 name1) = sh0 == sh1 && name0 == name1
   (==) (EConst c0) (EConst c1) = c0 == c1
   (==) (EDimensionless x0) (EDimensionless x1) = x0 == x1
-  (==) (ESingleton sh0 x0) (ESingleton sh1 x1) = sh0 == sh1 && x0 == x1
   (==) (EUnary op0 x0) (EUnary op1 x1) = op0 == op1 && x0 == x1
   (==) (EScale x0 y0) (EScale x1 y1) = x0 == x1 && y0 == y1
   (==) (ERef sh0 k0) (ERef sh1 k1) = sh0 == sh1 && k0 == k1
@@ -112,11 +111,19 @@ instance (Shape sh, Eq a, Element a) => Eq (Expr sh a) where
         | otherwise                                   =  x0 == x1 && y0 == y1
   (==) _ _ = False
 
+------------------------- hashable instances --------------------
+instance (Hashable a, Shape sh, Element a) => Hashable (Const sh a) where
+  hash (CSingleton sh x) = 24 `combine` hash (listOfShape sh) `combine` hash x
+  hash (CVec sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (25 `combine` hash (listOfShape sh)) v
+  hash (CMat sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (26 `combine` hash (listOfShape sh)) (LA.flatten v)
+  hash (CTensor sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (27 `combine` hash (listOfShape sh)) v
+
+
 instance (Hashable a, Shape sh, Element a) => Hashable (Expr sh a) where
-  hash (ESym sh name)     = 27 `combine` hash (listOfShape sh) `combine` hash name
-  hash (EConst c)         = 28 `combine` hash c
-  hash (EDimensionless x) = 29 `combine` hash x
-  hash (ESingleton sh x)  = 30 `combine` hash (listOfShape sh) `combine` hash x
+  hash (ESym sh name)     = 28 `combine` hash (listOfShape sh) `combine` hash name
+  hash (EConst c)         = 29 `combine` hash c
+  hash (EDimensionless x) = 30 `combine` hash x
+--  hash (EBroadcast sh x)  = 30 `combine` hash (listOfShape sh) `combine` hash x
   hash (EUnary op x)      = 31 `combine` hash op `combine` hash x
   hash (EBinary op x y)   = 32 `combine` hash op `combine` hashx `combine` hashy
     where
@@ -133,9 +140,10 @@ instance (Hashable a, Shape sh, Element a) => Hashable (Expr sh a) where
   hash (EJacob x y)       = 37 `combine` hash x `combine` hash y
 
 
+------------------------ symbolic stuff --------------------
 isVal :: Eq a => a -> Expr sh a -> Bool
 isVal x (EDimensionless y) = x == y
-isVal x (ESingleton _ y) = x == y
+isVal x (EConst (CSingleton _ y)) = x == y
 isVal _ _ = False
 
 -- | first layer of binary simplification: infer dimension of EDimensionless if possible
@@ -144,10 +152,11 @@ makeBinary :: (Eq a, Num (Vector a), LA.Container Vector a, Shape sh) =>
 -- | can't infer dimension, just apply operation
 makeBinary _  f (EDimensionless x) (EDimensionless y) = EDimensionless (f x y)
 -- | infer dimension, then call makeBinary' for further simplification
-makeBinary op f (EDimensionless x) y = makeBinary' op f (ESingleton (dim y) x) y
-makeBinary op f x (EDimensionless y) = makeBinary' op f x (ESingleton (dim x) y)
+makeBinary op f (EDimensionless x) y = makeBinary' op f (EConst (CSingleton (dim y) x)) y
+makeBinary op f x (EDimensionless y) = makeBinary' op f x (EConst (CSingleton (dim x) y))
 -- | dimension inferred, call makeBinary'
 makeBinary op f x y = makeBinary' op f x y
+
 
 -- | second layer of binary simplification: check dimensions
 makeBinary' :: (Eq a, Num (Vector a), LA.Container Vector a, Shape sh) =>
@@ -162,14 +171,15 @@ makeBinary' op f x y
     sdy = showShapeR shy
     sop = show op
 
+
 -- | third layer of binary simplification: 0*x == x*0 == 0
--- |                                       1*x == x*1 == x
--- |                                       0+x == x+0 == x
--- |                                       x/0 == error
--- |                                       x/1 == x
--- |                                       0/x == 0
--- |                                       x - 0 == 0
--- |                                       0 - x == neg x
+--                                         1*x == x*1 == x
+--                                         0+x == x+0 == x
+--                                         x/0 == error
+--                                         x/1 == x
+--                                         0/x == 0
+--                                         x - 0 == 0
+--                                         0 - x == neg x
 makeBinary'' :: (Eq a, Num (Vector a), LA.Container Vector a, Shape sh) =>
                 BinOp -> (a -> a -> a) -> Expr sh a -> Expr sh a -> Expr sh a
 makeBinary'' Mul f x y
@@ -197,7 +207,7 @@ makeBinary'' op f x y = makeBinary''' op f x y
 -- | fourth layer of binary simplification: make reasonable simplifications
 makeBinary''' :: (Num (Vector a), LA.Container Vector a) =>
                  BinOp -> (a -> a -> a) -> Expr sh a -> Expr sh a -> Expr sh a
--- | apply operation to constants
+-- apply vectorized operations
 makeBinary''' Add _ (EConst (CVec sh x)) (EConst (CVec _ y)) = EConst $ CVec sh (x + y)
 makeBinary''' Sub _ (EConst (CVec sh x)) (EConst (CVec _ y)) = EConst $ CVec sh (x - y)
 makeBinary''' Mul _ (EConst (CVec sh x)) (EConst (CVec _ y)) = EConst $ CVec sh (x * y)
@@ -210,10 +220,23 @@ makeBinary''' Add _ (EConst (CTensor sh x)) (EConst (CTensor _ y)) = EConst $ CT
 makeBinary''' Sub _ (EConst (CTensor sh x)) (EConst (CTensor _ y)) = EConst $ CTensor sh (x - y)
 makeBinary''' Mul _ (EConst (CTensor sh x)) (EConst (CTensor _ y)) = EConst $ CTensor sh (x * y)
 makeBinary''' Div _ (EConst (CTensor sh x)) (EConst (CTensor _ y)) = EConst $ CTensor sh (x / y)
-makeBinary''' _ f (EConst x) (EConst y) = EConst $ czipWith f x y
--- | broadcast constant operations
-makeBinary''' _ f (ESingleton _ x) (EConst y) = EConst $ cmap (f x) y
-makeBinary''' _ f (EConst x) (ESingleton _ y) = EConst $ cmap (`f` y) x
+makeBinary''' _ f (EConst x') (EConst y') = EConst $ czipWith x' y'
+  where
+    -- zip like things
+    czipWith (CSingleton sh x) (CSingleton _ y) = CSingleton sh (f x y)
+    czipWith (CTensor    sh x) (CTensor    _ y) = CTensor    sh (LA.zipVectorWith f x y)
+    czipWith (CVec       sh x) (CVec       _ y) = CVec       sh (LA.zipVectorWith f x y)
+    czipWith (CMat       sh x) (CMat       _ y) = CMat       sh (LA.reshape (LA.cols x) z)
+      where
+        z = LA.zipVectorWith f (LA.flatten x) (LA.flatten y)
+    -- broadcast singletons
+    czipWith (CSingleton _ x) (CTensor   sh y) = CTensor    sh (LA.mapVector (f x) y)
+    czipWith (CSingleton _ x) (CVec      sh y) = CVec       sh (LA.mapVector (f x) y)
+    czipWith (CSingleton _ x) (CMat      sh y) = CMat       sh (LA.mapMatrix (f x) y)
+    czipWith (CTensor   sh x) (CSingleton _ y) = CTensor    sh (LA.mapVector (`f` y) x)
+    czipWith (CVec      sh x) (CSingleton _ y) = CVec       sh (LA.mapVector (`f` y) x)
+    czipWith (CMat      sh x) (CSingleton _ y) = CMat       sh (LA.mapMatrix (`f` y) x)
+    czipWith _ _ = error "czipWith called on unlike constants"
 -- | otherwise make symbolic binary
 makeBinary''' op _ x y = EBinary op x y
 
@@ -221,8 +244,12 @@ makeBinary''' op _ x y = EBinary op x y
 -- | apply unary operations on constants
 makeUnary :: Storable a => UnOp -> (a -> a) -> Expr sh a -> Expr sh a
 makeUnary _ f (EDimensionless x) = EDimensionless (f x)
-makeUnary _ f (ESingleton sh x) = ESingleton sh (f x)
-makeUnary _ f (EConst x) = EConst $ cmap f x
+makeUnary _ f' (EConst x') = EConst $ cmap f' x'
+  where
+    cmap f (CSingleton sh x) = CSingleton sh (f x)
+    cmap f (CTensor    sh x) = CTensor    sh (LA.mapVector f x)
+    cmap f (CVec       sh x) = CVec       sh (LA.mapVector f x)
+    cmap f (CMat       sh x) = CMat       sh (LA.mapMatrix f x)
 makeUnary op _ x = EUnary op x
 
 instance (Shape sh, Num a, Eq a, Num (Vector a), LA.Container Vector a) =>
@@ -257,23 +284,7 @@ instance (Shape sh, Floating a, Eq a, Num (Vector a), LA.Container Vector a) =>
   atanh = error "no instance for atanh"
   acosh = error "no instance for acosh"
 
-paren :: Show a => a -> String
-paren x = "( "++show x++" )"
-
-instance (Shape sh, Show sh, Show a, Element a) => Show (Expr sh a) where
-  show (ESingleton _ x) = show x
-  show (EDimensionless x) = show x
-  show (ESym sh name) = name++"{"++showShapeR sh++"}"
-  show (EConst x) = "{" ++ show x ++ "}" 
-  show (EUnary op x) = showUnary x op
-  show (EBinary op x y) = paren x ++ showBinary op ++ paren y
-  show (EScale s x) = paren s ++ "*" ++ paren x
---  show (EDot _ _) = "EDot ?? ??"
-  show (ERef sh k) = "{ref:" ++ showShapeR sh ++ ":" ++ show k ++ "}"
-  show (EDeriv x y) = "deriv(" ++ show x ++ ", " ++ show y ++ ")"
-  show (EGrad  x y) = "grad("  ++ show x ++ ", " ++ show y ++ ")"
-  show (EJacob x y) = "jacob(" ++ show x ++ ", " ++ show y ++ ")"
-
+------------------------------ convenience functions -------------------------
 sym :: String -> Expr DIM0 a
 sym = ESym Z
 
