@@ -47,15 +47,13 @@ Library
   Exposed-modules:   Dvda
                      Dvda.BinUn
                      Dvda.Config
-                     Dvda.Dot
+--                     Dvda.Dot
                      Dvda.Dual
                      Dvda.Examples
                      Dvda.Expr
-                     Dvda.GExpr
                      Dvda.Graph
                      Dvda.HSBuilder
                      Dvda.HSSyntax
-                     Dvda.HomoDim
                      Dvda.SymMonad
 --                     Dvda.CFunction
 --                     Dvda.Codegen.CBuilder

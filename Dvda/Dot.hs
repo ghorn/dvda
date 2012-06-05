@@ -7,27 +7,12 @@
 module Dvda.Dot ( Dot(..)
                 ) where
 
-import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape, shapeOfList)
-
-import Dvda.HomoDim ( HomoDim(..), homoOfShape ) 
+import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape)
 
 
 class (Shape sh1, Shape sh2, Shape (DotT sh1 sh2)) => Dot sh1 sh2 where
   type DotT sh1 sh2
   dotDims :: sh1 -> sh2 -> DotT sh1 sh2
-
-instance Dot HomoDim HomoDim where
-  type DotT HomoDim HomoDim = HomoDim
-  dotDims (HomoDim x@[_,_]) (HomoDim y@[_,_]) =
-    homoOfShape $ dotDims (shapeOfList x :: DIM2) (shapeOfList y :: DIM2)
-  dotDims (HomoDim x@[_,_]) (HomoDim y@[_])   =
-    homoOfShape $ dotDims (shapeOfList x :: DIM2) (shapeOfList y :: DIM1)
-  dotDims (HomoDim x@[_])   (HomoDim y@[_,_]) =
-    homoOfShape $ dotDims (shapeOfList x :: DIM1) (shapeOfList y :: DIM2)
-  dotDims (HomoDim x@[_])   (HomoDim y@[_])   =
-    homoOfShape $ dotDims (shapeOfList x :: DIM1) (shapeOfList y :: DIM1)
-  dotDims x y = error $ "dotDims HomoDim not instanced for " ++ show x ++ " " ++ show y
-  
 
 instance Dot DIM2 DIM2 where -- matrix-matrix
   type DotT DIM2 DIM2 = DIM2

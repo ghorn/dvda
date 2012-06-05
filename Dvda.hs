@@ -19,7 +19,7 @@ module Dvda ( -- * primitives
             , mat
               -- * operations
             , scale
-            , dot
+--            , dot
             , diff
               -- * symbolic expression type
             , Expr

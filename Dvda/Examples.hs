@@ -24,7 +24,8 @@ exampleFunGraph = do
   inputs_ (x :* y :* z)
   
   z1 <- node $ (scale x z)**3
-  z2 <- node $ (dot z y)**2
+--  z2 <- node $ (dot z y)**2
+  z2 <- node $ y**2
   z3 <- node $ diff ((x*x/2)**x) x
   
   outputs_ (z1 :* z2 :* z3)
@@ -33,7 +34,8 @@ pureFun :: Exprs (DIM0 :* DIM1 :* DIM2) Double -> Exprs (DIM2 :* DIM1 :* DIM0) D
 pureFun (x :* y :* z) = z1 :* z2 :* z3
   where
     z1 = (scale x z)**3
-    z2 = (dot z y)**2
+--    z2 = (dot z y)**2
+    z2 = y**2
     z3 = diff ((x*x/2)**x) x
 
 exampleFunGraph' :: State (FunGraph
@@ -56,7 +58,7 @@ run' = do
   let gr@(FunGraph hm im _ _) = runFunGraph exampleFunGraph
       (FunGraph hm' im' _ _) = runFunGraph exampleFunGraph'
       
-  putStrLn $ funGraphSummary gr
+  putStrLn $ funGraphSummary' gr
   putStrLn $ showCollisions gr
   previewGraph gr
   putStrLn "\nimperative same as pure+cse?:"
@@ -67,16 +69,14 @@ run :: IO ()
 run = do
   let gr@( FunGraph _ _ _ _) = runFunGraph $ do
         let x = sym "x" :: Expr DIM0 Double
-            y = sym "y"
-            z1 = x * y
+--            y = sym "y"
+            z1 = x + x
             z2 = diff z1 x
 
-        inputs_ (x :* y)
+        inputs_ x
         outputs_ (z1 :* z2)
 
   putStrLn $ showCollisions gr
-  putStrLn "-------------------------------------------"
-  putStrLn $ funGraphSummary gr
   putStrLn "-------------------------------------------"
   putStrLn $ funGraphSummary' gr
   previewGraph gr

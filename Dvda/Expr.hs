@@ -1,68 +1,36 @@
 {-# Options_ghc -Wall #-}
-{-# Language TypeFamilies #-}
-{-# Language MultiParamTypeClasses #-}
-{-# Language GADTs #-}
-{-# Language FlexibleInstances #-}
-{-# Language FlexibleContexts #-}
 {-# Language StandaloneDeriving #-}
+{-# Language GADTs #-}
+{-# Language FlexibleContexts #-}
 
 module Dvda.Expr ( Expr(..)
                  , Const(..)
-                 , FromGExpr
                  , sym
                  , vsym
                  , msym
                  , vec
                  , mat
                  , scale
-                 , dot
+--                 , dot
                  , diff
                  , grad
                  , jacob
                  , hess
                  , dim
-                 , exprOfGExpr
                  ) where
 
-import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(rank), shapeOfList)
+import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList))
 import Numeric.LinearAlgebra ( Matrix, Vector, Element )
 import qualified Numeric.LinearAlgebra as LA
 import Foreign.Storable ( Storable )
 import Data.IntMap ( Key )
+import Data.Hashable ( Hashable, hash, combine )
 
-import Dvda.Dot ( Dot(..), dotDims )
+-- import Dvda.Dot ( Dot(..), dotDims )
 import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary )
-import Dvda.GExpr ( GExpr(..) )
-import Dvda.HomoDim ( HomoDim, shapeOfHomo )
 
 showShapeR :: Shape sh => sh -> String
 showShapeR = show . reverse . listOfShape
-
-class Shape sh => FromGExpr sh where
-  fromMM :: HomoDim -> HomoDim -> Key -> Key -> Expr sh a
-  fromMV :: HomoDim -> HomoDim -> Key -> Key -> Expr sh a
-  fromVM :: HomoDim -> HomoDim -> Key -> Key -> Expr sh a
-  fromVV :: HomoDim -> HomoDim -> Key -> Key -> Expr sh a
-  fromM :: HomoDim -> Matrix a -> Expr sh a
-  fromV :: HomoDim -> Vector a -> Expr sh a
-  fromMM shx shy = error $ "sorry, no fromMM instance for: " ++ show shx ++ ", " ++ show shy
-  fromMV shx shy = error $ "sorry, no fromMV instance for: " ++ show shx ++ ", " ++ show shy
-  fromVM shx shy = error $ "sorry, no fromVM instance for: " ++ show shx ++ ", " ++ show shy
-  fromVV shx shy = error $ "sorry, no fromVV instance for: " ++ show shx ++ ", " ++ show shy
-  fromM sh _ = error $ "sorry, no fromM instance for: " ++ show sh
-  fromV sh _ = error $ "sorry, no fromV instance for: " ++ show sh
-
-instance FromGExpr DIM2 where
-  fromMM shx shy kx ky = EDot (ERef (shapeOfHomo shx :: DIM2) kx) (ERef (shapeOfHomo shy :: DIM2) ky)
-  fromM sh x = EConst $ CMat (shapeOfHomo sh :: DIM2) x
-
-instance FromGExpr DIM1 where
-  fromMV shx shy kx ky = EDot (ERef (shapeOfHomo shx :: DIM2) kx) (ERef (shapeOfHomo shy :: DIM1) ky)
-  fromVM shx shy kx ky = EDot (ERef (shapeOfHomo shx :: DIM1) kx) (ERef (shapeOfHomo shy :: DIM2) ky)
-  fromV sh x = EConst $ CVec (shapeOfHomo sh :: DIM1) x
-
-instance FromGExpr DIM0 where
-  fromVV shx shy kx ky = EDot (ERef (shapeOfHomo shx :: DIM1) kx) (ERef (shapeOfHomo shy :: DIM1) ky)
 
 dim :: Expr sh a -> sh
 dim (ESym sh _) = sh
@@ -74,29 +42,11 @@ dim (ESingleton sh _) = sh
 dim (EUnary _ x) = dim x
 dim (EBinary _ x1 _) = dim x1
 dim (EScale _ y) = dim y
-dim (EDot x y) = dotDims (dim x) (dim y)
+--dim (EDot x y) = dotDims (dim x) (dim y)
 dim (ERef sh _) = sh
 dim (EDeriv _ _) = Z
 dim (EGrad _ args) = dim args
 dim (EJacob x args) = Z :. head (listOfShape (dim x)) :. head (listOfShape (dim args))
-
-exprOfGExpr :: (Shape sh, FromGExpr sh) => GExpr a -> Expr sh a
-exprOfGExpr (GBinary sh' op kx ky) = EBinary op (ERef sh kx) (ERef sh ky)
-  where
-    sh = shapeOfHomo sh'
-exprOfGExpr (GUnary sh op kx) = EUnary op (ERef (shapeOfHomo sh) kx)
-exprOfGExpr (GSym sh name) = ESym (shapeOfHomo sh) name
-exprOfGExpr (GSingleton sh a) = ESingleton (shapeOfHomo sh) a
-exprOfGExpr (GScale sh kx ky) = EScale (ERef Z kx) (ERef (shapeOfHomo sh) ky)
-exprOfGExpr (GVec sh v) = fromV sh v
-exprOfGExpr (GMat sh v) = fromM sh v
-exprOfGExpr (GTensor sh v) = EConst $ CTensor (shapeOfHomo sh) v
-exprOfGExpr (GDot shx shy kx ky) = case (rank shx, rank shy) of
-  (2,2) -> fromMM shx shy kx ky
-  (2,1) -> fromMV shx shy kx ky
-  (1,2) -> fromVM shx shy kx ky
-  (1,1) -> fromVV shx shy kx ky
-  nm    -> error $ "can't convert GDot of rank: " ++ show nm ++ " to Expr"
 
 data Const sh a where
   CVec :: DIM1 -> Vector a -> Const DIM1 a
@@ -104,7 +54,19 @@ data Const sh a where
   CTensor :: sh -> Vector a -> Const sh a 
 
 deriving instance (Show sh, Show a, Element a) => Show (Const sh a)
+
+instance (Shape sh, Element a, Eq a) => Eq (Const sh a) where
+  (==) (CVec sh0 v0) (CVec sh1 v1) = sh0 == sh1 && v0 == v1
+  (==) (CMat sh0 m0) (CMat sh1 m1) = sh0 == sh1 && (LA.flatten m0) == (LA.flatten m1)
+  (==) (CTensor sh0 v0) (CTensor sh1 v1) = sh0 == sh1 && v0 == v1
+  (==) _ _ = False
   
+instance (Hashable a, Shape sh, Element a) => Hashable (Const sh a) where
+  hash (CVec sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (24 `combine` hash (listOfShape sh)) v
+  hash (CMat sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (25 `combine` hash (listOfShape sh)) (LA.flatten v)
+  hash (CTensor sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (26 `combine` hash (listOfShape sh)) v
+
+
 cmap :: (Storable a, Storable b) => (a -> b) -> Const sh a -> Const sh b
 cmap f (CTensor sh x) = CTensor sh (LA.mapVector f x)
 cmap f (CVec    sh x) = CVec    sh (LA.mapVector f x)
@@ -126,12 +88,29 @@ data Expr sh a where
   EUnary :: UnOp -> Expr sh a -> Expr sh a
   EBinary :: BinOp -> Expr sh a -> Expr sh a -> Expr sh a
   EScale :: Expr DIM0 a -> Expr sh a -> Expr sh a
-  EDot :: Dot sh1 sh2 => Expr sh1 a -> Expr sh2 a -> Expr (DotT sh1 sh2) a
-  ERef :: sh -> Int -> Expr sh a
+--  EDot :: Dot sh1 sh2 => Expr sh1 a -> Expr sh2 a -> Expr (DotT sh1 sh2) a
+  ERef :: sh -> Key -> Expr sh a
 
   EDeriv :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
-  EGrad  :: Expr DIM0 a -> Expr DIM1 a -> Expr DIM1 a
+  EGrad  :: Expr DIM0 a -> Expr sh a -> Expr sh a
   EJacob :: Expr DIM1 a -> Expr DIM1 a -> Expr DIM2 a
+
+deriving instance (Shape sh, Eq a, Element a) => Eq (Expr sh a)
+
+instance (Hashable a, Shape sh, Element a) => Hashable (Expr sh a) where
+  hash (ESym sh name)     = 27 `combine` hash (listOfShape sh) `combine` hash name
+  hash (EConst c)         = 28 `combine` hash c
+  hash (EDimensionless x) = 29 `combine` hash x
+  hash (ESingleton sh x)  = 30 `combine` hash (listOfShape sh) `combine` hash x
+  hash (EUnary op x)      = 31 `combine` hash op `combine` hash x
+  hash (EBinary op x y)   = 32 `combine` hash op `combine` hash x `combine` hash y
+  hash (EScale x y)       = 33 `combine` hash x `combine` hash y
+  hash (ERef sh k)        = 34 `combine` hash (listOfShape sh) `combine` k
+
+  hash (EDeriv x y)       = 35 `combine` hash x `combine` hash y
+  hash (EGrad x y)        = 36 `combine` hash x `combine` hash y
+  hash (EJacob x y)       = 37 `combine` hash x `combine` hash y
+
 
 isVal :: Eq a => a -> Expr sh a -> Bool
 isVal x (EDimensionless y) = x == y
@@ -268,7 +247,7 @@ instance (Shape sh, Show sh, Show a, Element a) => Show (Expr sh a) where
   show (EUnary op x) = showUnary x op
   show (EBinary op x y) = paren x ++ showBinary op ++ paren y
   show (EScale s x) = paren s ++ "*" ++ paren x
-  show (EDot _ _) = "EDot ?? ??"
+--  show (EDot _ _) = "EDot ?? ??"
   show (ERef sh k) = "{ref:" ++ showShapeR sh ++ ":" ++ show k ++ "}"
   show (EDeriv x y) = "deriv(" ++ show x ++ ", " ++ show y ++ ")"
   show (EGrad  x y) = "grad("  ++ show x ++ ", " ++ show y ++ ")"
@@ -296,8 +275,8 @@ mat (r,c) xs
 scale :: Expr DIM0 a -> Expr sh a -> Expr sh a
 scale = EScale
 
-dot :: (Dot sh1 sh2, DotT sh1 sh2 ~ sh) => Expr sh1 a -> Expr sh2 a -> Expr sh a
-dot = EDot
+--dot :: (Dot sh1 sh2, DotT sh1 sh2 ~ sh) => Expr sh1 a -> Expr sh2 a -> Expr sh a
+--dot = EDot
 
 diff :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
 diff = EDeriv
@@ -310,3 +289,9 @@ jacob = EJacob
 
 hess :: Expr DIM0 a -> Expr DIM1 a -> Expr DIM2 a
 hess expr args = jacob (grad expr args) args
+
+
+
+
+simplifyCommutativeOps :: Bool
+simplifyCommutativeOps = True

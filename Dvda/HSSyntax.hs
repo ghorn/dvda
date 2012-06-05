@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# Language GADTs #-}
 
 module Dvda.HSSyntax ( writeHSSource
                      ) where
@@ -6,11 +7,10 @@ module Dvda.HSSyntax ( writeHSSource
 import Data.IntMap ( Key )
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
-import Data.Array.Repa ( Shape(rank) )
 
-import Dvda.GExpr ( GExpr(..) )
+import Dvda.Expr ( Expr(..), Const(..) )
 import Dvda.SymMonad ( MkIO(..) )
-import Dvda.Graph ( FunGraph(..) )
+import Dvda.Graph ( FunGraph(..), DynamicExpr, asIfExpr )
 import Dvda.BinUn ( BinOp(..), UnOp(..) )
 import qualified Dvda.Config as Config
 
@@ -47,27 +47,31 @@ hUnary ASinh  = "asinh"
 hUnary ATanh  = "atanh"
 hUnary ACosh  = "acosh"
 
-pretty :: (Show a, Element a) => (Int, GExpr a) -> String
-pretty (_, (GBinary _ op kx ky)) = hBinary op ++ " " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
-pretty (_, (GUnary _ op kx)) = hUnary op ++ " " ++ Config.nameHSVar kx
-pretty (_, (GSingleton _ x)) = show x
-pretty (_, (GScale _ kx ky)) = "LA.scale " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
-pretty (_, (GDot dx dy kx ky)) = op ++ " " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
-  where
-    op = case (rank dx, rank dy) of (1, 1) -> "(LA.<.>)"
-                                    (2, 2) -> "(LA.mXm)"
-                                    (2, 1) -> "(LA.mXv)"
-                                    (1, 2) -> "(LA.vXm)"
-                                    _ -> error "need moar dottable"
---pretty (k, (GConst _ vec)) = Config.nameHSConst k
-pretty (_, (GTensor _ x)) = show x -- Config.nameHSConst k
-pretty (_, (GVec _ x)) = show x -- Config.nameHSConst k
-pretty (_, (GMat _ x)) = show x -- Config.nameHSConst k
-pretty (_, (GSym _ _)) = error "GSym shouldn't be handled here"
+pretty :: (Show a, Element a) => Int -> Expr sh a -> String
+pretty _ (EBinary op (ERef _ kx) (ERef _ ky)) = hBinary op ++ " " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
+pretty _ (EBinary _ _ _) = error "EBinary got non ERef children"
+pretty _ (EUnary op (ERef _ kx)) = hUnary op ++ " " ++ Config.nameHSVar kx
+pretty _ (EUnary _ _) = error "EUnary got non ERef children"
+pretty _ (ESingleton _ x) = show x
+pretty _ (EScale (ERef _ kx) (ERef _ ky)) = "LA.scale " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
+pretty _ (EScale _ _) = error "EScale got non ERef children"
+pretty _ (EConst (CVec _ x)) = show x -- Config.nameHSConst k
+pretty _ (EConst (CMat _ x)) = show x -- Config.nameHSConst k
+pretty _ (EConst (CTensor _ x)) = show x -- Config.nameHSConst k
+pretty _ (ESym _ _) = error "ESym shouldn't be handled here"
+pretty _ (EDimensionless _) = error "EDimensionless shouldn't be handled here"
+pretty _ (EJacob _ _) = error "EJacob shouldn't be handled here"
+pretty _ (EDeriv _ _) = error "EDeriv shouldn't be handled here"
+pretty _ (EGrad _ _)  = error "EGrad shouldn't be handled here"
+pretty _ (ERef _ _) = error "ERef shouldn't be handled here"
 
-writeAssignment :: (Show a, Element a) => (Key, GExpr a) -> String
-writeAssignment (k, gexpr@(GSym _ _)) = "-- " ++ Config.nameHSVar k ++ ": " ++ show gexpr
-writeAssignment (k, gexpr) = sassign k ++ pretty (k,gexpr) ++ " -- " ++ show gexpr
+writeAssignment :: (Show a, Element a) => (Key, DynamicExpr a) -> String
+writeAssignment (k, dexpr) 
+  | asIfExpr isSym dexpr = "-- " ++ Config.nameHSVar k ++ ": " ++ show dexpr
+  | otherwise = sassign k ++ (asIfExpr (pretty k) dexpr) ++ " -- " ++ show dexpr
+  where
+    isSym (ESym _ _) = True
+    isSym _ = False
 
 writeHSSource :: (Show a, Element a, MkIO b, MkIO c) => FunGraph a b c -> String -> String
 writeHSSource (FunGraph _ im (ins,inKeys) (outs,outKeys)) hash =
