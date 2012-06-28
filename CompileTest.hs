@@ -12,7 +12,8 @@ fun0 :: Exprs (DIM0 :* DIM1 :* DIM2) Double -> Exprs (DIM2 :* DIM1 :* DIM0) Doub
 fun0 (x :* y :* z) = z1 :* z2 :* z3
   where
     z1 = (scale x z)**3
-    z2 = (dot z y)**2
+--    z2 = (dot z y)**2
+    z2 = y**2
     z3 = diff ((x*x/2)**x) x
 --    z3 = ((x*x/2)**x)*x
   
