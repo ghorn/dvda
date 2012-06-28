@@ -65,10 +65,10 @@ pretty _ (EDeriv _ _) = error "EDeriv shouldn't be handled here"
 pretty _ (EGrad _ _)  = error "EGrad shouldn't be handled here"
 pretty _ (ERef _ _) = error "ERef shouldn't be handled here"
 
-writeAssignment :: (Show a, Element a) => (Key, DynamicExpr a) -> String
+writeAssignment :: (Show a, Element a) => (Key, DynamicExpr a) -> (String, String)
 writeAssignment (k, dexpr) 
-  | asIfExpr isSym dexpr = "-- " ++ Config.nameHSVar k ++ ": " ++ show dexpr
-  | otherwise = sassign k ++ (asIfExpr (pretty k) dexpr) ++ " -- " ++ show dexpr
+  | asIfExpr isSym dexpr = ("-- " ++ Config.nameHSVar k ++ " (input)", show dexpr)
+  | otherwise = (sassign k ++ (asIfExpr (pretty k) dexpr), show dexpr)
   where
     isSym (ESym _ _) = True
     isSym _ = False
@@ -97,10 +97,17 @@ writeHSSource (FunGraph _ im (ins,inKeys) (outs,outKeys)) hash =
   , spaces ++ typeSignature outs
   , Config.nameHSFunction hash ++ " ( " ++ inputs ++ " ) = " ++ outputs
   , "  where"
-  , init $ unlines $ map ("    " ++) body 
+  , init $ unlines $ map ("    " ++) (zipWith3 (\d s c -> d ++ s ++ "-- " ++ c) decls extraSpaces comments)
   ]
     where
       spaces = replicate ((length (Config.nameHSFunction hash)) + 4) ' '
       inputs  = fst $ patternMatching ins  (map Config.nameHSVar inKeys)
       outputs = fst $ patternMatching outs (map Config.nameHSVar outKeys)
+      (decls, comments) = unzip $ map writeAssignment (IM.toList im)
       body = map writeAssignment (IM.toList im)
+
+      lengths = map length decls
+      longestDecl = maximum lengths
+      extraSpaces = map (\n -> replicate (longestDecl - n + 4) ' ') lengths
+
+
