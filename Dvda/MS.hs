@@ -59,10 +59,10 @@ dynamicsErrorsSimpson stateVecs' actionVecs' ode dt = zipWith (simpsonsRuleError
     xPairs = zip (init  stateVecs') (tail  stateVecs')
     uPairs = zip (init actionVecs') (tail actionVecs')
 
-msProblem :: [Expr Z Double] -> [Expr Z Double] -> Expr Z Double -> [Expr Z Double]
-             -> FunGraph Double [Expr Z Double]
+msProblem :: [Expr Z Double] -> [Expr Z Double] -> Expr Z Double -> [Expr Z Double] -> [Expr Z Double]
+             -> FunGraph Double ([Expr Z Double] :* [Expr Z Double])
              (Expr Z Double :* [Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [Expr Z Double] :* [[Expr Z Double]])
-msProblem ceqs_ cineqs_ cost_ dvs = runFunGraph $ do
+msProblem ceqs_ cineqs_ cost_ dvs params = runFunGraph $ do
   ceqs <- mapM node ceqs_
   cineqs <- mapM node cineqs_
   cost <- node cost_
@@ -75,5 +75,5 @@ msProblem ceqs_ cineqs_ cost_ dvs = runFunGraph $ do
       cineqsJacobs = map (map (fromDynamic Z)) cineqsJacobs_
       costGrad     = map (fromDynamic Z) costGrad_
 
-  inputs_ dvs
+  inputs_ (dvs :* params)
   outputs_ (cost :* costGrad :* ceqs :* ceqsJacobs :* cineqs :* cineqsJacobs)
