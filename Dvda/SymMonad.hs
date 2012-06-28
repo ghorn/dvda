@@ -19,6 +19,7 @@ module Dvda.SymMonad ( (:*)(..)
                      , getSensitivities
                      ) where
 
+import Data.List ( intersperse )
 import Control.Monad ( foldM )
 import Control.Monad.State ( MonadState, StateT, get, put, liftM, runState )
 import Data.Functor.Identity ( Identity )
@@ -235,7 +236,32 @@ instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, M
     exprs <- mapM node exprs_
     return (exprs_, map (\(ERef _ k) -> k) exprs)
   typeSignature xs = "[" ++ typeSignature (head xs) ++ "]"
-  patternMatching xs varStrings = (\(x0,x1) -> (show x0, x1)) $ splitAt (length xs) varStrings
+  patternMatching xs varStrings = (\(x0,x1) -> ('[':(concat $ intersperse "," x0) ++ "]", x1)) $
+                                  splitAt (length xs) varStrings
+
+instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkIO (Expr sh a), DvdaDim sh) =>
+         MkIO [[Expr sh a]] where
+  type NumT [[Expr sh a]] = a
+  type GenT [[Expr sh a]] = [[GenT (Expr sh a)]]
+  mkNodes exprs_ = do 
+    exprs <- mapM (mapM node) exprs_
+    return (exprs_, concatMap (map (\(ERef _ k) -> k)) exprs)
+  typeSignature xs = "[[" ++ typeSignature (head (head xs)) ++ "]]"
+  patternMatching xs varStrings = (\(x0,x1) -> ('[':(concat $ intersperse "," x0) ++ "]", x1)) $
+                                  splitAt (length xs) varStrings
+
+--instance (Show a, MkIO a) => MkIO [a] where
+--  type NumT [a] = NumT a
+--  type GenT [a] = [GenT a]
+--  mkNodes xs = do
+--    (x',kxs) <- mapM mkNodes xs >>= (return . unzip)
+--    return (x', concat kxs)
+--  typeSignature xs = "[" ++ typeSignature (head xs) ++ "]"
+--  patternMatching xs varStrings = trace ("patternMatching xs: "++ show xs) $
+--                                  (\(x0,x1) -> ('[':(concat $ intersperse "," x0) ++ "]", x1)) $ splitAt (length xs) varStrings
+----    where
+----      map patternMatching 
+----  patternMatching xs varStrings = (\(x0,x1) -> ('[':(concat $ interspshow x0, x1)) $ splitAt (length xs) varStrings
 
 instance (MkIO a, MkIO b, NumT a ~ NumT b) => MkIO (a :* b) where
   type NumT (a :* b) = NumT a

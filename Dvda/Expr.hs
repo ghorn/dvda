@@ -28,10 +28,10 @@ import Foreign.Storable ( Storable )
 import Data.IntMap ( Key )
 import Data.Hashable ( Hashable, hash, combine )
 import Data.List ( sort )
-import SparseLA ( SparseVec, SparseMat, svFromList, smFromLists )
 
 import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative )
 import Dvda.Config ( simplifyCommutativeOps )
+import Dvda.SparseLA ( SparseVec, SparseMat, svFromList, smFromLists )
 
 showShapeR :: Shape sh => sh -> String
 showShapeR = show . reverse . listOfShape
