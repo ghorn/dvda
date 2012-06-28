@@ -136,22 +136,17 @@ funGraphSummary (FunGraph hm _ (b,bkeys) (c,ckeys)) =
                  , "output dims: " ++ show c
                  , "output nodes:" ++ show ckeys
                  , "number of nodes: " ++ show (HM.size hm)
-                 , "graph: " ++ show hm
                  ]
 
 -- more extensive
 funGraphSummary' :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String
-funGraphSummary' (FunGraph hm im (b,bkeys) (c,ckeys)) =
-  init $ unlines [ "input dims: " ++ show b
-                 , "input nodes:" ++ show bkeys
-                 , "output dims: " ++ show c
-                 , "output nodes:" ++ show ckeys
-                 , "number of nodes: " ++ show (HM.size hm)
-                 , "graph:" 
+funGraphSummary' fg@(FunGraph _ im _ (_,ckeys)) =
+  init $ unlines $ [ "graph:" 
                  , init $ unlines (map show (IM.toList im))
                  , "outputs:"
                  , init $ unlines (map (show . (\k -> fromJust (IM.lookup k im))) ckeys)
-                 ]
+                 , ""
+                 ] ++ [funGraphSummary fg]
 
 collisions :: (Hashable a, Element a) => FunGraph a b c -> (Int, Int, Double)
 collisions (FunGraph gr _ _ _) = (numCollisions, numTotal, fromIntegral numCollisions / fromIntegral numTotal)
