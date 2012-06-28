@@ -55,7 +55,7 @@ data Const sh a where
   CSingleton :: sh -> a -> Const sh a
   CVec :: DIM1 -> Vector a -> Const DIM1 a
   CMat :: DIM2 -> Matrix a -> Const DIM2 a
-  CTensor :: sh -> Vector a -> Const sh a 
+  CTensor :: sh -> Vector a -> Const sh a
 
 data Expr sh a where
   ESym :: sh -> String -> Expr sh a
@@ -71,7 +71,13 @@ data Expr sh a where
   EJacob :: Expr DIM1 a -> Expr DIM1 a -> Expr DIM2 a
 
 --------------------------------- show instances -----------------------------
-deriving instance (Show sh, Show a, Element a) => Show (Const sh a)
+--deriving instance (Show sh, Show a, Element a) => Show (Const sh a)
+instance (Show sh, Show a, Element a) => Show (Const sh a) where
+  show (CSingleton _ x) = show x
+  show (CVec sh v) = "CVec " ++ show sh ++ " " ++ show v
+  show (CMat sh m) = "CMat " ++ show sh ++ " " ++ show m
+  show (CTensor sh v) = "CTensor " ++ show sh ++ " " ++ show v
+
 
 paren :: Show a => a -> String
 paren x = "( "++show x++" )"
