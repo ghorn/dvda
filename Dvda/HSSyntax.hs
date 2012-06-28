@@ -1,18 +1,57 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language GADTs #-}
+{-# Language TypeOperators #-}
+{-# Language FlexibleInstances #-}
+{-# Language FlexibleContexts #-}
 
 module Dvda.HSSyntax ( writeHSSource
+                     , GenHaskell
                      ) where
 
+import Data.List ( intersperse )
+import Data.Array.Repa ( DIM0, DIM1, DIM2 )
 import Data.IntMap ( Key )
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
 
 import Dvda.Expr ( Expr(..), Const(..) )
-import Dvda.SymMonad ( MkIO(..) )
-import Dvda.Graph ( FunGraph(..), DynamicExpr, asIfExpr )
+import Dvda.SymMonad ( (:*)(..) )
+import Dvda.Graph ( FunGraph(..), DynamicExpr, DvdaDim, asIfExpr )
 import Dvda.BinUn ( BinOp(..), UnOp(..) )
 import qualified Dvda.Config as Config
+
+class GenHaskell a where
+  typeSignature :: a -> String
+  patternMatching :: a -> [String] -> (String, [String])
+
+instance GenHaskell (Expr DIM0 Double) where
+  typeSignature _ = "Double"
+  patternMatching _ varStrings = (head varStrings, tail varStrings)
+
+instance GenHaskell (Expr DIM1 Double) where
+  typeSignature _ = "Vector Double"
+  patternMatching _ varStrings = (head varStrings, tail varStrings)
+
+instance GenHaskell (Expr DIM2 Double) where
+  typeSignature _ = "Matrix Double"
+  patternMatching _ varStrings = (head varStrings, tail varStrings)
+
+instance (GenHaskell (Expr sh Double), DvdaDim sh) => GenHaskell [Expr sh Double] where
+  typeSignature xs = "[" ++ typeSignature (head xs) ++ "]"
+  patternMatching xs varStrings = (\(x0,x1) -> ('[':(concat $ intersperse "," x0) ++ "]", x1)) $
+                                  splitAt (length xs) varStrings
+
+instance (GenHaskell (Expr sh Double), DvdaDim sh) => GenHaskell [[Expr sh Double]] where
+  typeSignature xs = "[[" ++ typeSignature (head (head xs)) ++ "]]"
+  patternMatching xs varStrings = (\(x0,x1) -> ('[':(concat $ intersperse "," x0) ++ "]", x1)) $
+                                  splitAt (length xs) varStrings
+
+instance (GenHaskell a, GenHaskell b) => GenHaskell (a :* b) where
+  typeSignature (x :* y) = typeSignature x ++ " :* " ++ typeSignature y
+  patternMatching (x :* y) varStrings0 = (x' ++ " :* " ++ y', varStrings2)
+    where
+      (x', varStrings1) = patternMatching x varStrings0
+      (y', varStrings2) = patternMatching y varStrings1
 
 
 -- assign a scalar
@@ -73,7 +112,7 @@ writeAssignment (k, dexpr)
     isSym (ESym _ _) = True
     isSym _ = False
 
-writeHSSource :: (Show a, Element a, MkIO b, MkIO c) => FunGraph a b c -> String -> String
+writeHSSource :: (Show a, Element a, GenHaskell b, GenHaskell c) => FunGraph a b c -> String -> String
 writeHSSource (FunGraph _ im (ins,inKeys) (outs,outKeys)) hash =
   init $ unlines $
   [ "-- {-# OPTIONS_GHC -Wall #-}"
@@ -104,7 +143,6 @@ writeHSSource (FunGraph _ im (ins,inKeys) (outs,outKeys)) hash =
       inputs  = fst $ patternMatching ins  (map Config.nameHSVar inKeys)
       outputs = fst $ patternMatching outs (map Config.nameHSVar outKeys)
       (decls, comments) = unzip $ map writeAssignment (IM.toList im)
-      body = map writeAssignment (IM.toList im)
 
       lengths = map length decls
       longestDecl = maximum lengths

@@ -16,28 +16,28 @@ import qualified System.Plugins.Make as Make
 import qualified System.Plugins.Load as Load
 import Numeric.LinearAlgebra ( Element )
 
-import Dvda.HSSyntax ( writeHSSource )
+import Dvda.HSSyntax ( GenHaskell, writeHSSource )
 import Dvda.Graph ( FunGraph(..) )
-import Dvda.SymMonad ( MkIO(..), makeFunGraph )
+import Dvda.SymMonad ( MkFunGraph(..), makeFunGraph )
 import qualified Dvda.Config as Config
 
 
 -- | take in a pure function and symbolic inputs, return JIT compiled function
-buildHSFunctionPure :: (Show (NumT c), Element (NumT c), H.Hashable (NumT c), MkIO c,
-                        MkIO b, NumT b ~ NumT c) =>
+buildHSFunctionPure :: (Show (NumT c), Element (NumT c), H.Hashable (NumT c), MkFunGraph c,
+                        MkFunGraph b, NumT b ~ NumT c, GenHaskell b, GenHaskell c) =>
                        (b -> c) -> b -> IO (GenT b -> GenT c)
 buildHSFunctionPure fg xs = buildHSFunction xs (fg xs)
 
 
 -- | take in symbolic inputs and outputs, return JIT compiled function
-buildHSFunction :: (Show (NumT b), Element (NumT b), H.Hashable (NumT b), MkIO b,
-                    MkIO c, NumT c ~ NumT b) =>
+buildHSFunction :: (Show (NumT b), Element (NumT b), H.Hashable (NumT b), MkFunGraph b,
+                    MkFunGraph c, NumT c ~ NumT b, GenHaskell b, GenHaskell c) =>
                    b -> c -> IO (GenT b -> GenT c)
 buildHSFunction inputs outputs = buildHSFunctionFromGraph $ makeFunGraph inputs outputs
 
 
 -- | take in FunGraph, return JIT compiled function
-buildHSFunctionFromGraph :: (Show a, Element a, H.Hashable a, MkIO c, MkIO b) =>
+buildHSFunctionFromGraph :: (Show a, Element a, H.Hashable a, GenHaskell b, GenHaskell c) =>
                             FunGraph a b c -> IO (GenT b -> GenT c)
 buildHSFunctionFromGraph fg = do
   -- source and hash

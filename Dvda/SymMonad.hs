@@ -6,7 +6,7 @@
 {-# Language GADTs #-}
 
 module Dvda.SymMonad ( (:*)(..)
-                     , MkIO(..)
+                     , MkFunGraph(..)
                      , node
                      , node'
                      , inputs
@@ -19,7 +19,6 @@ module Dvda.SymMonad ( (:*)(..)
                      , getSensitivities
                      ) where
 
-import Data.List ( intersperse )
 import Control.Monad ( foldM )
 import Control.Monad.State ( MonadState, StateT, get, put, liftM, runState )
 import Data.Functor.Identity ( Identity )
@@ -191,111 +190,86 @@ infixr 6 :*
 
 
 ---------------------------------- input/output class ---------------------------------------------
-class MkIO a where
+class MkFunGraph a where
   type NumT a
   type GenT a
   mkNodes :: a -> StateT (FunGraph (NumT a) b c) Identity (a,[Key])
-  typeSignature :: a -> String
-  patternMatching :: a -> [String] -> (String, [String])
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
-         MkIO (Expr DIM0 a) where
+         MkFunGraph (Expr DIM0 a) where
   type NumT (Expr DIM0 a) = a
   type GenT (Expr DIM0 a) = a
   mkNodes expr_ = do 
     expr@(ERef _ k) <- node expr_
     return (expr, [k])
-  typeSignature _ = "Double"
-  patternMatching _ varStrings = (head varStrings, tail varStrings)
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
-         MkIO (Expr DIM1 a) where
+         MkFunGraph (Expr DIM1 a) where
   type NumT (Expr DIM1 a) = a
   type GenT (Expr DIM1 a) = Vector a
   mkNodes expr_ = do 
     expr@(ERef _ k) <- node expr_
     return (expr, [k])
-  typeSignature _ = "Vector Double"
-  patternMatching _ varStrings = (head varStrings, tail varStrings)
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
-         MkIO (Expr DIM2 a) where
+         MkFunGraph (Expr DIM2 a) where
   type NumT (Expr DIM2 a) = a
   type GenT (Expr DIM2 a) = Matrix a
   mkNodes expr_ = do
     expr@(ERef _ k) <- node expr_
     return (expr, [k])
-  typeSignature _ = "Matrix Double"
-  patternMatching _ varStrings = (head varStrings, tail varStrings)
 
-instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkIO (Expr sh a), DvdaDim sh) =>
-         MkIO [Expr sh a] where
+instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkFunGraph (Expr sh a), DvdaDim sh) =>
+         MkFunGraph [Expr sh a] where
   type NumT [Expr sh a] = a
   type GenT [Expr sh a] = [GenT (Expr sh a)]
   mkNodes exprs_ = do 
     exprs <- mapM node exprs_
     return (exprs_, map (\(ERef _ k) -> k) exprs)
-  typeSignature xs = "[" ++ typeSignature (head xs) ++ "]"
-  patternMatching xs varStrings = (\(x0,x1) -> ('[':(concat $ intersperse "," x0) ++ "]", x1)) $
-                                  splitAt (length xs) varStrings
 
-instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkIO (Expr sh a), DvdaDim sh) =>
-         MkIO [[Expr sh a]] where
+instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkFunGraph (Expr sh a), DvdaDim sh) =>
+         MkFunGraph [[Expr sh a]] where
   type NumT [[Expr sh a]] = a
   type GenT [[Expr sh a]] = [[GenT (Expr sh a)]]
   mkNodes exprs_ = do 
     exprs <- mapM (mapM node) exprs_
     return (exprs_, concatMap (map (\(ERef _ k) -> k)) exprs)
-  typeSignature xs = "[[" ++ typeSignature (head (head xs)) ++ "]]"
-  patternMatching xs varStrings = (\(x0,x1) -> ('[':(concat $ intersperse "," x0) ++ "]", x1)) $
-                                  splitAt (length xs) varStrings
 
---instance (Show a, MkIO a) => MkIO [a] where
+--instance (Show a, MkFunGraph a) => MkFunGraph [a] where
 --  type NumT [a] = NumT a
 --  type GenT [a] = [GenT a]
 --  mkNodes xs = do
 --    (x',kxs) <- mapM mkNodes xs >>= (return . unzip)
 --    return (x', concat kxs)
---  typeSignature xs = "[" ++ typeSignature (head xs) ++ "]"
---  patternMatching xs varStrings = trace ("patternMatching xs: "++ show xs) $
---                                  (\(x0,x1) -> ('[':(concat $ intersperse "," x0) ++ "]", x1)) $ splitAt (length xs) varStrings
-----    where
-----      map patternMatching 
-----  patternMatching xs varStrings = (\(x0,x1) -> ('[':(concat $ interspshow x0, x1)) $ splitAt (length xs) varStrings
 
-instance (MkIO a, MkIO b, NumT a ~ NumT b) => MkIO (a :* b) where
+instance (MkFunGraph a, MkFunGraph b, NumT a ~ NumT b) => MkFunGraph (a :* b) where
   type NumT (a :* b) = NumT a
   type GenT (a :* b) = GenT a :* GenT b
   mkNodes (x :* y) = do
     (x',kxs) <- mkNodes x
     (y',kys) <- mkNodes y
     return (x' :* y', kxs ++ kys)
-  typeSignature (x :* y) = typeSignature x ++ " :* " ++ typeSignature y
-  patternMatching (x :* y) varStrings0 = (x' ++ " :* " ++ y', varStrings2)
-    where
-      (x', varStrings1) = patternMatching x varStrings0
-      (y', varStrings2) = patternMatching y varStrings1
 
-inputs :: MkIO b => b -> StateT (FunGraph (NumT b) b c) Identity b
+inputs :: MkFunGraph b => b -> StateT (FunGraph (NumT b) b c) Identity b
 inputs exprs_ = do
   (exprs, keys) <- mkNodes exprs_
   FunGraph hm im _ outs <- get
   put $ FunGraph hm im (exprs, keys) outs
   return exprs
 
-outputs :: MkIO c => c -> StateT (FunGraph (NumT c) b c) Identity c
+outputs :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b c) Identity c
 outputs exprs_ = do
   (exprs,keys) <- mkNodes exprs_
   FunGraph hm im ins _ <- get
   put $ FunGraph hm im ins (exprs,keys)
   return exprs
 
-inputs_ :: MkIO b => b -> StateT (FunGraph (NumT b) b c) Identity ()
+inputs_ :: MkFunGraph b => b -> StateT (FunGraph (NumT b) b c) Identity ()
 inputs_ exprs = do
   _ <- inputs exprs
   return ()
 
-outputs_ :: MkIO c => c -> StateT (FunGraph (NumT c) b c) Identity ()
+outputs_ :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b c) Identity ()
 outputs_ exprs = do
   _ <- outputs exprs
   return ()
@@ -304,7 +278,7 @@ outputs_ exprs = do
 runFunGraph :: StateT (FunGraph a b c) Identity d -> FunGraph a b c
 runFunGraph f = snd $ runState f emptyFunGraph
 
-makeFunGraph :: (MkIO b, MkIO c, NumT b ~ NumT c) =>
+makeFunGraph :: (MkFunGraph b, MkFunGraph c, NumT b ~ NumT c) =>
                 b -> c -> FunGraph (NumT b) b c
 makeFunGraph ins outs = runFunGraph $ do
   inputs_ ins

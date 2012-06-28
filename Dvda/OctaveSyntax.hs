@@ -9,7 +9,6 @@ import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
 
 import Dvda.Expr ( Expr(..), Const(..) )
-import Dvda.SymMonad ( MkIO(..) )
 import Dvda.Graph ( FunGraph(..), DynamicExpr, asIfExpr )
 import Dvda.BinUn ( BinOp(..), UnOp(..) )
 import qualified Dvda.Config as Config
@@ -73,7 +72,7 @@ writeAssignment (k, dexpr)
     isSym (ESym _ _) = True
     isSym _ = False
 
-writeOctaveSource :: (Show a, Element a, MkIO b, MkIO c) => FunGraph a b c -> String -> String
+writeOctaveSource :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String -> String
 writeOctaveSource (FunGraph _ im (ins,inKeys) (outs,outKeys)) hash =
   init $ unlines $
   [ "function " ++ outputs ++ " = " ++ Config.nameHSFunction hash ++ "(" ++ inputs ++ ")"
@@ -81,8 +80,8 @@ writeOctaveSource (FunGraph _ im (ins,inKeys) (outs,outKeys)) hash =
   , "end"
   ]
     where
-      inputs  = fst $ patternMatching ins  (map Config.nameHSVar inKeys)
-      outputs = fst $ patternMatching outs (map Config.nameHSVar outKeys)
+      inputs  = show (ins, inKeys) --fst $ patternMatching ins  (map Config.nameHSVar inKeys)
+      outputs = show (outs, outKeys) --fst $ patternMatching outs (map Config.nameHSVar outKeys)
       (decls, comments) = unzip $ map writeAssignment (IM.toList im)
 
       lengths = map length decls
