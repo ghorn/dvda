@@ -15,6 +15,8 @@ module Dvda ( -- * primitives
               sym
             , vsym
             , msym
+            , svec
+            , smat
             , vec
             , mat
               -- * operations

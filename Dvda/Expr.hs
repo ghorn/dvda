@@ -6,6 +6,8 @@
 module Dvda.Expr ( Expr(..)
                  , Const(..)
                  , sym
+                 , svec
+                 , smat
                  , vsym
                  , msym
                  , vec
@@ -26,6 +28,7 @@ import Foreign.Storable ( Storable )
 import Data.IntMap ( Key )
 import Data.Hashable ( Hashable, hash, combine )
 import Data.List ( sort )
+import SparseLA ( SparseVec, SparseMat, svFromList, smFromLists )
 
 import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative )
 import Dvda.Config ( simplifyCommutativeOps )
@@ -286,24 +289,40 @@ instance (Shape sh, Floating a, Eq a, Num (Vector a), LA.Container Vector a) =>
   acosh = error "no instance for acosh"
 
 ------------------------------ convenience functions -------------------------
+-- | symbolic scalar
 sym :: String -> Expr DIM0 a
 sym = ESym Z
 
+-- | symbolic dense vector
 vsym :: Int -> String -> Expr DIM1 a
 vsym k = ESym (Z :. k)
 
+-- | symbolic dense matrix
 msym :: (Int,Int) -> String -> Expr DIM2 a
 msym (r,c) = ESym (Z :. r :. c)
 
+-- | symbolic dense constant vector
 vec :: Storable a => [a] -> Expr DIM1 a
 vec xs = EConst $ CVec (shapeOfList [length xs]) (LA.fromList xs)
 
+-- | symbolic dense constant matrix
 mat :: Element a => (Int,Int) -> [[a]] -> Expr DIM2 a
 mat (r,c) xs 
   | r*c == sum (map length xs) && r == length xs = EConst $ CMat (shapeOfList [c,r]) (LA.fromLists xs)
   | otherwise = error $ "bad dims in mat!"++
                 "\ngiven (r,c):  " ++ show (r,c) ++
                 "\nactual (r,c): " ++ show (length xs, map length xs)
+
+-- | symbolic sparse vector
+svec :: String -> Int -> SparseVec (Expr DIM0 a)
+svec name len = svFromList $ map (\k -> sym $ name ++ "_" ++ show k) [0..len-1]
+
+-- | symbolic sparse matrix
+smat :: String -> (Int,Int) -> SparseMat (Expr DIM0 a)
+smat name (rows,cols) = smFromLists allRcs
+  where
+    allRcs = map (\row -> map (\col -> (sym $ name ++ "_" ++ show row ++ "_" ++ show col)) [0..cols-1]) [0..rows-1]
+
 
 scale :: Expr DIM0 a -> Expr sh a -> Expr sh a
 scale = EScale
