@@ -19,7 +19,7 @@ module Dvda.Expr ( Expr(..)
                  , dim
                  ) where
 
-import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList))
+import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList), rank )
 import Numeric.LinearAlgebra ( Matrix, Vector, Element )
 import qualified Numeric.LinearAlgebra as LA
 import Foreign.Storable ( Storable )
@@ -75,7 +75,8 @@ paren x = "( "++show x++" )"
 
 instance (Shape sh, Show sh, Show a, Element a) => Show (Expr sh a) where
   show (EDimensionless x) = show x
-  show (ESym sh name) = name++"{"++showShapeR sh++"}"
+  show (ESym sh name) = case rank sh of 0 -> name
+                                        _ -> name++"{"++showShapeR sh++"}"
   show (EConst x) = "{" ++ show x ++ "}" 
   show (EUnary op x) = showUnary x op
   show (EBinary op x y) = paren x ++ showBinary op ++ paren y
