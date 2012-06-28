@@ -11,6 +11,7 @@ import qualified Data.IntMap as IM
 import Dvda
 import Dvda.SparseLA
 import Dvda.MS
+import Dvda.OctaveSyntax
 
 n :: Int
 n = 2
@@ -88,5 +89,6 @@ problem = msProblem ceqs cineqs cost dvList
 
 run :: IO ()
 run = do
-  _ <- buildHSFunctionFromGraph problem
+--  _ <- buildHSFunctionFromGraph problem
+  putStrLn $ writeOctaveSource problem "foo"
   print "yay"
