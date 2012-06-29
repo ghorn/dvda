@@ -57,6 +57,8 @@ Library
 --                     Dvda.HSSyntax
                      Dvda.MS
                      Dvda.MSExample
+                     Dvda.MSDSL
+                     Dvda.MSDSLExample
                      Dvda.OctaveSyntax
                      Dvda.SparseLA
                      Dvda.SymMonad
