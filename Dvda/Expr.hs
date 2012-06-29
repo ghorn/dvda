@@ -1,5 +1,6 @@
 {-# Options_ghc -Wall #-}
 {-# Language StandaloneDeriving #-}
+{-# Language DeriveDataTypeable #-}
 {-# Language GADTs #-}
 {-# Language FlexibleContexts #-}
 
@@ -28,6 +29,7 @@ import Foreign.Storable ( Storable )
 import Data.IntMap ( Key )
 import Data.Hashable ( Hashable, hash, combine )
 import Data.List ( sort )
+import Data.Typeable ( Typeable2 )
 
 import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative )
 import Dvda.Config ( simplifyCommutativeOps )
@@ -50,6 +52,9 @@ dim (ERef sh _) = sh
 dim (EDeriv _ _) = Z
 dim (EGrad _ args) = dim args
 dim (EJacob x args) = Z :. head (listOfShape (dim x)) :. head (listOfShape (dim args))
+
+deriving instance Typeable2 Const
+deriving instance Typeable2 Expr
 
 data Const sh a where
   CSingleton :: sh -> a -> Const sh a
