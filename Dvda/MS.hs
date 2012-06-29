@@ -12,7 +12,7 @@ import qualified Data.IntMap as IM
 import Data.Array.Repa ( Z(..) )
 
 import Dvda
-import Dvda.SymMonad ( rad )
+import Dvda.SymMonad ( rad, KeyT )
 import Dvda.Graph ( fromDynamic )
 import Dvda.SparseLA
 
@@ -60,8 +60,8 @@ dynamicsErrorsSimpson stateVecs' actionVecs' ode dt = zipWith (simpsonsRuleError
     uPairs = zip (init actionVecs') (tail actionVecs')
 
 msProblem :: [Expr Z Double] -> [Expr Z Double] -> Expr Z Double -> [Expr Z Double] -> [Expr Z Double]
-             -> FunGraph Double ([Expr Z Double] :* [Expr Z Double])
-             (Expr Z Double :* [Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [Expr Z Double] :* [[Expr Z Double]])
+             -> FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double]))
+             (KeyT (Expr Z Double :* [Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [Expr Z Double] :* [[Expr Z Double]]))
 msProblem ceqs_ cineqs_ cost_ dvs params = runFunGraph $ do
   ceqs <- mapM node ceqs_
   cineqs <- mapM node cineqs_

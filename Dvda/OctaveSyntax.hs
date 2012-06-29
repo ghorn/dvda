@@ -6,17 +6,52 @@
 module Dvda.OctaveSyntax ( writeOctaveSource
                          ) where
 
+import Data.List ( intersperse )
 import Data.Maybe ( fromJust )
 import Data.IntMap ( IntMap, Key )
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
+import Text.Printf
 
 import Dvda ( DIM0 )
 import Dvda.Expr ( Expr(..), Const(..) )
 import Dvda.Graph ( FunGraph(..), DynamicExpr, asIfExpr )
 import Dvda.BinUn ( BinOp(..), UnOp(..) )
-import Dvda.SymMonad ( (:*)(..) )
+import Dvda.SymMonad ( (:*)(..), KeyT )
 import qualified Dvda.Config as Config
+
+class OctaveOutputs a where
+  numOutputs :: a -> Int
+  writeOutputs :: a -> Int -> String
+
+instance OctaveOutputs (Expr DIM0 Double, Int) where
+  numOutputs _ = 1
+  writeOutputs (_, key) outputK = printf "\noutput%d = %s; %% Expr DIM0 Double" outputK (Config.nameHSVar key)
+
+instance OctaveOutputs ([Expr DIM0 Double], [Int]) where
+  numOutputs _ = 1
+  writeOutputs (_, []) outputK = printf "\noutput%d = []; %% [Expr DIM0 Double]" outputK;
+  writeOutputs (_, keys) outputK = init $ unlines $
+                                 [printf "\noutput%d = zeros(%d,1); %% [Expr DIM0 Double]" outputK (length keys)] ++
+                                 zipWith f [(1::Int)..] keys
+    where
+      f outIdx node = printf "output%d(%d) = %s;" outputK outIdx (Config.nameHSVar node)
+
+instance OctaveOutputs ([[Expr DIM0 Double]], [[Int]]) where
+  numOutputs _ = 1
+  writeOutputs (_, []) outputK = printf "\noutput%d = []; %% [[Expr DIM0 Double]]" outputK;
+  writeOutputs (_, keys) outputK =
+    init $ unlines $
+    (printf "\noutput%d = zeros(%d,%d); %% [[Expr DIM0 Double]]" outputK (length keys) (length (head keys))):
+    zipWith f [(r,c) | r <- [1..length (keys)], c <- [1..(length (head keys))]] (concat keys)
+    where
+      f (rowIdx,colIdx) node = printf "output%d(%d,%d) = %s;" outputK rowIdx colIdx (Config.nameHSVar node)
+
+
+instance (OctaveOutputs a, OctaveOutputs b) => OctaveOutputs (a :* b) where
+  numOutputs (kp0 :* kp1) = numOutputs kp0 + numOutputs kp1
+  writeOutputs (kp0 :* kp1) outputK = writeOutputs kp0 outputK ++ "\n" ++
+                                      writeOutputs kp1 (outputK + numOutputs kp0)
 
 -- assign a scalar
 sassign :: Key -> String
@@ -78,25 +113,28 @@ writeAssignment inputMap (k, dexpr)
     isSym _ = False
 
 
-writeOctaveSource :: (Show a, Element a, Show c) => FunGraph a ([Expr DIM0 Double] :* [Expr DIM0 Double]) c -> String -> String
-writeOctaveSource (FunGraph _ im ((ins0 :* ins1),inKeys) (outs,outKeys)) hash =
+writeOctaveSource :: (Show a, Element a, OctaveOutputs c) =>
+                     FunGraph a (KeyT ([Expr DIM0 Double] :* [Expr DIM0 Double])) c -> String -> String
+writeOctaveSource (FunGraph _ im ((_, inKeys0) :* (_, inKeys1)) outs) hash =
   init $ unlines $
-  [ "function " ++ outputs ++ " = " ++ Config.nameHSFunction hash ++ "( x0, x1 )"
+  [ "function " ++ outputHeader ++ " = " ++ Config.nameHSFunction hash ++ "( x0, x1 )"
   , ""
-  , init $ unlines $ map ("    " ++) (zipWith3 (\d s c -> d ++ s ++ "% " ++ c) decls extraSpaces comments)
+  , init $ unlines $ (zipWith3 (\d s c -> d ++ s ++ "% " ++ c) decls extraSpaces comments)
+  , ""
+  , ""
+  , "% outputs:"
+  , writeOutputs outs 0
   , ""
   , "end"
-  , show outs
-  , ""
-  , show outKeys
   ]
     where
-      (inKeys0, inKeys1) = splitAt (length ins0) inKeys
       inputMap = IM.fromList $
                  (zipWith (\k inputK -> (k, (0, inputK))) inKeys0 [1..]) ++
                  (zipWith (\k inputK -> (k, (1, inputK))) inKeys1 [1..])
       
-      outputs = "[outputs go here, yo]" -- show (outs, outKeys) --fst $ patternMatching outs (map Config.nameHSVar outKeys)
+      outputHeader = "[" ++
+                     concat (intersperse "," (map (\k -> "output"++show k) [0..(numOutputs outs - 1)])) ++
+                     "]"
       (decls, comments) = unzip $ map (writeAssignment inputMap) (IM.toList im)
 
       lengths = map length decls

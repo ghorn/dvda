@@ -64,11 +64,11 @@ type FgNode a = (Key, SymSet a)
 data FunGraph a b c = FunGraph
                       (HM.HashMap (DynamicExpr a) (FgNode a)) -- main lookup
                       (IM.IntMap (DynamicExpr a)) -- internal for reverse lookup
-                      (b,[Key])
-                      (c,[Key]) --  deriving Show
+                      b
+                      c --  deriving Show
                                          
-instance (Hashable a, Element a)  => Hashable (FunGraph a b c) where
-  hash (FunGraph _ im (_, inskeys) (_, outskeys)) = hash (IM.toList im, inskeys, outskeys)
+instance (Hashable a, Hashable b, Hashable c, Element a)  => Hashable (FunGraph a b c) where
+  hash (FunGraph _ im inskeys outskeys) = hash (IM.toList im, inskeys, outskeys)
 
 class Shape sh => DvdaDim sh where
   makeDynamic :: Expr sh a -> DynamicExpr a
@@ -130,21 +130,17 @@ insert expr = do
 
 
 funGraphSummary :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String
-funGraphSummary (FunGraph hm _ (b,bkeys) (c,ckeys)) =
-  init $ unlines [ "input dims: " ++ show b
-                 , "input nodes:" ++ show bkeys
-                 , "output dims: " ++ show c
-                 , "output nodes:" ++ show ckeys
+funGraphSummary (FunGraph hm _ b c) =
+  init $ unlines [ "inputs: " ++ show b
+                 , "outputs: " ++ show c
                  , "number of nodes: " ++ show (HM.size hm)
                  ]
 
 -- more extensive
 funGraphSummary' :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String
-funGraphSummary' fg@(FunGraph _ im _ (_,ckeys)) =
+funGraphSummary' fg@(FunGraph _ im _ _) =
   init $ unlines $ [ "graph:" 
                  , init $ unlines (map show (IM.toList im))
-                 , "outputs:"
-                 , init $ unlines (map (show . (\k -> fromJust (IM.lookup k im))) ckeys)
                  , ""
                  ] ++ [funGraphSummary fg]
 
@@ -167,7 +163,7 @@ showCollisions gr = show numCollisions ++ '/' : show numTotal ++ " collisions ("
     (numCollisions, numTotal, frac) = collisions gr
 
 emptyFunGraph :: FunGraph a b c
-emptyFunGraph = FunGraph HM.empty IM.empty (inerr,inerr) (outerr,outerr)
+emptyFunGraph = FunGraph HM.empty IM.empty inerr outerr
   where
     inerr = error "must specify inputs"
     outerr = error "must specify outputs"

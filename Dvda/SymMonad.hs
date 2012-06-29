@@ -128,7 +128,7 @@ lookupSymSet expr = do
 getSensitivities :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh) =>
                     HS.HashSet (DynamicExpr a) -> Expr sh a -> Expr sh a
                     -> StateT (FunGraph a b c) Identity (HM.HashMap (DynamicExpr a) (DynamicExpr a))
-getSensitivities _ (EGrad _ _) _ = error "don't call getSensitivities on EGrad"
+getSensitivities _ (EGrad  _ _) _ = error "don't call getSensitivities on EGrad"
 getSensitivities _ (EJacob _ _) _ = error "don't call getSensitivities on EJacob"
 getSensitivities _ (EDeriv _ _) _ = error "don't call getSensitivities on EDeriv"
 getSensitivities _ (EDimensionless _) _ = return HM.empty
@@ -193,51 +193,58 @@ infixr 6 :*
 class MkFunGraph a where
   type NumT a
   type GenT a
-  mkNodes :: a -> StateT (FunGraph (NumT a) b c) Identity (a,[Key])
+  type KeyT a
+  mkNodes :: a -> StateT (FunGraph (NumT a) b c) Identity (a, KeyT a)
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
          MkFunGraph (Expr DIM0 a) where
   type NumT (Expr DIM0 a) = a
   type GenT (Expr DIM0 a) = a
+  type KeyT (Expr DIM0 a) = (Expr DIM0 a, Int)
   mkNodes expr_ = do 
     expr@(ERef _ k) <- node expr_
-    return (expr, [k])
+    return (expr, (expr, k))
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
          MkFunGraph (Expr DIM1 a) where
   type NumT (Expr DIM1 a) = a
   type GenT (Expr DIM1 a) = Vector a
+  type KeyT (Expr DIM1 a) = (Expr DIM1 a, Int)
   mkNodes expr_ = do 
     expr@(ERef _ k) <- node expr_
-    return (expr, [k])
+    return (expr, (expr, k))
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
          MkFunGraph (Expr DIM2 a) where
   type NumT (Expr DIM2 a) = a
   type GenT (Expr DIM2 a) = Matrix a
+  type KeyT (Expr DIM2 a) = (Expr DIM2 a, Int)
   mkNodes expr_ = do
     expr@(ERef _ k) <- node expr_
-    return (expr, [k])
+    return (expr, (expr, k))
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkFunGraph (Expr sh a), DvdaDim sh) =>
          MkFunGraph [Expr sh a] where
   type NumT [Expr sh a] = a
   type GenT [Expr sh a] = [GenT (Expr sh a)]
+  type KeyT [Expr sh a] = ([Expr sh a], [Int])
   mkNodes exprs_ = do 
     exprs <- mapM node exprs_
-    return (exprs_, map (\(ERef _ k) -> k) exprs)
+    return (exprs, (exprs, map (\(ERef _ k) -> k) exprs))
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkFunGraph (Expr sh a), DvdaDim sh) =>
          MkFunGraph [[Expr sh a]] where
   type NumT [[Expr sh a]] = a
   type GenT [[Expr sh a]] = [[GenT (Expr sh a)]]
+  type KeyT [[Expr sh a]] = ([[Expr sh a]], [[Int]])
   mkNodes exprs_ = do 
     exprs <- mapM (mapM node) exprs_
-    return (exprs_, concatMap (map (\(ERef _ k) -> k)) exprs)
+    return (exprs, (exprs, map (map (\(ERef _ k) -> k)) exprs))
 
 --instance (Show a, MkFunGraph a) => MkFunGraph [a] where
 --  type NumT [a] = NumT a
 --  type GenT [a] = [GenT a]
+--  type KeyT [a] = [KeyT a]
 --  mkNodes xs = do
 --    (x',kxs) <- mapM mkNodes xs >>= (return . unzip)
 --    return (x', concat kxs)
@@ -245,31 +252,32 @@ instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, M
 instance (MkFunGraph a, MkFunGraph b, NumT a ~ NumT b) => MkFunGraph (a :* b) where
   type NumT (a :* b) = NumT a
   type GenT (a :* b) = GenT a :* GenT b
+  type KeyT (a :* b) = KeyT a :* KeyT b
   mkNodes (x :* y) = do
     (x',kxs) <- mkNodes x
     (y',kys) <- mkNodes y
-    return (x' :* y', kxs ++ kys)
+    return (x' :* y', kxs :* kys)
 
-inputs :: MkFunGraph b => b -> StateT (FunGraph (NumT b) b c) Identity b
+inputs :: MkFunGraph b => b -> StateT (FunGraph (NumT b) (KeyT b) c) Identity b
 inputs exprs_ = do
-  (exprs, keys) <- mkNodes exprs_
+  (exprs, keyPairs) <- mkNodes exprs_
   FunGraph hm im _ outs <- get
-  put $ FunGraph hm im (exprs, keys) outs
+  put $ FunGraph hm im keyPairs outs
   return exprs
 
-outputs :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b c) Identity c
+outputs :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b (KeyT c)) Identity c
 outputs exprs_ = do
-  (exprs,keys) <- mkNodes exprs_
+  (exprs, keyPairs) <- mkNodes exprs_
   FunGraph hm im ins _ <- get
-  put $ FunGraph hm im ins (exprs,keys)
+  put $ FunGraph hm im ins keyPairs
   return exprs
 
-inputs_ :: MkFunGraph b => b -> StateT (FunGraph (NumT b) b c) Identity ()
+inputs_ :: MkFunGraph b => b -> StateT (FunGraph (NumT b) (KeyT b) c) Identity ()
 inputs_ exprs = do
   _ <- inputs exprs
   return ()
 
-outputs_ :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b c) Identity ()
+outputs_ :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b (KeyT c)) Identity ()
 outputs_ exprs = do
   _ <- outputs exprs
   return ()
@@ -279,7 +287,7 @@ runFunGraph :: StateT (FunGraph a b c) Identity d -> FunGraph a b c
 runFunGraph f = snd $ runState f emptyFunGraph
 
 makeFunGraph :: (MkFunGraph b, MkFunGraph c, NumT b ~ NumT c) =>
-                b -> c -> FunGraph (NumT b) b c
+                b -> c -> FunGraph (NumT b) (KeyT b) (KeyT c)
 makeFunGraph ins outs = runFunGraph $ do
   inputs_ ins
   outputs_ outs

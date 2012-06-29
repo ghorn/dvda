@@ -113,7 +113,7 @@ writeAssignment (k, dexpr)
     isSym _ = False
 
 writeHSSource :: (Show a, Element a, GenHaskell b, GenHaskell c) => FunGraph a b c -> String -> String
-writeHSSource (FunGraph _ im (ins,inKeys) (outs,outKeys)) hash =
+writeHSSource (FunGraph _ im inKeys outKeys) hash =
   init $ unlines $
   [ "-- {-# OPTIONS_GHC -Wall #-}"
   , "{-# Language GADTs #-}"

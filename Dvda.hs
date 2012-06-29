@@ -38,9 +38,9 @@ module Dvda ( -- * primitives
             , showCollisions
             , previewGraph
               -- * compile and link function
-            , buildHSFunction
-            , buildHSFunctionPure
-            , buildHSFunctionFromGraph
+--            , buildHSFunction
+--            , buildHSFunctionPure
+--            , buildHSFunctionFromGraph
               -- * Heterogenous inputs/outputs
             , (:*)(..)
             , Exprs
@@ -57,7 +57,7 @@ module Dvda ( -- * primitives
 
 import Dvda.Expr
 import Dvda.Graph
-import Dvda.HSBuilder
+--import Dvda.HSBuilder
 import Dvda.SymMonad
 
 import Data.Array.Repa ( DIM0, DIM1, DIM2, Z(..), Shape, (:.) )
