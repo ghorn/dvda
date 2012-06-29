@@ -4,7 +4,6 @@
 
 module Dvda.Config( -- * directory stuff
                     dvdaDir
-                  , functionDir
                     -- * C syntax
                   , cType
                   , cName
@@ -19,6 +18,8 @@ module Dvda.Config( -- * directory stuff
                   , nameHSSource
                   , nameHSVar
                   , nameHSConst
+                    -- * Octave
+                  , nameOctaveSource
                     -- * gcc stuff
                   , gccString
                   , spewGccCall
@@ -64,12 +65,6 @@ ghcString :: FilePath -> FilePath -> String
 ghcString src obj = "ghc -c " ++ src ++ " -o " ++ obj
 
 
-functionDir :: String -> IO FilePath
-functionDir hash = do
-  -- dvda directory
-  topDir <- dvdaDir
-  return (topDir ++ "/" ++ nameCFunction hash)
-
 -- c syntax
 -- | type to use when generating c code
 cType :: String
@@ -113,6 +108,9 @@ nameHSModule hash = "Call_" ++ hash
 
 nameHSSource :: String -> String
 nameHSSource = (++ ".hs") . nameHSModule
+
+nameOctaveSource :: String -> String
+nameOctaveSource = (++ ".m")
 
 nameHSObject :: String -> String
 nameHSObject = (++ ".o") . nameHSModule

@@ -5,8 +5,9 @@
 
 module Dvda.MS ( dynamicsErrorsEuler
                , dynamicsErrorsSimpson
-               , msProblem
-               , writeMSProblem
+               , msCost
+               , msConstraints
+               , writeMS
                ) where
 
 import qualified Data.IntMap as IM
@@ -15,7 +16,7 @@ import Data.Array.Repa ( Z(..) )
 import Dvda
 import Dvda.Codegen ( writeSourceFile )
 import Dvda.Graph ( fromDynamic )
-import Dvda.OctaveSyntax ( showOctaveSource )
+import Dvda.OctaveSyntax ( OctaveOutputs, showOctaveSource )
 import Dvda.SparseLA
 import Dvda.SymMonad ( rad, KeyT )
 import qualified Dvda.Config as Config
@@ -63,31 +64,39 @@ dynamicsErrorsSimpson stateVecs' actionVecs' ode dt = zipWith (simpsonsRuleError
     xPairs = zip (init  stateVecs') (tail  stateVecs')
     uPairs = zip (init actionVecs') (tail actionVecs')
 
-msProblem :: [Expr Z Double] -> [Expr Z Double] -> Expr Z Double -> [Expr Z Double] -> [Expr Z Double]
-             -> FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double]))
-             (KeyT (Expr Z Double :* [Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [Expr Z Double] :* [[Expr Z Double]]))
-msProblem ceqs_ cineqs_ cost_ dvs params = runFunGraph $ do
+msConstraints :: [Expr Z Double] -> [Expr Z Double] -> [Expr Z Double] -> [Expr Z Double]
+                 -> FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double]))
+                 (KeyT ([Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [[Expr Z Double]]))
+msConstraints ceqs_ cineqs_ dvs params = runFunGraph $ do
   ceqs <- mapM node ceqs_
   cineqs <- mapM node cineqs_
-  cost <- node cost_
 
   ceqsJacobs_ <- mapM (flip rad dvs) ceqs
   cineqsJacobs_ <- mapM (flip rad dvs) cineqs
-  costGrad_ <- (flip rad dvs) cost
 
   let ceqsJacobs   = map (map (fromDynamic Z)) ceqsJacobs_
       cineqsJacobs = map (map (fromDynamic Z)) cineqsJacobs_
-      costGrad     = map (fromDynamic Z) costGrad_
 
   inputs_ (dvs :* params)
-  outputs_ (cost :* costGrad :* ceqs :* ceqsJacobs :* cineqs :* cineqsJacobs)
+  outputs_ (cineqs :* ceqs :* cineqsJacobs :* ceqsJacobs)
 
-writeMSProblem :: FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double]))
-                  (KeyT (Expr Z Double :* [Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [Expr Z Double] :* [[Expr Z Double]])) -> IO ()
-writeMSProblem fg = do
-  -- source and hash
-  let name = "someProblem"
-      source = showOctaveSource fg name
-      sourceName = Config.nameHSSource name
-  sourcePath <- writeSourceFile name source sourceName
-  print sourcePath
+
+msCost :: Expr Z Double -> [Expr Z Double] -> [Expr Z Double]
+          -> FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double]))
+          (KeyT (Expr Z Double :* [Expr Z Double]))
+msCost cost_ dvs params = runFunGraph $ do
+  cost <- node cost_
+
+  costGrad_ <- (flip rad dvs) cost
+
+  let costGrad     = map (fromDynamic Z) costGrad_
+
+  inputs_ (dvs :* params)
+  outputs_ (cost :* costGrad)
+
+writeMS :: OctaveOutputs c => FilePath -> String
+           -> FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double])) c-> IO FilePath
+writeMS funDir name fg = do
+  let source = showOctaveSource fg name
+      sourceName = Config.nameOctaveSource name
+  writeSourceFile source funDir sourceName

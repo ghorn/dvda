@@ -41,11 +41,14 @@ buildHSFunction inputs outputs = buildHSFunctionFromGraph $ makeFunGraph inputs 
 buildHSFunctionFromGraph :: (Show a, Element a, H.Hashable a, GenHaskell b, GenHaskell c) =>
                             FunGraph a b c -> IO (GenT b -> GenT c)
 buildHSFunctionFromGraph fg = do
+  topDir <- dvdaDir
   -- source and hash
   let hash = show $ abs $ H.hash fg
       source = writeHSSource fg hash
       sourceName = Config.nameHSSource hash
-  sourcePath <- writeSourceFile hash source sourceName
+      funDir = topDir ++ "/" ++ nameCFunction hash
+
+  sourcePath <- writeSourceFile source funDir sourceName
   
   -- write  source
   putStrLn "writing source"

@@ -8,11 +8,11 @@ import Control.Monad(when)
 
 import qualified Dvda.Config as Config
 
-writeSourceFile :: String -> String -> FilePath -> IO FilePath
-writeSourceFile hash source sourceName = do
-  -- function directory
-  dir <- Config.functionDir hash
-  
+writeSourceFile :: String -> FilePath -> FilePath -> IO FilePath
+writeSourceFile source functionDir sourceName = do
+  topDir <- Config.dvdaDir
+  let dir = topDir ++ "/" ++ functionDir
+
   -- make function directory if it doesn't exist
   createDirectoryIfMissing False dir
   
@@ -32,7 +32,7 @@ writeSourceFile hash source sourceName = do
       "====================================================\n\n"
   
   -- write  source
-  putStrLn "writing source"
+  putStrLn $ "writing " ++ sourcePath
   writeFile sourcePath source
 
   return sourcePath

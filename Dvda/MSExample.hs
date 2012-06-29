@@ -2,19 +2,14 @@
 {-# Language FlexibleContexts #-}
 {-# Language TypeOperators #-}
 
-module Dvda.MSExample( problem
-                     , run
+module Dvda.MSExample( run
                      ) where
 
 import qualified Data.IntMap as IM
-import Data.Array.Repa ( Z(..) )
 
 import Dvda
 import Dvda.SparseLA
 import Dvda.MS
-import Dvda.SymMonad ( rad, KeyT )
-import Dvda.OctaveSyntax
-import Dvda.Graph ( fromDynamic )
 
 n :: Int
 n = 2
@@ -95,25 +90,14 @@ cineqs = []
 cost :: Expr Z Double
 cost = costFun stateLists actionLists
 
-problem :: FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double]))
-           (KeyT (Expr Z Double :* [Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [Expr Z Double] :* [[Expr Z Double]]))
-problem = msProblem ceqs cineqs cost dvList paramList
-
 run :: IO ()
 run = do
---  _ <- buildHSFunctionFromGraph problem
-  putStrLn $ showOctaveSource problem "foo"
-  print "yay"
+  let costFg = msCost cost dvList paramList
+      cnstFg = msConstraints ceqs cineqs dvList paramList
 
-blah :: IO ()
-blah = do
-  let fg = runFunGraph $ do
-        ceqs' <- mapM node ceqs
-  
-        ceqsJacobs <- mapM (flip rad dvList) ceqs'
-      
-        let ceqsJacobs' = map (map (fromDynamic Z)) ceqsJacobs
-  
-        inputs_ (dvList :* paramList)
-        outputs_ ceqs'
-  putStrLn $ showOctaveSource fg "foo"
+      fundir = "testProblem"
+
+  _ <- writeMS fundir "cost" costFg
+  _ <- writeMS fundir "constraints" cnstFg
+
+  return ()
