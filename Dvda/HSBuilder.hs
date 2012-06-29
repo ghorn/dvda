@@ -16,6 +16,7 @@ import qualified System.Plugins.Make as Make
 import qualified System.Plugins.Load as Load
 import Numeric.LinearAlgebra ( Element )
 
+import Dvda.Codegen ( writeSourceFile )
 import Dvda.HSSyntax ( GenHaskell, writeHSSource )
 import Dvda.Graph ( FunGraph(..) )
 import Dvda.SymMonad ( MkFunGraph(..), makeFunGraph )
@@ -42,28 +43,9 @@ buildHSFunctionFromGraph :: (Show a, Element a, H.Hashable a, GenHaskell b, GenH
 buildHSFunctionFromGraph fg = do
   -- source and hash
   let hash = show $ abs $ H.hash fg
-      source = writeHSSource fg hash 
-
-  -- function directory
-  dir <- Config.functionDir hash
-  
-  -- make function directory if it doesn't exist
-  createDirectoryIfMissing False dir
-  
-  -- filenames
-  let sourcePath  = dir ++ "/" ++ Config.nameHSSource  hash
-      -- objectPath  = dir ++ "/" ++ Config.nameHSObject  hash
-      
-  -- if the source already exists, make sure it matches the old source
-  srcExists <- doesFileExist sourcePath
-  when srcExists $ do
-    oldSrc <- readFile sourcePath
-    when (source /= oldSrc) $ putStrLn $
-      "====================================================\n" ++ 
-      "WARNING: Hash not unique or source code has been edited\n"++ 
-      "If you have not edited the auto-generated code, please let me\n" ++
-      "know that Hash collisions are a problem at gregmainland@gmail.com\n" ++
-      "====================================================\n\n"
+      source = writeHSSource fg hash
+      sourceName = Config.nameHSSource hash
+  sourcePath <- writeSourceFile hash source sourceName
   
   -- write  source
   putStrLn "writing source"

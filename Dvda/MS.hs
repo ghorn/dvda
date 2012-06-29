@@ -6,15 +6,19 @@
 module Dvda.MS ( dynamicsErrorsEuler
                , dynamicsErrorsSimpson
                , msProblem
+               , writeMSProblem
                ) where
 
 import qualified Data.IntMap as IM
 import Data.Array.Repa ( Z(..) )
 
 import Dvda
-import Dvda.SymMonad ( rad, KeyT )
+import Dvda.Codegen ( writeSourceFile )
 import Dvda.Graph ( fromDynamic )
+import Dvda.OctaveSyntax ( showOctaveSource )
 import Dvda.SparseLA
+import Dvda.SymMonad ( rad, KeyT )
+import qualified Dvda.Config as Config
 
 eulerError :: (Fractional a, Num (SparseVec a))
               => ([a] -> [a] -> [a])
@@ -77,3 +81,13 @@ msProblem ceqs_ cineqs_ cost_ dvs params = runFunGraph $ do
 
   inputs_ (dvs :* params)
   outputs_ (cost :* costGrad :* ceqs :* ceqsJacobs :* cineqs :* cineqsJacobs)
+
+writeMSProblem :: FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double]))
+                  (KeyT (Expr Z Double :* [Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [Expr Z Double] :* [[Expr Z Double]])) -> IO ()
+writeMSProblem fg = do
+  -- source and hash
+  let name = "someProblem"
+      source = showOctaveSource fg name
+      sourceName = Config.nameHSSource name
+  sourcePath <- writeSourceFile name source sourceName
+  print sourcePath

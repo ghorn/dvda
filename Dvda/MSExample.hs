@@ -12,7 +12,6 @@ import Data.Array.Repa ( Z(..) )
 import Dvda
 import Dvda.SparseLA
 import Dvda.MS
-import Dvda.SymMonad ( KeyT )
 import Dvda.SymMonad ( rad, KeyT )
 import Dvda.OctaveSyntax
 import Dvda.Graph ( fromDynamic )
@@ -103,7 +102,7 @@ problem = msProblem ceqs cineqs cost dvList paramList
 run :: IO ()
 run = do
 --  _ <- buildHSFunctionFromGraph problem
-  putStrLn $ writeOctaveSource problem "foo"
+  putStrLn $ showOctaveSource problem "foo"
   print "yay"
 
 blah :: IO ()
@@ -117,4 +116,4 @@ blah = do
   
         inputs_ (dvList :* paramList)
         outputs_ ceqs'
-  putStrLn $ writeOctaveSource fg "foo"
+  putStrLn $ showOctaveSource fg "foo"

@@ -3,7 +3,8 @@
 {-# Language FlexibleInstances #-}
 {-# Language TypeOperators #-}
 
-module Dvda.OctaveSyntax ( writeOctaveSource
+module Dvda.OctaveSyntax ( OctaveOutputs
+                         , showOctaveSource
                          ) where
 
 import Data.List ( intersperse )
@@ -113,9 +114,9 @@ writeAssignment inputMap (k, dexpr)
     isSym _ = False
 
 
-writeOctaveSource :: (Show a, Element a, OctaveOutputs c) =>
-                     FunGraph a (KeyT ([Expr DIM0 Double] :* [Expr DIM0 Double])) c -> String -> String
-writeOctaveSource (FunGraph _ im ((_, inKeys0) :* (_, inKeys1)) outs) hash =
+showOctaveSource :: (Show a, Element a, OctaveOutputs c) =>
+                    FunGraph a (KeyT ([Expr DIM0 Double] :* [Expr DIM0 Double])) c -> String -> String
+showOctaveSource (FunGraph _ im ((_, inKeys0) :* (_, inKeys1)) outs) hash =
   init $ unlines $
   [ "function " ++ outputHeader ++ " = " ++ Config.nameHSFunction hash ++ "( x0, x1 )"
   , ""
