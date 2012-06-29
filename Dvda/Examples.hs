@@ -11,11 +11,10 @@ import Data.Array.Repa.Index
 
 import Dvda
 import Dvda.Graph ( FunGraph(..) )
-import Dvda.SymMonad ( KeyT )
 
 exampleFunGraph :: State (FunGraph
-                          Double (KeyT (Exprs (DIM0 :* DIM1 :* DIM2) Double))
-                          (KeyT (Exprs (DIM2 :* DIM1 :* DIM0) Double)))
+                          Double (Exprs (DIM0 :* DIM1 :* DIM2) Double)
+                          (Exprs (DIM2 :* DIM1 :* DIM0) Double))
                           ()
 exampleFunGraph = do
   let x = sym "x" :: Expr DIM0 Double
@@ -40,8 +39,8 @@ pureFun (x :* y :* z) = z1 :* z2 :* z3
 
 exampleFunGraph' :: State (FunGraph
                            Double
-                           (KeyT (Exprs (DIM0 :* DIM1 :* DIM2) Double))
-                           (KeyT (Exprs (DIM2 :* DIM1 :* DIM0) Double)))
+                           (Exprs (DIM0 :* DIM1 :* DIM2) Double)
+                           (Exprs (DIM2 :* DIM1 :* DIM0) Double))
                     ()
 exampleFunGraph' = do
   let x = sym "x" :: Expr DIM0 Double
@@ -69,12 +68,13 @@ run :: IO ()
 run = do
   let gr@( FunGraph _ _ _ _) = runFunGraph $ do
         let x = sym "x" :: Expr DIM0 Double
---            y = sym "y"
-            z1 = x + x
+            y = sym "y"
+            z1 = x + x + y
             z2 = diff z1 x
+            z3 = diff z1 y
 
-        inputs_ x
-        outputs_ (z1 :* z2)
+        inputs_ (x :* y)
+        outputs_ (z1 :* z2 :* z3)
 
   putStrLn $ showCollisions gr
   putStrLn "-------------------------------------------"
@@ -84,8 +84,8 @@ run = do
 showoff :: IO ()
 showoff = do
   let gr :: FunGraph Double
-            (KeyT (Exprs (DIM0 :* DIM0 :* DIM0) Double))
-            (KeyT (Exprs (DIM0 :* DIM0 :* DIM0 :* DIM0) Double))
+            (Exprs (DIM0 :* DIM0 :* DIM0) Double)
+            (Exprs (DIM0 :* DIM0 :* DIM0 :* DIM0) Double)
       gr = makeFunGraph (x' :* y' :* z') (f :* fx :* fy :* fz)
         where
           x' = sym "x" :: Expr DIM0 Double
@@ -104,4 +104,4 @@ showoff = do
 
   putStrLn $ showCollisions gr
 --  putStrLn $ funGraphSummary' gr
---  previewGraph gr
+  previewGraph gr

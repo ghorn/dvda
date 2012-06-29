@@ -187,53 +187,37 @@ infixr 6 :*
 class MkFunGraph a where
   type NumT a
   type GenT a
-  type KeyT a
-  mkNodes :: a -> StateT (FunGraph (NumT a) b c) Identity (a, KeyT a)
+  mkNodes :: a -> StateT (FunGraph (NumT a) b c) Identity a
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
          MkFunGraph (Expr DIM0 a) where
   type NumT (Expr DIM0 a) = a
   type GenT (Expr DIM0 a) = a
-  type KeyT (Expr DIM0 a) = (Expr DIM0 a, Int)
-  mkNodes expr_ = do 
-    expr@(ERef _ k) <- node expr_
-    return (expr, (expr, k))
+  mkNodes = node
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
          MkFunGraph (Expr DIM1 a) where
   type NumT (Expr DIM1 a) = a
   type GenT (Expr DIM1 a) = Vector a
-  type KeyT (Expr DIM1 a) = (Expr DIM1 a, Int)
-  mkNodes expr_ = do 
-    expr@(ERef _ k) <- node expr_
-    return (expr, (expr, k))
+  mkNodes = node
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
          MkFunGraph (Expr DIM2 a) where
   type NumT (Expr DIM2 a) = a
   type GenT (Expr DIM2 a) = Matrix a
-  type KeyT (Expr DIM2 a) = (Expr DIM2 a, Int)
-  mkNodes expr_ = do
-    expr@(ERef _ k) <- node expr_
-    return (expr, (expr, k))
+  mkNodes = node
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkFunGraph (Expr sh a), DvdaDim sh) =>
          MkFunGraph [Expr sh a] where
   type NumT [Expr sh a] = a
   type GenT [Expr sh a] = [GenT (Expr sh a)]
-  type KeyT [Expr sh a] = ([Expr sh a], [Int])
-  mkNodes exprs_ = do 
-    exprs <- mapM node exprs_
-    return (exprs, (exprs, map (\(ERef _ k) -> k) exprs))
+  mkNodes = mapM node
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkFunGraph (Expr sh a), DvdaDim sh) =>
          MkFunGraph [[Expr sh a]] where
   type NumT [[Expr sh a]] = a
   type GenT [[Expr sh a]] = [[GenT (Expr sh a)]]
-  type KeyT [[Expr sh a]] = ([[Expr sh a]], [[Int]])
-  mkNodes exprs_ = do 
-    exprs <- mapM (mapM node) exprs_
-    return (exprs, (exprs, map (map (\(ERef _ k) -> k)) exprs))
+  mkNodes = mapM (mapM node)
 
 --instance (Show a, MkFunGraph a) => MkFunGraph [a] where
 --  type NumT [a] = NumT a
@@ -246,32 +230,31 @@ instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, M
 instance (MkFunGraph a, MkFunGraph b, NumT a ~ NumT b) => MkFunGraph (a :* b) where
   type NumT (a :* b) = NumT a
   type GenT (a :* b) = GenT a :* GenT b
-  type KeyT (a :* b) = KeyT a :* KeyT b
   mkNodes (x :* y) = do
-    (x',kxs) <- mkNodes x
-    (y',kys) <- mkNodes y
-    return (x' :* y', kxs :* kys)
+    x' <- mkNodes x
+    y' <- mkNodes y
+    return (x' :* y')
 
-inputs :: MkFunGraph b => b -> StateT (FunGraph (NumT b) (KeyT b) c) Identity b
+inputs :: MkFunGraph b => b -> StateT (FunGraph (NumT b) b c) Identity b
 inputs exprs_ = do
-  (exprs, keyPairs) <- mkNodes exprs_
+  exprs <- mkNodes exprs_
   FunGraph hm im _ outs <- get
-  put $ FunGraph hm im keyPairs outs
+  put $ FunGraph hm im exprs outs
   return exprs
 
-outputs :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b (KeyT c)) Identity c
+outputs :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b c) Identity c
 outputs exprs_ = do
-  (exprs, keyPairs) <- mkNodes exprs_
+  exprs <- mkNodes exprs_
   FunGraph hm im ins _ <- get
-  put $ FunGraph hm im ins keyPairs
+  put $ FunGraph hm im ins exprs
   return exprs
 
-inputs_ :: MkFunGraph b => b -> StateT (FunGraph (NumT b) (KeyT b) c) Identity ()
+inputs_ :: MkFunGraph b => b -> StateT (FunGraph (NumT b) b c) Identity ()
 inputs_ exprs = do
   _ <- inputs exprs
   return ()
 
-outputs_ :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b (KeyT c)) Identity ()
+outputs_ :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b c) Identity ()
 outputs_ exprs = do
   _ <- outputs exprs
   return ()
@@ -281,7 +264,7 @@ runFunGraph :: StateT (FunGraph a b c) Identity d -> FunGraph a b c
 runFunGraph f = snd $ runState f emptyFunGraph
 
 makeFunGraph :: (MkFunGraph b, MkFunGraph c, NumT b ~ NumT c) =>
-                b -> c -> FunGraph (NumT b) (KeyT b) (KeyT c)
+                b -> c -> FunGraph (NumT b) b c
 makeFunGraph ins outs = runFunGraph $ do
   inputs_ ins
   outputs_ outs
