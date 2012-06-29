@@ -8,7 +8,6 @@
 module Dvda.SymMonad ( (:*)(..)
                      , MkFunGraph(..)
                      , node
-                     , node'
                      , inputs
                      , inputs_
                      , outputs
@@ -20,14 +19,13 @@ module Dvda.SymMonad ( (:*)(..)
                      ) where
 
 import Control.Monad ( foldM )
-import Control.Monad.State ( MonadState, StateT, get, put, liftM, runState )
+import Control.Monad.State ( MonadState, StateT, get, put, runState )
 import Data.Functor.Identity ( Identity )
 import Data.Array.Repa ( DIM0, DIM1, DIM2 )
 import Data.Hashable ( Hashable )
 import Data.Maybe ( fromJust )
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import Data.IntMap ( Key )
 import Numeric.LinearAlgebra ( Element, Vector, Matrix )
 import qualified Numeric.LinearAlgebra as LA
 import Debug.Trace ( trace )
@@ -37,39 +35,35 @@ import Dvda.BinUn ( applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
 import Dvda.Expr ( Expr(..), Const(..), dim )
 
--- | take all sub expressions of an Expr and turn them into nodes
---   return an Expr that is just a ref
+---- | take all sub expressions of an Expr and turn them into nodes
+----   return an Expr that is just a ref
 node :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, DvdaDim sh) => 
-        Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
-node expr = liftM (ERef (dim expr)) (node' expr)
-            
-node' :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, DvdaDim sh) => 
-         Expr sh a -> StateT (FunGraph a b c) Identity Key
-node' (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
-node' (ERef _ k) = return k
-node' e@(ESym _ _) = insert e
-node' e@(EConst _) = insert e
-node' (EUnary op x') = do
+         Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
+node (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
+node e@(ERef _ _) = return e
+node e@(ESym _ _) = insert e
+node e@(EConst _) = insert e -- don't put constants in?
+node (EUnary op x') = do
   x <- node x'
   insert $ EUnary op x
-node' (EBinary op x' y') = do
+node (EBinary op x' y') = do
   x <- node x'
   y <- node y'
   insert $ EBinary op x y
-node' (EScale x' y') = do
+node (EScale x' y') = do
   x <- node x'
   y <- node y'
   insert $ EScale x y
-node' (EDeriv x_ arg_) = do
+node (EDeriv x_ arg_) = do
   x <- node x_
   arg <- node arg_
   outs <- rad x [arg]
-  node' (fromDynamic (dim arg) $ head outs)
-node' (EGrad x_ arg_) = do
+  node (fromDynamic (dim arg) $ head outs)
+node (EGrad x_ arg_) = do
   x <- node x_
   arg <- node arg_
   outs <- rad x [arg]
-  node' (fromDynamic (dim arg) $ head outs)
+  node (fromDynamic (dim arg) $ head outs)
 
 
 -- gradient of expression w.r.t. list of args

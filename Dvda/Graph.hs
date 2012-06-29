@@ -39,7 +39,7 @@ import Data.Array.Repa ( Shape(rank,listOfShape), DIM0, DIM1, DIM2 )
 import Control.Monad.State ( MonadState, StateT, get, put )
 import Data.Functor.Identity ( Identity )
 
-import Dvda.Expr ( Expr(..), Const(..) )
+import Dvda.Expr ( Expr(..), Const(..), dim )
 
 --------------------- dynamic Expr stuff ---------------------------
 data DynamicExpr a = DynamicExpr0 (Expr DIM0 a)
@@ -116,17 +116,17 @@ symSet _ (EJacob _ _) = error "don't take symSet of EJacob"
 -- | Try to insert the GExpr into the hashmap performing CSE.
 --   If the GExpr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
-insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> StateT (FunGraph a b c) Identity Key
+insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
 insert expr = do
   let dexpr = makeDynamic expr
   fg@(FunGraph hm im ins outs) <- get
   case fgLookup expr fg of
-    Just (k',_) -> return k'
+    Just (k',_) -> return (ERef (dim expr) k')
     Nothing -> do let k = HM.size hm
                       hm' = HM.insert dexpr (k, symSet fg expr) hm
                       im' = IM.insert k dexpr im
                   put (FunGraph hm' im' ins outs)
-                  return k
+                  return (ERef (dim expr) k)
 
 
 funGraphSummary :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String
