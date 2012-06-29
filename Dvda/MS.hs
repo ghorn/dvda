@@ -16,9 +16,9 @@ import Data.Array.Repa ( Z(..) )
 import Dvda
 import Dvda.Codegen ( writeSourceFile )
 import Dvda.Graph ( fromDynamic )
-import Dvda.OctaveSyntax ( OctaveOutputs, showOctaveSource )
+import Dvda.OctaveSyntax ( GenOctave, showOctaveSource )
 import Dvda.SparseLA
-import Dvda.SymMonad ( rad, KeyT )
+import Dvda.SymMonad ( rad )
 import qualified Dvda.Config as Config
 
 eulerError :: (Fractional a, Num (SparseVec a))
@@ -65,8 +65,8 @@ dynamicsErrorsSimpson stateVecs' actionVecs' ode dt = zipWith (simpsonsRuleError
     uPairs = zip (init actionVecs') (tail actionVecs')
 
 msConstraints :: [Expr Z Double] -> [Expr Z Double] -> [Expr Z Double] -> [Expr Z Double]
-                 -> FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double]))
-                 (KeyT ([Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [[Expr Z Double]]))
+                 -> FunGraph Double ([Expr Z Double] :* [Expr Z Double])
+                 ([Expr Z Double] :* [Expr Z Double] :* [[Expr Z Double]] :* [[Expr Z Double]])
 msConstraints ceqs_ cineqs_ dvs params = runFunGraph $ do
   ceqs <- mapM node ceqs_
   cineqs <- mapM node cineqs_
@@ -82,8 +82,8 @@ msConstraints ceqs_ cineqs_ dvs params = runFunGraph $ do
 
 
 msCost :: Expr Z Double -> [Expr Z Double] -> [Expr Z Double]
-          -> FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double]))
-          (KeyT (Expr Z Double :* [Expr Z Double]))
+          -> FunGraph Double ([Expr Z Double] :* [Expr Z Double])
+          (Expr Z Double :* [Expr Z Double])
 msCost cost_ dvs params = runFunGraph $ do
   cost <- node cost_
 
@@ -94,8 +94,8 @@ msCost cost_ dvs params = runFunGraph $ do
   inputs_ (dvs :* params)
   outputs_ (cost :* costGrad)
 
-writeMS :: OctaveOutputs c => FilePath -> String
-           -> FunGraph Double (KeyT ([Expr Z Double] :* [Expr Z Double])) c-> IO FilePath
+writeMS :: GenOctave c => FilePath -> String
+           -> FunGraph Double ([Expr Z Double] :* [Expr Z Double]) c-> IO FilePath
 writeMS funDir name fg = do
   let source = showOctaveSource fg name
       sourceName = Config.nameOctaveSource name

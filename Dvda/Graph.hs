@@ -113,8 +113,8 @@ symSet _ (EDeriv _ _) = error "don't take symSet of EDeriv"
 symSet _ (EGrad _ _)  = error "don't take symSet of EGrad"
 symSet _ (EJacob _ _) = error "don't take symSet of EJacob"
 
--- | Try to insert the GExpr into the hashmap performing CSE.
---   If the GExpr is not yet in the map, insert it and return new key.
+-- | Try to insert the Expr into the hashmap performing CSE.
+--   If the Expr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
 insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
 insert expr = do

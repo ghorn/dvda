@@ -4,6 +4,7 @@
 module Dvda.Examples ( run
                      , run'
                      , showoff
+                     , bigGraph
                      ) where
 
 import Control.Monad.State (State)
@@ -81,27 +82,27 @@ run = do
   putStrLn $ funGraphSummary' gr
   previewGraph gr
 
-showoff :: IO ()
-showoff = do
-  let gr :: FunGraph Double
+bigGraph :: FunGraph Double
             (Exprs (DIM0 :* DIM0 :* DIM0) Double)
             (Exprs (DIM0 :* DIM0 :* DIM0 :* DIM0) Double)
-      gr = makeFunGraph (x' :* y' :* z') (f :* fx :* fy :* fz)
-        where
-          x' = sym "x" :: Expr DIM0 Double
-          y' = sym "y"
-          z' = sym "z"
+bigGraph = makeFunGraph (x' :* y' :* z') (f :* fx :* fy :* fz)
+  where
+    x' = sym "x" :: Expr DIM0 Double
+    y' = sym "y"
+    z' = sym "z"
+    
+    f0 x y z = (z + x*y)*log(cos x / tanh y)**(z/exp y)
+    fx0 = f0 (f0 x' y' z') (f0 z' y' x') (f0 y' x' z')
+    fy0 = f0 (f0 z' x' y') (f0 x' z' y') (f0 z' z' y')
+    fz0 = f0 (f0 x' y' z') (f0 x' y' x') (f0 y' x' y')
+    f = f0 fx0 fy0 fz0
+    
+    fx = diff f x'
+    fy = diff f y'
+    fz = diff f z'
 
-          f0 x y z = (z + x*y)*log(cos x / tanh y)**(z/exp y)
-          fx0 = f0 (f0 x' y' z') (f0 z' y' x') (f0 y' x' z')
-          fy0 = f0 (f0 z' x' y') (f0 x' z' y') (f0 z' z' y')
-          fz0 = f0 (f0 x' y' z') (f0 x' y' x') (f0 y' x' y')
-          f = f0 fx0 fy0 fz0
-          
-          fx = diff f x'
-          fy = diff f y'
-          fz = diff f z'
-
-  putStrLn $ showCollisions gr
---  putStrLn $ funGraphSummary' gr
-  previewGraph gr
+showoff :: IO ()
+showoff = do
+  putStrLn $ showCollisions bigGraph
+--  putStrLn $ funGraphSummary' bigGraph
+  previewGraph bigGraph
