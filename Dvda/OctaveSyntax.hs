@@ -118,7 +118,7 @@ showOctaveSource :: (Show a, Element a, OctaveOutputs c) =>
                     FunGraph a (KeyT ([Expr DIM0 Double] :* [Expr DIM0 Double])) c -> String -> String
 showOctaveSource (FunGraph _ im ((_, inKeys0) :* (_, inKeys1)) outs) hash =
   init $ unlines $
-  [ "function " ++ outputHeader ++ " = " ++ Config.nameHSFunction hash ++ "( x0, x1 )"
+  [ "function " ++ outputHeader ++ " = " ++ Config.nameOctaveFunction hash ++ "( x0, x1 )"
   , ""
   , init $ unlines $ (zipWith3 (\d s c -> d ++ s ++ "% " ++ c) decls extraSpaces comments)
   , ""

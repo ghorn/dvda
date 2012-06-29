@@ -20,6 +20,7 @@ module Dvda.Config( -- * directory stuff
                   , nameHSConst
                     -- * Octave
                   , nameOctaveSource
+                  , nameOctaveFunction
                     -- * gcc stuff
                   , gccString
                   , spewGccCall
@@ -111,6 +112,9 @@ nameHSSource = (++ ".hs") . nameHSModule
 
 nameOctaveSource :: String -> String
 nameOctaveSource = (++ ".m")
+
+nameOctaveFunction :: String -> String
+nameOctaveFunction hash = hash
 
 nameHSObject :: String -> String
 nameHSObject = (++ ".o") . nameHSModule
