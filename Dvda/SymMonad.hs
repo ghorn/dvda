@@ -40,9 +40,10 @@ import Dvda.Expr ( Expr(..), Const(..), dim )
 node :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, DvdaDim sh) => 
          Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
 node (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
+node (EJacob _ _) = error "can't do node EJacob yet"
 node e@(ERef _ _) = return e
+node e@(EConst _) = return e
 node e@(ESym _ _) = insert e
-node e@(EConst _) = insert e -- don't put constants in?
 node (EUnary op x') = do
   x <- node x'
   insert $ EUnary op x
@@ -125,6 +126,7 @@ getSensitivities :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container 
 getSensitivities _ (EGrad  _ _) _ = error "don't call getSensitivities on EGrad"
 getSensitivities _ (EJacob _ _) _ = error "don't call getSensitivities on EJacob"
 getSensitivities _ (EDeriv _ _) _ = error "don't call getSensitivities on EDeriv"
+getSensitivities _ (EScale _ _) _ = error "cant' do getSensitivities on EScale yet (needs EinSum?)"
 getSensitivities _ (EDimensionless _) _ = return HM.empty
 getSensitivities _ (EConst _) _         = return HM.empty
 getSensitivities args (ERef sh k) sens  = do
