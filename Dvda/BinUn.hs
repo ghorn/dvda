@@ -69,8 +69,8 @@ instance Hashable BinOp where
   hash Pow     = 22
   hash LogBase = 23
                               
-showUnary :: Show a => a -> UnOp -> String
-showUnary x Abs    = '|': show x ++ "|"
+showUnary :: String -> UnOp -> String
+showUnary x Abs    = '|': x ++ "|"
 showUnary x Neg    = '-':paren x
 showUnary x Signum = "signum"++paren x
 showUnary x Exp    = "exp"++paren x
@@ -139,5 +139,5 @@ isCommutative Div     = False
 isCommutative Pow     = False
 isCommutative LogBase = False
 
-paren :: Show a => a -> String
-paren x = "( "++show x++" )"
+paren :: String -> String
+paren x = "( "++ x ++" )"

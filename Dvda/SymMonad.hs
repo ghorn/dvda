@@ -16,6 +16,7 @@ module Dvda.SymMonad ( (:*)(..)
                      , runFunGraph
                      , rad
                      , getSensitivities
+                     , fullShow
                      ) where
 
 import Control.Monad ( foldM )
@@ -33,7 +34,7 @@ import Debug.Trace ( trace )
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
-import Dvda.Expr ( Expr(..), Const(..), dim )
+import Dvda.Expr ( Expr(..), Const(..), dim, fullShow' )
 
 ---- | take all sub expressions of an Expr and turn them into nodes
 ----   return an Expr that is just a ref
@@ -270,3 +271,7 @@ makeFunGraph :: (MkFunGraph b, MkFunGraph c, NumT b ~ NumT c) =>
 makeFunGraph ins outs = runFunGraph $ do
   inputs_ ins
   outputs_ outs
+
+
+fullShow :: (Show a, Element a, DvdaDim sh) => FunGraph a b c -> Expr sh a -> String
+fullShow fg expr = fullShow' (Just (\sh k -> fromJust $ fgExprFromKey sh k fg)) expr

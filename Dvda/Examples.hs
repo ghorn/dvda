@@ -104,5 +104,15 @@ bigGraph = makeFunGraph (x' :* y' :* z') (f :* fx :* fy :* fz)
 showoff :: IO ()
 showoff = do
   putStrLn $ showCollisions bigGraph
+  let FunGraph _ _ _ (f :* fx :* fy :* fz) = bigGraph
+  putStrLn "--------------------------------------------------------------"
+  putStrLn $ fullShow bigGraph f
+  putStrLn "--------------------------------------------------------------"
+  putStrLn $ fullShow bigGraph fx
+  putStrLn "--------------------------------------------------------------"
+  putStrLn $ fullShow bigGraph fy
+  putStrLn "--------------------------------------------------------------"
+  putStrLn $ fullShow bigGraph fz
+  putStrLn "--------------------------------------------------------------"
 --  putStrLn $ funGraphSummary' bigGraph
   previewGraph bigGraph
