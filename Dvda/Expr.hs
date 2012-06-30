@@ -20,6 +20,7 @@ module Dvda.Expr ( Expr(..)
                  , jacob
                  , hess
                  , dim
+                 , isVal
                  ) where
 
 import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList), rank )
