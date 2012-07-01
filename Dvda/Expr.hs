@@ -33,7 +33,7 @@ import Data.Hashable ( Hashable, hash, combine )
 import Data.List ( sort )
 import Data.Typeable ( Typeable2 )
 
-import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative )
+import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative, lassoc, rassoc )
 import Dvda.Config ( simplifyCommutativeOps )
 import Dvda.SparseLA ( SparseVec, SparseMat, svFromList, smFromLists )
 
@@ -87,7 +87,7 @@ instance (Shape sh, Show a, Element a) => Show (Const sh a) where
 
 
 paren :: String -> String
-paren x = "( "++ x ++" )"
+paren x = "("++ x ++")"
 
 -- fullShow' recursively shows the Expr type
 -- if given Nothing, it will not chase references but only print "{ref:n}
@@ -104,8 +104,18 @@ fullShow' _ (ESym sh name) = case rank sh of 0 -> name
 fullShow' _ (EConst x) = show x
 fullShow' chaseRef (EUnary op x) = showUnary (fullShow' chaseRef x) op
 fullShow' chaseRef (EBinary op x y) =
-  paren (fullShow' chaseRef x) ++ showBinary op ++ paren (fullShow' chaseRef y)
---fullShow' chaseRef (EScale x y) = paren (fullShow' chaseRef x) ++ "*" ++ paren (fullShow' chaseRef y)
+  parenx x (fullShow' chaseRef x) ++ " " ++ showBinary op ++ " " ++ pareny y (fullShow' chaseRef y)
+  where
+    parenx x' = case (chaseRef, x') of
+      (_, EBinary xop _ _) -> if lassoc xop op then id else paren
+      (Just cr, ERef sh k) -> parenx (cr sh k)
+      _ -> id
+    pareny y' = case (chaseRef, y') of
+      (_, EBinary yop _ _) -> if rassoc op yop then id else paren
+      (Just cr, ERef sh k) -> pareny (cr sh k)
+      _ -> id
+      
+-- fullShow' chaseRef (EScale x y) = paren (fullShow' chaseRef x) ++ "*" ++ paren (fullShow' chaseRef y)
 fullShow' chaseRef (EDeriv x y) = "deriv(" ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
 --fullShow' chaseRef (EGrad  x y) = "grad("  ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
 --fullShow' chaseRef (EJacob x y) = "jacob(" ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"

@@ -70,7 +70,7 @@ run = do
   let gr@( FunGraph _ _ _ _) = runFunGraph $ do
         let x = sym "x" :: Expr DIM0 Double
             y = sym "y"
-            z1 = x + x + y + 3
+            z1 = x + x / y + 3
             z2 = diff z1 x
             z3 = diff z1 y
 
@@ -80,7 +80,7 @@ run = do
   putStrLn $ showCollisions gr
   putStrLn $ fullShowNodes gr
   let FunGraph _ _ _ (z:* zx :* zy) = gr
-  putStrLn $ "z:     " ++ fullShow gr z
+  putStrLn $ "\nz:     " ++ fullShow gr z
   putStrLn $ "dz/dx: " ++ fullShow gr zx
   putStrLn $ "dz/dy: " ++ fullShow gr zy
   previewGraph gr

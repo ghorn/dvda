@@ -9,6 +9,8 @@ module Dvda.BinUn ( BinOp(..)
                   , unaryDeriv
                   , binaryDeriv
                   , isCommutative
+                  , lassoc
+                  , rassoc
                   ) where
 
 import Data.Hashable ( Hashable, hash )
@@ -138,6 +140,52 @@ isCommutative Mul     = True
 isCommutative Div     = False
 isCommutative Pow     = False
 isCommutative LogBase = False
+
+lassoc :: BinOp -> BinOp -> Bool
+lassoc Add Add = True -- a + b + c == (a + b) + c
+lassoc Add Sub = True -- a + b - c == (a + b) - c
+--lassoc Add Mul = True -- a + b * c == (a + b) * c
+--lassoc Add Div = True -- a + b / c == (a + b) / c
+
+lassoc Sub Add = True -- a - b + c == (a - b) + c
+lassoc Sub Sub = True -- a - b - c == (a - b) - c
+--lassoc Sub Mul = True -- a - b * c == (a - b) * c
+--lassoc Sub Div = True -- a - b / c == (a - b) / c
+
+lassoc Div Add = True -- a / b + c == (a / b) + c
+lassoc Div Sub = True -- a / b - c == (a / b) - c
+lassoc Div Mul = True -- a / b * c == (a / b) * c
+lassoc Div Div = True -- a / b / c == (a / b) / c
+
+lassoc Mul Add = True -- a * b + c == (a * b) + c
+lassoc Mul Sub = True -- a * b - c == (a * b) - c
+lassoc Mul Mul = True -- a * b * c == (a * b) * c
+lassoc Mul Div = True -- a * b / c == (a * b) / c
+
+lassoc _ _ = False
+
+rassoc :: BinOp -> BinOp -> Bool
+--rassoc Add Add = True -- a + b + c == a + (b + c)
+--rassoc Add Sub = True -- a + b - c == a + (b - c)
+rassoc Add Mul = True -- a + b * c == a + (b * c)
+rassoc Add Div = True -- a + b / c == a + (b / c)
+
+--rassoc Sub Add = True -- a - b + c == a - (b + c)
+--rassoc Sub Sub = True -- a - b - c == a - (b - c)
+rassoc Sub Mul = True -- a - b * c == a - (b * c)
+rassoc Sub Div = True -- a - b / c == a - (b / c)
+
+--rassoc Div Add = True -- a / b + c == a / (b + c)
+--rassoc Div Sub = True -- a / b - c == a / (b - c)
+--rassoc Div Mul = True -- a / b * c == a / (b * c)
+--rassoc Div Div = True -- a / b / c == a / (b / c)
+
+--rassoc Mul Add = True -- a * b + c == a * (b + c)
+--rassoc Mul Sub = True -- a * b - c == a * (b - c)
+--rassoc Mul Mul = True -- a * b * c == a * (b * c)
+--rassoc Mul Div = True -- a * b / c == a * (b / c)
+
+rassoc _ _ = False
 
 paren :: String -> String
 paren x = "( "++ x ++" )"
