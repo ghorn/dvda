@@ -4,6 +4,7 @@
 {-# Language FlexibleInstances #-}
 {-# Language FlexibleContexts #-}
 {-# Language GADTs #-}
+{-# Language DoAndIfThenElse #-}
 
 module Dvda.SymMonad ( (:*)(..)
                      , MkFunGraph(..)
@@ -140,8 +141,8 @@ getSensitivities args (ERef sh k) sens  = do
   getSensitivities args expr sens
 getSensitivities args primal@(ESym _ _) sens = do
   let dprimal = makeDynamic primal
-  if HS.member dprimal args then
-    return $ HM.fromList [(dprimal, makeDynamic sens)]
+  if HS.member dprimal args
+  then return $ HM.fromList [(dprimal, makeDynamic sens)]
     -- don't backprop if there aren't any interesting symbols farther in the tree
   else return HM.empty
 
