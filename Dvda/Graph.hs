@@ -117,6 +117,7 @@ symSet _ (EJacob _ _) = error "don't take symSet of EJacob"
 --   If the Expr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
 insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
+insert (ERef _ _) = error "don't insert ERef into graph, ya goon"
 insert expr = do
   let dexpr = makeDynamic expr
   fg@(FunGraph hm im ins outs) <- get

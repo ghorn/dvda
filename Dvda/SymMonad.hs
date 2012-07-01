@@ -71,18 +71,22 @@ node (EGrad x_ arg_) = do
 -- gradient of expression w.r.t. list of args
 rad :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh0, DvdaDim sh) =>
        Expr sh0 a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [DynamicExpr a]
-rad expr_ args_ = do
-  expr <- node expr_
-  args <- mapM node args_
-  let argSet = HS.fromList (map makeDynamic args)
+rad expr' args' = do
+  expr <- node expr'
+  args'' <- mapM node args'
+  fg <- get
+
+  let args = map (\(ERef sh k) -> fromJust $ fgExprFromKey sh k fg) args''
+      argSet = HS.fromList (map makeDynamic args)
+
   sensitivities <- getSensitivities argSet expr (EConst (CSingleton (dim expr) 1))
   -- order inputs requested by user
-  let getSens x = case HM.lookup (makeDynamic x) sensitivities of
+  
+  let getSens arg = case HM.lookup (makeDynamic arg) sensitivities of
         Just sens -> sens
         Nothing -> trace "WARNING: taking deriviative df/dx where f is not a function of x" $
-                   makeDynamic (EConst (CSingleton (dim x) 0))
-      orderedSensitivities = map getSens args
-  return orderedSensitivities
+                   makeDynamic (EConst (CSingleton (dim arg) 0))
+  return (map getSens args)
 
 
 -- | combine two (DynamicExpr a, DynamicExpr a) hashmaps
@@ -134,10 +138,13 @@ getSensitivities args (ERef sh k) sens  = do
   fg <- get
   let expr = fromJust $ fgExprFromKey sh k fg
   getSensitivities args expr sens
-getSensitivities args primal@(ESym _ _) sens = if HS.member (makeDynamic primal) args then do
-  return $ HM.fromList [(makeDynamic primal, makeDynamic sens)]
-  -- don't backprop if there aren't any interesting symbols farther in the tree
+getSensitivities args primal@(ESym _ _) sens = do
+  let dprimal = makeDynamic primal
+  if HS.member dprimal args then
+    return $ HM.fromList [(dprimal, makeDynamic sens)]
+    -- don't backprop if there aren't any interesting symbols farther in the tree
   else return HM.empty
+
 getSensitivities args (EUnary op g) sens = do
   symSetG <- lookupSymSet g
   case HS.size (HS.intersection args symSetG) of
