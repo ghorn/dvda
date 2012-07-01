@@ -20,6 +20,8 @@ module Dvda.Graph ( FunGraph(..)
                   , showCollisions
                   , funGraphSummary
                   , funGraphSummary'
+                  , showNodes
+                  , fullShowNodes
                   , asIfExpr
                   ) where
 
@@ -35,11 +37,11 @@ import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
-import Data.Array.Repa ( Shape(rank,listOfShape), DIM0, DIM1, DIM2 )
+import Data.Array.Repa ( Shape(rank,listOfShape), DIM0, DIM1, DIM2, Z(..) )
 import Control.Monad.State ( MonadState, StateT, get, put )
 import Data.Functor.Identity ( Identity )
 
-import Dvda.Expr ( Expr(..), Const(..), dim )
+import Dvda.Expr ( Expr(..), Const(..), dim, fullShow' )
 
 --------------------- dynamic Expr stuff ---------------------------
 data DynamicExpr a = DynamicExpr0 (Expr DIM0 a)
@@ -117,6 +119,8 @@ symSet _ (EJacob _ _) = error "don't take symSet of EJacob"
 --   If the Expr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
 insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
+insert (ERef _ _) = error "don't insert ERef into graph, ya goon"
+insert (EConst _) = error "don't insert EConst into graph, ya goon"
 insert expr = do
   let dexpr = makeDynamic expr
   fg@(FunGraph hm im ins outs) <- get
@@ -135,6 +139,14 @@ funGraphSummary (FunGraph hm _ b c) =
                  , "outputs: " ++ show c
                  , "number of nodes: " ++ show (HM.size hm)
                  ]
+
+fullShowNodes :: (Show a, Element a) => FunGraph a b c -> String
+fullShowNodes fg@(FunGraph _ im _ _) = init $ unlines $ map (\(a,b) -> show a ++ ": " ++ fs (fromDynamic Z b)) (IM.toList im)
+  where
+    fs expr = fullShow' (Just (\sh k -> fromJust $ fgExprFromKey sh k fg)) expr
+
+showNodes :: (Show a, Element a) => FunGraph a b c -> String
+showNodes (FunGraph _ im _ _) = init $ unlines (map show (IM.toList im))
 
 -- more extensive
 funGraphSummary' :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String

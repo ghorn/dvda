@@ -20,6 +20,8 @@ module Dvda.Expr ( Expr(..)
                  , jacob
                  , hess
                  , dim
+                 , isVal
+                 , fullShow'
                  ) where
 
 import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList), rank )
@@ -31,7 +33,7 @@ import Data.Hashable ( Hashable, hash, combine )
 import Data.List ( sort )
 import Data.Typeable ( Typeable2 )
 
-import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative )
+import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative, lassoc, rassoc )
 import Dvda.Config ( simplifyCommutativeOps )
 import Dvda.SparseLA ( SparseVec, SparseMat, svFromList, smFromLists )
 
@@ -77,29 +79,49 @@ data Expr sh a where
 
 --------------------------------- show instances -----------------------------
 --deriving instance (Show sh, Show a, Element a) => Show (Const sh a)
-instance (Show sh, Show a, Element a) => Show (Const sh a) where
+instance (Shape sh, Show a, Element a) => Show (Const sh a) where
   show (CSingleton _ x) = show x
-  show (CVec sh v) = "CVec " ++ show sh ++ " " ++ show v
-  show (CMat sh m) = "CMat " ++ show sh ++ " " ++ show m
-  show (CTensor sh v) = "CTensor " ++ show sh ++ " " ++ show v
+  show (CVec sh v) = "CVec " ++ showShapeR sh ++ " " ++ show v
+  show (CMat sh m) = "CMat " ++ showShapeR sh ++ " " ++ show m
+  show (CTensor sh v) = "CTensor " ++ showShapeR sh ++ " " ++ show v
 
 
-paren :: Show a => a -> String
-paren x = "( "++show x++" )"
+paren :: String -> String
+paren x = "("++ x ++")"
 
-instance (Shape sh, Show sh, Show a, Element a) => Show (Expr sh a) where
-  show (EDimensionless x) = show x
-  show (ESym sh name) = case rank sh of 0 -> name
-                                        _ -> name++"{"++showShapeR sh++"}"
-  show (EConst x) = "{" ++ show x ++ "}" 
-  show (EUnary op x) = showUnary x op
-  show (EBinary op x y) = paren x ++ showBinary op ++ paren y
-  show (EScale s x) = paren s ++ "*" ++ paren x
---  show (EDot _ _) = "EDot ?? ??"
-  show (ERef sh k) = "{ref:" ++ showShapeR sh ++ ":" ++ show k ++ "}"
-  show (EDeriv x y) = "deriv(" ++ show x ++ ", " ++ show y ++ ")"
-  show (EGrad  x y) = "grad("  ++ show x ++ ", " ++ show y ++ ")"
-  show (EJacob x y) = "jacob(" ++ show x ++ ", " ++ show y ++ ")"
+-- fullShow' recursively shows the Expr type
+-- if given Nothing, it will not chase references but only print "{ref:n}
+-- if given (Just f), it will call f to lookup a node and call fullShow' recursively
+--fullShow' :: (Shape sh, Show a, Element a) => Maybe (forall sh' . sh' -> Int -> Expr sh' a) -> Expr sh a -> String
+fullShow' :: (Shape sh, Show a, Element a) => Maybe (sh -> Int -> Expr sh a) -> Expr sh a -> String
+fullShow' cr@(Just chaseRef) (ERef sh k) = fullShow' cr (chaseRef sh k)
+fullShow' Nothing (ERef sh k)
+  | rank sh == 0 = "{ref:" ++ show k ++ "}"
+  | otherwise    = "{ref:" ++ show k ++ ",(" ++ showShapeR sh ++ ")}"
+fullShow' _ (EDimensionless x) = show x
+fullShow' _ (ESym sh name) = case rank sh of 0 -> name
+                                             _ -> name++"{"++showShapeR sh++"}"
+fullShow' _ (EConst x) = show x
+fullShow' chaseRef (EUnary op x) = showUnary (fullShow' chaseRef x) op
+fullShow' chaseRef (EBinary op x y) =
+  parenx x (fullShow' chaseRef x) ++ " " ++ showBinary op ++ " " ++ pareny y (fullShow' chaseRef y)
+  where
+    parenx x' = case (chaseRef, x') of
+      (_, EBinary xop _ _) -> if lassoc xop op then id else paren
+      (Just cr, ERef sh k) -> parenx (cr sh k)
+      _ -> id
+    pareny y' = case (chaseRef, y') of
+      (_, EBinary yop _ _) -> if rassoc op yop then id else paren
+      (Just cr, ERef sh k) -> pareny (cr sh k)
+      _ -> id
+      
+-- fullShow' chaseRef (EScale x y) = paren (fullShow' chaseRef x) ++ "*" ++ paren (fullShow' chaseRef y)
+fullShow' chaseRef (EDeriv x y) = "deriv(" ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
+--fullShow' chaseRef (EGrad  x y) = "grad("  ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
+--fullShow' chaseRef (EJacob x y) = "jacob(" ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
+
+instance (Shape sh, Show a, Element a) => Show (Expr sh a) where
+  show = fullShow' Nothing
 
 --------------------------------- eq instances -------------------------
 instance (Shape sh, Element a, Eq a) => Eq (Const sh a) where

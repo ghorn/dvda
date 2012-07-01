@@ -7,11 +7,11 @@ module Dvda.Examples ( run
                      , bigGraph
                      ) where
 
-import Control.Monad.State (State)
 import Data.Array.Repa.Index
+import Control.Monad.State
 
 import Dvda
-import Dvda.Graph ( FunGraph(..) )
+import Dvda.Graph ( FunGraph(..), fullShowNodes )
 
 exampleFunGraph :: State (FunGraph
                           Double (Exprs (DIM0 :* DIM1 :* DIM2) Double)
@@ -70,7 +70,7 @@ run = do
   let gr@( FunGraph _ _ _ _) = runFunGraph $ do
         let x = sym "x" :: Expr DIM0 Double
             y = sym "y"
-            z1 = x + x + y
+            z1 = x + x / y + 3
             z2 = diff z1 x
             z3 = diff z1 y
 
@@ -78,8 +78,11 @@ run = do
         outputs_ (z1 :* z2 :* z3)
 
   putStrLn $ showCollisions gr
-  putStrLn "-------------------------------------------"
-  putStrLn $ funGraphSummary' gr
+  putStrLn $ fullShowNodes gr
+  let FunGraph _ _ _ (z:* zx :* zy) = gr
+  putStrLn $ "\nz:     " ++ fullShow gr z
+  putStrLn $ "dz/dx: " ++ fullShow gr zx
+  putStrLn $ "dz/dy: " ++ fullShow gr zy
   previewGraph gr
 
 bigGraph :: FunGraph Double
@@ -104,5 +107,15 @@ bigGraph = makeFunGraph (x' :* y' :* z') (f :* fx :* fy :* fz)
 showoff :: IO ()
 showoff = do
   putStrLn $ showCollisions bigGraph
+  let FunGraph _ _ _ (f :* fx :* fy :* fz) = bigGraph
+  putStrLn "--------------------------------------------------------------"
+  putStrLn $ fullShow bigGraph f
+  putStrLn "--------------------------------------------------------------"
+  putStrLn $ fullShow bigGraph fx
+  putStrLn "--------------------------------------------------------------"
+  putStrLn $ fullShow bigGraph fy
+  putStrLn "--------------------------------------------------------------"
+  putStrLn $ fullShow bigGraph fz
+  putStrLn "--------------------------------------------------------------"
 --  putStrLn $ funGraphSummary' bigGraph
   previewGraph bigGraph

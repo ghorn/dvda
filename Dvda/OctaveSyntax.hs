@@ -15,7 +15,7 @@ import Numeric.LinearAlgebra ( Element )
 import Text.Printf
 
 import Dvda ( DIM0 )
-import Dvda.Expr ( Expr(..), Const(..) )
+import Dvda.Expr ( Expr(..), Const(..), isVal )
 import Dvda.Graph ( FunGraph(..), DynamicExpr, asIfExpr )
 import Dvda.BinUn ( BinOp(..), UnOp(..) )
 import Dvda.SymMonad ( (:*)(..) )
@@ -43,7 +43,11 @@ instance GenOctave [Expr DIM0 Double] where
     (printf "%% output %d\noutput%d = zeros(%d,1); %% [Expr DIM0 Double]" outputK outputK (length exprs)):
     zipWith f [(1::Int)..] exprs
     where
-      f outIdx e = printf "output%d(%d) = %s;" outputK outIdx (writeExpr e)
+      f outIdx e = printf "%soutput%d(%d) = %s;" maybeComment outputK outIdx (writeExpr e)
+        where
+          maybeComment
+            | isVal 0 e = "% "
+            | otherwise = ""
   writeInputs exprs inputK = ((printf "%% input %d\n" inputK) ++ unlines (map snd keyDecls), IM.fromList keyDecls)
     where
       keyDecls = zipWith f [(1::Int)..] exprs
@@ -58,7 +62,11 @@ instance GenOctave [[Expr DIM0 Double]] where
     (printf "output%d = zeros(%d,%d); %% [[Expr DIM0 Double]]" outputK (length exprs) (length (head exprs))):
     zipWith f [(r,c) | r <- [1..length exprs], c <- [1..(length (head exprs))]] (concat exprs)
     where
-      f (rowIdx,colIdx) e = printf "output%d(%d,%d) = %s;" outputK rowIdx colIdx (writeExpr e)
+      f (rowIdx,colIdx) e = printf "%soutput%d(%d,%d) = %s;" maybeComment outputK rowIdx colIdx (writeExpr e)
+        where
+          maybeComment
+            | isVal 0 e = "% "
+            | otherwise = ""
   writeInputs exprs inputK = ((printf "% input %d\n" inputK) ++ unlines (map snd keyDecls), IM.fromList keyDecls)
     where
       keyDecls = zipWith f [(r,c) | r <- [1..length exprs], c <- [1..(length (head exprs))]] (concat exprs)

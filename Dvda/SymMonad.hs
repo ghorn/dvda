@@ -4,6 +4,7 @@
 {-# Language FlexibleInstances #-}
 {-# Language FlexibleContexts #-}
 {-# Language GADTs #-}
+{-# Language DoAndIfThenElse #-}
 
 module Dvda.SymMonad ( (:*)(..)
                      , MkFunGraph(..)
@@ -16,9 +17,10 @@ module Dvda.SymMonad ( (:*)(..)
                      , runFunGraph
                      , rad
                      , getSensitivities
+                     , fullShow
                      ) where
 
-import Control.Monad ( foldM )
+import Control.Monad ( foldM, liftM )
 import Control.Monad.State ( MonadState, StateT, get, put, runState )
 import Data.Functor.Identity ( Identity )
 import Data.Array.Repa ( DIM0, DIM1, DIM2 )
@@ -33,7 +35,7 @@ import Debug.Trace ( trace )
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
-import Dvda.Expr ( Expr(..), Const(..), dim )
+import Dvda.Expr ( Expr(..), Const(..), dim, fullShow' )
 
 ---- | take all sub expressions of an Expr and turn them into nodes
 ----   return an Expr that is just a ref
@@ -70,18 +72,22 @@ node (EGrad x_ arg_) = do
 -- gradient of expression w.r.t. list of args
 rad :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh0, DvdaDim sh) =>
        Expr sh0 a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [DynamicExpr a]
-rad expr_ args_ = do
-  expr <- node expr_
-  args <- mapM node args_
-  let argSet = HS.fromList (map makeDynamic args)
+rad expr' args' = do
+  expr <- node expr'
+  args'' <- mapM node args'
+  fg <- get
+
+  let args = map (\(ERef sh k) -> fromJust $ fgExprFromKey sh k fg) args''
+      argSet = HS.fromList (map makeDynamic args)
+
   sensitivities <- getSensitivities argSet expr (EConst (CSingleton (dim expr) 1))
   -- order inputs requested by user
-  let getSens x = case HM.lookup (makeDynamic x) sensitivities of
+  
+  let getSens arg = case HM.lookup (makeDynamic arg) sensitivities of
         Just sens -> sens
         Nothing -> trace "WARNING: taking deriviative df/dx where f is not a function of x" $
-                   makeDynamic (EConst (CSingleton (dim x) 0))
-      orderedSensitivities = map getSens args
-  return orderedSensitivities
+                   makeDynamic (EConst (CSingleton (dim arg) 0))
+  return (map getSens args)
 
 
 -- | combine two (DynamicExpr a, DynamicExpr a) hashmaps
@@ -113,11 +119,11 @@ unionWithPlus xs ys = foldM addCommon union0 commonDExprs
 
 
 lookupSymSet :: (Eq a, Hashable a, Element a, DvdaDim sh) =>
-                Expr sh a -> StateT (FunGraph a b c) Identity (HS.HashSet (DynamicExpr a))
+                Expr sh a -> StateT (FunGraph a b c) Identity (Maybe (HS.HashSet (DynamicExpr a)))
 lookupSymSet expr = do
   fg <- get
-  let (_,symSet) = fromJust $ fgLookup expr fg
-  return symSet
+  case fgLookup expr fg of Just (_,symSet) -> return (Just symSet)
+                           Nothing -> return Nothing
 
 
 getSensitivities :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh) =>
@@ -133,12 +139,15 @@ getSensitivities args (ERef sh k) sens  = do
   fg <- get
   let expr = fromJust $ fgExprFromKey sh k fg
   getSensitivities args expr sens
-getSensitivities args primal@(ESym _ _) sens = if HS.member (makeDynamic primal) args then do
-  return $ HM.fromList [(makeDynamic primal, makeDynamic sens)]
-  -- don't backprop if there aren't any interesting symbols farther in the tree
+getSensitivities args primal@(ESym _ _) sens = do
+  let dprimal = makeDynamic primal
+  if HS.member dprimal args
+  then return $ HM.fromList [(dprimal, makeDynamic sens)]
+    -- don't backprop if there aren't any interesting symbols farther in the tree
   else return HM.empty
+
 getSensitivities args (EUnary op g) sens = do
-  symSetG <- lookupSymSet g
+  symSetG <- liftM fromJust $ lookupSymSet g
   case HS.size (HS.intersection args symSetG) of
     -- don't backprop if there aren't any interesting symbols farther in the tree
     0 -> return HM.empty
@@ -152,11 +161,13 @@ getSensitivities args (EBinary op g h) sens = do
   let dfdg = dualPerturbation $ applyBinary op (Dual g 1) (Dual h 0)
       dfdh = dualPerturbation $ applyBinary op (Dual g 0) (Dual h 1)
   
-  gsens <- case HS.size (HS.intersection args symSetG) of
-                0 -> return HM.empty
+  gsens <- case liftM HS.size (liftM (HS.intersection args) symSetG) of
+                Nothing -> return HM.empty
+                Just 0 -> return HM.empty
                 _ -> getSensitivities args g (sens*dfdg)
-  hsens <- case HS.size (HS.intersection args symSetH) of
-                0 -> return HM.empty
+  hsens <- case liftM HS.size (liftM (HS.intersection args) symSetH) of
+                Nothing -> return HM.empty
+                Just 0 -> return HM.empty
                 _ -> getSensitivities args h (sens*dfdh)
   unionWithPlus gsens hsens
 --getSensitivities args (EScale g h) sens = do
@@ -167,10 +178,12 @@ getSensitivities args (EBinary op g h) sens = do
 --  let dfdg = h
 --      dfdh = g
 --  
---  gsens <- case HS.size (HS.intersection args symSetG) of
---                0 -> return HM.empty
+--  gsens <- case liftM HS.size (liftM (HS.intersection args) symSetG) of
+--                Nothing -> return HM.empty
+--                Just 0 -> return HM.empty
 --                _ -> getSensitivities args g (sens*dfdg)
---  hsens <- case HS.size (HS.intersection args symSetH) of
+--  hsens <- case liftM HS.size (liftM (HS.intersection args) symSetH) of
+--                Nothing -> return HM.empty
 --                0 -> return HM.empty
 --                _ -> getSensitivities args h (sens*dfdh)
 --  unionWithPlus gsens hsens
@@ -270,3 +283,7 @@ makeFunGraph :: (MkFunGraph b, MkFunGraph c, NumT b ~ NumT c) =>
 makeFunGraph ins outs = runFunGraph $ do
   inputs_ ins
   outputs_ outs
+
+
+fullShow :: (Show a, Element a, DvdaDim sh) => FunGraph a b c -> Expr sh a -> String
+fullShow fg expr = fullShow' (Just (\sh k -> fromJust $ fgExprFromKey sh k fg)) expr

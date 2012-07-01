@@ -86,10 +86,9 @@ msCost :: Expr Z Double -> [Expr Z Double] -> [Expr Z Double]
           (Expr Z Double :* [Expr Z Double])
 msCost cost_ dvs params = runFunGraph $ do
   cost <- node cost_
-
   costGrad_ <- (flip rad dvs) cost
 
-  let costGrad     = map (fromDynamic Z) costGrad_
+  let costGrad = map (fromDynamic Z) costGrad_
 
   inputs_ (dvs :* params)
   outputs_ (cost :* costGrad)
