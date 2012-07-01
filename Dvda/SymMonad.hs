@@ -19,7 +19,7 @@ module Dvda.SymMonad ( (:*)(..)
                      , fullShow
                      ) where
 
-import Control.Monad ( foldM )
+import Control.Monad ( foldM, liftM )
 import Control.Monad.State ( MonadState, StateT, get, put, runState )
 import Data.Functor.Identity ( Identity )
 import Data.Array.Repa ( DIM0, DIM1, DIM2 )
@@ -118,11 +118,11 @@ unionWithPlus xs ys = foldM addCommon union0 commonDExprs
 
 
 lookupSymSet :: (Eq a, Hashable a, Element a, DvdaDim sh) =>
-                Expr sh a -> StateT (FunGraph a b c) Identity (HS.HashSet (DynamicExpr a))
+                Expr sh a -> StateT (FunGraph a b c) Identity (Maybe (HS.HashSet (DynamicExpr a)))
 lookupSymSet expr = do
   fg <- get
-  let (_,symSet) = fromJust $ fgLookup expr fg
-  return symSet
+  case fgLookup expr fg of Just (_,symSet) -> return (Just symSet)
+                           Nothing -> return Nothing
 
 
 getSensitivities :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh) =>
@@ -146,7 +146,7 @@ getSensitivities args primal@(ESym _ _) sens = do
   else return HM.empty
 
 getSensitivities args (EUnary op g) sens = do
-  symSetG <- lookupSymSet g
+  symSetG <- liftM fromJust $ lookupSymSet g
   case HS.size (HS.intersection args symSetG) of
     -- don't backprop if there aren't any interesting symbols farther in the tree
     0 -> return HM.empty
@@ -160,11 +160,13 @@ getSensitivities args (EBinary op g h) sens = do
   let dfdg = dualPerturbation $ applyBinary op (Dual g 1) (Dual h 0)
       dfdh = dualPerturbation $ applyBinary op (Dual g 0) (Dual h 1)
   
-  gsens <- case HS.size (HS.intersection args symSetG) of
-                0 -> return HM.empty
+  gsens <- case liftM HS.size (liftM (HS.intersection args) symSetG) of
+                Nothing -> return HM.empty
+                Just 0 -> return HM.empty
                 _ -> getSensitivities args g (sens*dfdg)
-  hsens <- case HS.size (HS.intersection args symSetH) of
-                0 -> return HM.empty
+  hsens <- case liftM HS.size (liftM (HS.intersection args) symSetH) of
+                Nothing -> return HM.empty
+                Just 0 -> return HM.empty
                 _ -> getSensitivities args h (sens*dfdh)
   unionWithPlus gsens hsens
 --getSensitivities args (EScale g h) sens = do
@@ -175,10 +177,12 @@ getSensitivities args (EBinary op g h) sens = do
 --  let dfdg = h
 --      dfdh = g
 --  
---  gsens <- case HS.size (HS.intersection args symSetG) of
---                0 -> return HM.empty
+--  gsens <- case liftM HS.size (liftM (HS.intersection args) symSetG) of
+--                Nothing -> return HM.empty
+--                Just 0 -> return HM.empty
 --                _ -> getSensitivities args g (sens*dfdg)
---  hsens <- case HS.size (HS.intersection args symSetH) of
+--  hsens <- case liftM HS.size (liftM (HS.intersection args) symSetH) of
+--                Nothing -> return HM.empty
 --                0 -> return HM.empty
 --                _ -> getSensitivities args h (sens*dfdh)
 --  unionWithPlus gsens hsens

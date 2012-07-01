@@ -70,7 +70,7 @@ run = do
   let gr@( FunGraph _ _ _ _) = runFunGraph $ do
         let x = sym "x" :: Expr DIM0 Double
             y = sym "y"
-            z1 = x + x + y
+            z1 = x + x + y + 3
             z2 = diff z1 x
             z3 = diff z1 y
 

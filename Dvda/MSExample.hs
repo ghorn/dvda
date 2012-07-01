@@ -10,6 +10,7 @@ import qualified Data.IntMap as IM
 import Dvda
 import Dvda.SparseLA
 import Dvda.MS
+import Dvda.Graph
 
 n :: Int
 n = 2
@@ -97,6 +98,14 @@ run = do
 
       fundir = "testProblem"
 
+  let FunGraph _ _ _ (cost :* costGrad) = costFg
+      FunGraph _ _ _ (cineqs :* ceqs :* cineqsJacobs :* ceqsJacobs) = cnstFg
+
+  putStrLn "--------------------------------------------------------------"
+  putStrLn $ fullShow costFg cost
+  putStrLn "--------------------------------------------------------------"
+  mapM_ putStrLn $ map (fullShow costFg) costGrad
+  
   _ <- writeMS fundir "cost" costFg
   _ <- writeMS fundir "constraints" cnstFg
 
