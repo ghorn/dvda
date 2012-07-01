@@ -7,11 +7,11 @@ module Dvda.Examples ( run
                      , bigGraph
                      ) where
 
-import Control.Monad.State (State)
 import Data.Array.Repa.Index
+import Control.Monad.State
 
 import Dvda
-import Dvda.Graph ( FunGraph(..) )
+import Dvda.Graph ( FunGraph(..), fullShowNodes )
 
 exampleFunGraph :: State (FunGraph
                           Double (Exprs (DIM0 :* DIM1 :* DIM2) Double)
@@ -78,8 +78,11 @@ run = do
         outputs_ (z1 :* z2 :* z3)
 
   putStrLn $ showCollisions gr
-  putStrLn "-------------------------------------------"
-  putStrLn $ funGraphSummary' gr
+  putStrLn $ fullShowNodes gr
+  let FunGraph _ _ _ (z:* zx :* zy) = gr
+  putStrLn $ "z:     " ++ fullShow gr z
+  putStrLn $ "dz/dx: " ++ fullShow gr zx
+  putStrLn $ "dz/dy: " ++ fullShow gr zy
   previewGraph gr
 
 bigGraph :: FunGraph Double

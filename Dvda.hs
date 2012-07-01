@@ -30,6 +30,8 @@ module Dvda ( -- * primitives
             , FunGraph
             , makeFunGraph
             , runFunGraph
+            , inputs
+            , outputs
             , inputs_
             , outputs_
             , node
