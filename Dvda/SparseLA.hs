@@ -1,11 +1,15 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Dvda.SparseLA ( SparseVec(..)
-                     , SparseMat(..)
+module Dvda.SparseLA ( SparseVec
+                     , SparseMat
                      , svFromList
                      , smFromLists
                      , svFromSparseList
                      , smFromSparseList
+                     , denseListFromSv
+                     , sparseListFromSv
+                     , svZeros
+                     , smZeros
                      , svSize
                      , smSize
                      , svMap
@@ -31,18 +35,15 @@ module Dvda.SparseLA ( SparseVec(..)
 import Data.List ( foldl' )
 import Data.Maybe ( fromJust, fromMaybe ) --, isNothing )
 --import qualified Data.Traversable as T
-import Data.Array.Repa ( DIM1, DIM2, (:.)(..), Z(..) )
-import qualified Data.Array.Repa as Repa
 import Data.IntMap ( IntMap )
 import qualified Data.IntMap as IM
 
 -- map from row to (map from col to value)
-data SparseMat a = SparseMat DIM2 (IntMap (IntMap a))
+data SparseMat a = SparseMat (Int,Int) (IntMap (IntMap a))
 
 instance Show a => Show (SparseMat a) where
-  show (SparseMat s xs) = "SparseMat " ++ show vals ++ " " ++ show (rows, cols)
+  show (SparseMat rowsCols xs) = "SparseMat " ++ show vals ++ " " ++ show rowsCols
     where
-      [cols,rows] = Repa.listOfShape s
       vals = concatMap f (IM.toList xs)
       f (row,m) = map g (IM.toList m)
         where
@@ -55,8 +56,23 @@ instance Num a => Num (SparseMat a) where
   abs = smMap abs
   signum = smMap signum
 
+-- puts zeroes where there aren't entries
+denseListFromSv :: Num a => SparseVec a -> [a]
+denseListFromSv v@(SparseVec _ im) = IM.elems $ IM.union im (IM.fromList $ zip [0..n-1] (repeat 0))
+  where
+    n = svSize v
+
+sparseListFromSv :: SparseVec a -> [a]
+sparseListFromSv (SparseVec _ im) = IM.elems im
+  
+svZeros :: Int -> SparseVec a
+svZeros n = SparseVec n IM.empty
+
+smZeros :: (Int, Int) -> SparseMat a
+smZeros rowsCols = SparseMat rowsCols IM.empty
+
 smSize :: SparseMat a -> (Int,Int)
-smSize (SparseMat sh _) = (\[cols,rows] -> (rows,cols)) $ Repa.listOfShape sh
+smSize (SparseMat rowsCols _) = rowsCols
 
 smMap :: (a -> b) -> SparseMat a -> SparseMat b
 smMap f (SparseMat sh maps) = SparseMat sh (IM.map (IM.map f) maps)
@@ -69,7 +85,7 @@ smFromLists blah = smFromSparseList sparseList (rows, cols)
     sparseList = concat $ zipWith (\row xs -> zipWith (\col x -> ((row,col),x)) [0..] xs) [0..] blah
 
 smFromSparseList :: [((Int,Int),a)] -> (Int,Int) -> SparseMat a
-smFromSparseList xs' (rows,cols) = SparseMat (Repa.shapeOfList [cols, rows]) (foldr f IM.empty xs')
+smFromSparseList xs' rowsCols = SparseMat rowsCols (foldr f IM.empty xs')
   where
     f ((row,col), val) = IM.insertWith g row (IM.singleton col val)
       where
@@ -93,22 +109,21 @@ smFromSparseList xs' (rows,cols) = SparseMat (Repa.shapeOfList [cols, rows]) (fo
 
 smBinary :: (a -> a -> a) -> (IntMap a -> IntMap a) -> (IntMap a -> IntMap a)
             -> SparseMat a -> SparseMat a -> Maybe (SparseMat a)
-smBinary fBoth fLeft fRight (SparseMat shx xs) (SparseMat shy ys)
+smBinary fBoth fLeft fRight (SparseMat shx@(_,cols) xs) (SparseMat shy ys)
   | shx /= shy = Nothing
   | otherwise = Just $ SparseMat shx merged
   where
     merged = IM.unionWith f (IM.map fLeft xs) (IM.map fRight ys)
       where
-        cols = Repa.shapeOfList [head $ Repa.listOfShape shx]
         f x y = case svBinary fBoth fLeft fRight (SparseVec cols x) (SparseVec cols y) of
           Just (SparseVec _ im) -> im
           Nothing -> error "goons everywhere"
 
 --------------------------------------------------------------------------------------
-data SparseVec a = SparseVec DIM1 (IntMap a)
+data SparseVec a = SparseVec Int (IntMap a)
 
 svSize :: SparseVec a -> Int
-svSize (SparseVec sh _) = head $ Repa.listOfShape sh
+svSize (SparseVec sh _) = sh
 
 instance Show a => Show (SparseVec a) where
   show sv@(SparseVec _ xs) = "SparseVec " ++ show vals ++ " " ++ show rows
@@ -127,7 +142,7 @@ svFromList :: [a] -> SparseVec a
 svFromList xs = svFromSparseList (zip [0..] xs) (length xs)
 
 svFromSparseList :: [(Int,a)] -> Int -> SparseVec a
-svFromSparseList xs rows = SparseVec (Repa.shapeOfList [rows]) (IM.fromList xs)
+svFromSparseList xs rows = SparseVec rows (IM.fromList xs)
 
 svMap :: (a -> b) -> SparseVec a -> SparseVec b
 svMap f (SparseVec sh maps) = SparseVec sh (IM.map f maps)
@@ -175,48 +190,44 @@ smScale x (SparseMat sh xs) = SparseMat sh (IM.map (IM.map (x *)) xs)
 
 --------------------------------------------------------------------------
 getRow :: Int -> SparseMat a -> SparseVec a
-getRow row sm@(SparseMat sh xs)
+getRow row sm@(SparseMat (_,cols) xs)
   | row >= (\(rows,_) -> rows) (smSize sm) =
     error $ "getRow saw out of bounds index " ++ show row ++ " for matrix size " ++ show (smSize sm)
   | otherwise = SparseVec cols out
   where
     out = fromMaybe IM.empty (IM.lookup row xs)
-    cols = Repa.shapeOfList [head $ Repa.listOfShape sh]
 
 getCol :: Int -> SparseMat a -> SparseVec a
-getCol col sm@(SparseMat sh xs)
+getCol col sm@(SparseMat (rows,_) xs)
   | col >= (\(_,cols) -> cols) (smSize sm) =
     error $ "getCol saw out of bounds index " ++ show col ++ " for matrix size " ++ show (smSize sm)
   | otherwise = SparseVec rows out
   where
     out = IM.mapMaybe (IM.lookup col) xs
-    rows = Repa.shapeOfList [last $ Repa.listOfShape sh]
 
 ---------------------------------------------------------------------------
 sVV :: Num a => SparseVec a -> SparseVec a -> Maybe a
 sVV x y = fmap (\(SparseVec _ xs) -> sum (IM.elems xs)) (svMul x y)
 
 sMV :: Num a => SparseMat a -> SparseVec a -> Maybe (SparseVec a)
-sMV (SparseMat shm ms) vec@(SparseVec shv _)
+sMV (SparseMat (mrows,mcols) ms) vec@(SparseVec vsize _)
   | mcols /= vsize = Nothing
-  | otherwise = Just $ SparseVec (Repa.shapeOfList [mrows]) out
+  | otherwise = Just $ SparseVec mrows out
   where
-    [mrows,mcols] = reverse $ Repa.listOfShape shm
-    vsize = Repa.size shv
     out = IM.mapMaybe f ms
       where
-        f im = sVV (SparseVec (Repa.shapeOfList [mcols]) im) vec
+        f im = sVV (SparseVec mcols im) vec
 
 ---------------------------------------------------------------------------
 svCat :: SparseVec a -> SparseVec a -> SparseVec a
-svCat svx@(SparseVec _ xs) svy@(SparseVec _ ys) = SparseVec (Repa.shapeOfList [shx + shy]) (IM.union xs newYs)
+svCat svx@(SparseVec _ xs) svy@(SparseVec _ ys) = SparseVec (shx + shy) (IM.union xs newYs)
   where
     shx = svSize svx
     shy = svSize svy
     newYs = IM.fromList $ map (\(k,x) -> (k+shx, x)) $ IM.toList ys
 
 svCats :: [SparseVec a] -> SparseVec a
-svCats [] = SparseVec (Z :. 0) IM.empty
+svCats [] = SparseVec 0 IM.empty
 svCats (xs0:xs) = foldl' svCat xs0 xs
 
 --mx' :: SparseMat Double
