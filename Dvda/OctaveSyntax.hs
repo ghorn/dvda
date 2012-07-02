@@ -4,7 +4,7 @@
 {-# Language TypeOperators #-}
 
 module Dvda.OctaveSyntax ( GenOctave
-                         , showOctaveSource
+                         , toOctaveSource
                          ) where
 
 import Data.Maybe ( fromJust )
@@ -117,7 +117,7 @@ octaveUnary ACosh  = "acosh"
 writeExpr :: (Show a, Element a) => Expr sh a -> String
 writeExpr (ERef _ k) = Config.nameHSVar k
 writeExpr (EBinary op x y) = writeExpr x ++ " " ++ octaveBinary op ++ " " ++ writeExpr y
-writeExpr (EUnary op x) = octaveUnary op ++ " " ++ writeExpr x
+writeExpr (EUnary op x) = octaveUnary op ++ "( " ++ writeExpr x ++ " )"
 writeExpr (EScale x y) = "LA.scale " ++ writeExpr x ++ " " ++ writeExpr y
 writeExpr (EConst (CSingleton _ x)) = show x
 writeExpr (EConst (CVec _ x)) = show x -- Config.nameHSConst k
@@ -138,11 +138,11 @@ writeAssignment inputMap (k, dexpr)
     isSym _ = False
 
 
-showOctaveSource :: (Show a, Element a, GenOctave b, GenOctave c) =>
-                    FunGraph a b c -> String -> String
-showOctaveSource (FunGraph _ im inputs outputs) hash =
+toOctaveSource :: (Show a, Element a, GenOctave b, GenOctave c) =>
+                  FunGraph a b c -> String -> String
+toOctaveSource (FunGraph _ im inputs outputs) funName =
   unlines $
-  [ "function [" ++ outputHeader ++ "] = " ++ Config.nameOctaveFunction hash ++ "(" ++ inputHeader ++ ")"
+  [ "function [" ++ outputHeader ++ "] = " ++ funName ++ "(" ++ inputHeader ++ ")"
   , ""
   , "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% inputs: %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
   , unlines $ map ('%' :) $ lines inputDecls
