@@ -61,17 +61,17 @@ node (EDeriv x_ arg_) = do
   x <- node x_
   arg <- node arg_
   outs <- rad x [arg]
-  node (fromDynamic (dim arg) $ head outs)
+  node (head outs)
 node (EGrad x_ arg_) = do
   x <- node x_
   arg <- node arg_
   outs <- rad x [arg]
-  node (fromDynamic (dim arg) $ head outs)
+  node (head outs)
 
 
 -- gradient of expression w.r.t. list of args
 rad :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh0, DvdaDim sh) =>
-       Expr sh0 a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [DynamicExpr a]
+       Expr sh0 a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [Expr sh a]
 rad expr' args' = do
   expr <- node expr'
   args'' <- mapM node args'
@@ -84,10 +84,10 @@ rad expr' args' = do
   -- order inputs requested by user
   
   let getSens arg = case HM.lookup (makeDynamic arg) sensitivities of
-        Just sens -> sens
+        Just sens -> node $ fromDynamic (dim arg) sens
         Nothing -> trace "WARNING: taking deriviative df/dx where f is not a function of x" $
-                   makeDynamic (EConst (CSingleton (dim arg) 0))
-  return (map getSens args)
+                   return $ EConst (CSingleton (dim arg) 0)
+  mapM getSens args
 
 
 -- | combine two (DynamicExpr a, DynamicExpr a) hashmaps
