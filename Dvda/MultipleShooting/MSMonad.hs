@@ -1,104 +1,91 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language FlexibleContexts #-}
 
-module Dvda.MSMonad ( -- * monadic dsl api
-                      setStates
-                    , setActions
-                    , setParams
-                    , setConstants
-                    , setDxdt
-                    , setCost
-                    , addConstraint
-                    , setBound
-                      -- * monadic dsl internal
---                    , runSteps
-                    ) where
+module Dvda.MultipleShooting.MSMonad ( setStates
+                                     , setActions
+                                     , setParams
+                                     , setConstants
+                                     , setDxdt
+                                     , setCost
+                                     , addConstraint
+                                     , setBound
+                                     , runOneStep
+                                     ) where
 
 import Data.Array.Repa ( Z(..) )
-import Data.List ( nub, union, sort )
-import Data.Map ( Map )
-import qualified Data.Map as Map
-import Data.Maybe ( isJust )
+import Data.Hashable ( Hashable )
+import qualified Data.HashMap.Lazy as HM
+import qualified Data.HashSet as HS
+import Data.List ( nub, sort ) --, union )
+import Data.Maybe ( isJust, isNothing )
 import Control.Monad ( when )
 import Control.Monad.State ( State )
 import qualified Control.Monad.State as State
-import Data.Set ( Set )
 import Debug.Trace ( trace )
 import Text.Printf ( printf )
 
 import Dvda ( sym )
 import Dvda.Expr ( Expr(..), Const(..) )
-import Dvda.MultipleShooting ( Bound(..) )
-
-data Constraint' a = Constraint' (Expr Z a) Ordering (Expr Z a) deriving Show
-
-data Step a = Step { stepStates :: Maybe [Expr Z a]
-                   , stepActions :: Maybe [Expr Z a]
-                   , stepDxdt :: Maybe [Expr Z a]
-                   , stepCost :: Maybe (Expr Z a)
-                   , stepBounds :: Map (Expr Z a) (a,a)
-                   , stepConstraints :: [Constraint' a]
-                   , stepParams :: Maybe [Expr Z a]
-                   , stepConstants :: Maybe [Expr Z a]
-                   }
+import Dvda.MultipleShooting.Types
 
 failDuplicates :: [String] -> [String]
 failDuplicates names
   | length names == length (nub names) = names
   | otherwise = error $ "ERROR: saw duplicate names in: " ++ show (sort names)
 
-setStates :: [String] -> State (Step a, Int) [Expr Z a]
-setStates names = do
-  (step,k) <- State.get
+setStates :: [String] -> State (Step a) [Expr Z a]
+setStates names' = do
+  step <- State.get
   when (isJust (stepStates step)) $ error "states already set, don't call setStates twice"
-  let syms = map (sym . (++ "_" ++ show k)) (failDuplicates names)
-  State.put (step {stepStates = Just syms}, k)
+  let names = failDuplicates names'
+      syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
+  State.put $ step {stepStates = Just (zip syms names)}
   return syms
 
-setActions :: [String] -> State (Step a, Int) [Expr Z a]
-setActions names = do
-  (step,k) <- State.get
+setActions :: [String] -> State (Step a) [Expr Z a]
+setActions names' = do
+  step <- State.get
   when (isJust (stepActions step)) $ error "actions already set, don't call setActions twice"
-  let syms = map (sym . (++ "_" ++ show k)) (failDuplicates names)
-  State.put $ (step {stepActions = Just syms}, k)
+  let names = failDuplicates names'
+      syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
+  State.put $ step {stepActions = Just (zip syms names)}
   return syms
 
-setParams :: Eq (Expr Z a) => [String] -> State (Step a, Int) [Expr Z a]
+setParams :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step a) [Expr Z a]
 setParams names = do
-  (step, k)  <- State.get
+  step  <- State.get
   when (isJust (stepParams step)) $ error "params already set, don't call setParams twice"
   let syms = map sym (failDuplicates names)
-  State.put $ (step {stepParams = Just syms}, k)
+  State.put $ step {stepParams = Just (HS.fromList syms)}
   return syms
 
-setConstants :: Eq (Expr Z a) => [String] -> State (Step a, Int) [Expr Z a]
+setConstants :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step a) [Expr Z a]
 setConstants names = do
-  (step, k)  <- State.get
+  step  <- State.get
   when (isJust (stepConstants step)) $ error "constants already set, don't call setConstants twice"
   let syms = map sym (failDuplicates names)
-  State.put $ (step {stepConstants = Just syms}, k)
+  State.put $ step {stepConstants = Just (HS.fromList syms)}
   return syms
   
 -------------------------------------------
 
-setDxdt :: [Expr Z a] -> State (Step a, Int) ()
+setDxdt :: [Expr Z a] -> State (Step a) ()
 setDxdt vars = do
-  (step, k)  <- State.get
+  step  <- State.get
   when (isJust (stepDxdt step)) $ error "dxdt already set, don't call setDxdt twice"
-  State.put $ (step {stepDxdt = Just vars}, k)
+  State.put $ step {stepDxdt = Just vars}
 
-setCost :: Expr Z a -> State (Step a, Int) ()
+setCost :: Expr Z a -> State (Step a) ()
 setCost var = do
-  (step, k)  <- State.get
+  step  <- State.get
   when (isJust (stepCost step)) $ error "cost already set, don't call setCost twice"
-  State.put $ (step {stepCost = Just var}, k)
+  State.put $ step {stepCost = Just var}
 
-setBound :: (Show a, Show (Expr Z a), Ord (Expr Z a)) => Expr Z a -> (a, a) -> State (Step a) ()
+setBound :: (Show a, Show (Expr Z a), Eq (Expr Z a), Hashable (Expr Z a)) => Expr Z a -> (a, a) -> State (Step a) ()
 setBound var@(ESym _ _) (lb, ub) = do
   step <- State.get
-  let bound = Bound {boundVar = var, boundL = lb, boundU = ub}
-      oldBounds = stepBounds step
-      newBounds = Map.insertWith merge var (lb,ub) oldBounds
+  let oldBounds = stepBounds step
+      newBounds = HM.insertWith merge var (lb,ub) oldBounds
         where
           merge new old = trace msg new
             where
@@ -111,33 +98,59 @@ setBound var (lb, ub) = trace "WARNING - setBound called on non-design variable,
 
 addConstraint :: Expr Z a -> Ordering -> Expr Z a -> State (Step a) ()
 addConstraint x ordering y =
-  State.state (\step -> ((), step {stepConstraints = (stepConstraints step) ++ [Constraint' x ordering y]}))
+  State.state (\step -> ((), step {stepConstraints = (stepConstraints step) ++ [Constraint x ordering y]}))
 
 
-------------------------------------------------------------------------
---runSteps :: Eq (Expr Z a) => State (Step a, Int) b -> Int -> Sys a
---runSteps userStepFun n = Sys { sysSteps = steps
---                             , sysParams = params
---                             , sysConstants = rcs
---                             }
+runOneStep :: State (Step a) b -> Int -> Step a
+runOneStep userStep k
+  | isNothing (stepStates  ret) = error "ERROR: need to set states"
+  | isNothing (stepActions ret) = error "ERROR: need to set actions"
+  | isNothing (stepDxdt    ret) = error "ERROR: need to set dxdt"
+  | otherwise = ret
+  where
+    ret = State.execState userStep $ Step { stepStates = Nothing
+                                          , stepActions = Nothing
+                                          , stepDxdt = Nothing
+                                          , stepCost = Nothing
+                                          , stepBounds = HM.empty
+                                          , stepConstraints = []
+                                          , stepParams = Nothing
+                                          , stepConstants = Nothing
+                                          , stepIdx = k
+                                          }
+
+
+--simpleSystem userStep n = undefined
 --  where
---    emptyStep = Step { stepStates = []
---                     , stepActions = []
---                     , stepDxdt = []
---                     , stepBounds = []
---                     , stepConstraints = []
---                     , stepCost = Nothing
---                     }
---    runStep userStepFun' k = State.execState userStepFun' (emptyStep, k, ([], []))
---    outs = map (runStep userStepFun) [0..n-1]
---    
---    steps = map (\(step,_,_) -> step) outs
---    params = nub $ concat $ map (\(_,_,(params',   _)) -> params') outs
---    rcs =    nub $ concat $ map (\(_,_,(      _,rcs')) -> rcs'   ) outs
+--    steps = map (runOneStep userStep) [0..n-1]
+--    -- ensure that state/action (names) are the same in all steps
+--    f Nothing hs = hs
+--    f (Just next) hs = HS.union hs next
+--    params    = foldr f HS.empty (map stepParams    steps)
+--    constants = foldr f HS.empty (map stepConstants steps)
+--    states'  = map (fst . unzip . fromJust . stepStates ) steps -- fromJust checked in runOneStep
+--    actions' = map (fst . unzip . fromJust . stepActions) steps -- fromJust checked in runOneStep
+--
+--    stateNames  = map (snd . unzip . fromJust . stepStates ) steps  -- fromJust checked in runOneStep
+--    actionNames = map (snd . unzip . fromJust . stepActions) steps  -- fromJust checked in runOneStep    
+--
+--    states = if all (head stateNames  ==) stateNames
+--             then states'
+--             else error "ERROR: different states in different timesteps"
+--    actions = if all (head stateNames  ==) stateNames
+--              then actions'
+--              else error "ERROR: different actions in different timesteps"
+--
+--    constraints = concatMap stepConstraints steps
+--
+    
 
-cartpole :: (Eq (Expr Z a), Num (Expr Z a)) => State (Step a, Int) ()
-cartpole = do
-  [x, v] <- setStates ["x","v"]
-  [u] <- setActions ["u"]
-  [k, b] <- setConstants ["k", "b"]
-  setDxdt [v, -k*x - b*v + u]
+--cartpole :: State (Step Double) ()
+--cartpole = do
+--  [x, v] <- setStates ["x","v"]
+--  [u] <- setActions ["u"]
+--  [k, b] <- setConstants ["k", "b"]
+--  setDxdt [v, -k*x - b*v + u]
+--  setBound x (-5, 5)
+--  setBound v (-10, 10)
+--  setBound u (-20, 10)

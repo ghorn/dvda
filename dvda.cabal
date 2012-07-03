@@ -55,10 +55,10 @@ Library
                      Dvda.Graph
 --                     Dvda.HSBuilder
 --                     Dvda.HSSyntax
-                     Dvda.MS
-                     Dvda.MSExample
-                     Dvda.MSDSL
-                     Dvda.MSDSLExample
+                     Dvda.MultipleShooting.MSCoctave
+                     Dvda.MultipleShooting.MSMonad
+                     Dvda.MultipleShooting.MultipleShooting
+                     Dvda.MultipleShooting.Types
                      Dvda.OctaveSyntax
                      Dvda.SparseLA
                      Dvda.SymMonad
