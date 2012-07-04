@@ -5,12 +5,16 @@ module Dvda.Examples ( run
                      , run'
                      , showoff
                      , bigGraph
+                     , smallGraph
+                     , runCallNative
                      ) where
 
 import Data.Array.Repa.Index
 import Control.Monad.State
 
 import Dvda
+import Dvda.Expr
+import Dvda.CallNative
 import Dvda.Graph ( FunGraph(..), fullShowNodes )
 
 exampleFunGraph :: State (FunGraph
@@ -103,6 +107,23 @@ bigGraph = makeFunGraph (x' :* y' :* z') (f :* fx :* fy :* fz)
     fx = diff f x'
     fy = diff f y'
     fz = diff f z'
+
+smallGraph :: FunGraph Double
+            (Exprs (DIM0 :* DIM0 :* DIM0) Double)
+            (Exprs (DIM0 :* DIM0) Double)
+smallGraph = makeFunGraph (x :* y :* z) (f0 :* f1)
+  where
+    x = sym "x" :: Expr DIM0 Double
+    y = sym "y"
+    z = sym "z"
+
+    f0 = x*y*z + 3
+    f1 = 40*f0/x
+
+runCallNative :: Exprs (Z :* Z) Double
+runCallNative = toNative smallGraph (f 1 :* f 2 :* f 3)
+  where
+    f = EConst . (CSingleton Z)
 
 showoff :: IO ()
 showoff = do
