@@ -28,7 +28,7 @@ import Dvda.Codegen ( writeSourceFile )
 writeOctaveSolver :: MultipleShooting Double -> [Bound Double] -> DesignVars Double -> [Constraint Double]
                      -> FilePath -> String -> IO ()
 writeOctaveSolver ms bounds' dvsGuess moreConstraints funDir name = do
-  let isEqConstraint (Constraint ConstraintEq _ _) = True
+  let isEqConstraint (Constraint EQ _ _) = True
       isEqConstraint _ = False
 
       allConstraints = msDodeConstraints ms ++ moreConstraints
@@ -60,7 +60,7 @@ writeOctaveSolver ms bounds' dvsGuess moreConstraints funDir name = do
       defaultBounds = IM.fromList [(k, (-1e6, 1e6)) | k <- [0..numDvs ms - 1]]
       bounds = IM.union (IM.fromListWithKey resolve $ map toTuple bounds') defaultBounds
         where
-          toTuple (Bound {var = v, lbound = lb, ubound = ub}) = (dvIdx ms v, (lb, ub))
+          toTuple (Bound {boundVar = v, boundL = lb, boundU = ub}) = (dvIdx ms v, (lb, ub))
           resolve k x@(lbx,ubx) y@(lby,uby) = trace msg ret
             where
               ret = (max lbx lby, min ubx uby)

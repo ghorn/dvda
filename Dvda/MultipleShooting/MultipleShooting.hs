@@ -5,7 +5,6 @@ module Dvda.MultipleShooting ( Ode(..)
                              , Cost(..)
                              , MultipleShooting(..)
                              , Constraint(..)
-                             , ConstraintType(..)
                              , DesignVars(..)
                              , Bound(..)
                              , multipleShooting
@@ -24,27 +23,37 @@ module Dvda.MultipleShooting ( Ode(..)
                              , eulerError
                              ) where
 
-import Text.Printf
+import Text.Printf ( printf )
 import Data.List ( elemIndex, zipWith6 )
-import Data.Maybe
+import Data.Maybe ( isJust, fromJust )
+import Debug.Trace ( trace )
+import Data.Array.Repa ( Z(..) )
 
-import Dvda ( Expr, Z, svec )
+import Dvda ( svec )
+import Dvda.Expr ( Expr(..) )
 import Dvda.SparseLA ( SparseVec, svCats, svScale, svZeros, svSize, sparseListFromSv, svFromList )
 
 data Ode a = Ode (SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a)) (Int,Int)
 data Cost a = Cost (SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> Expr Z a) (Int,Int)
 
-data ConstraintType = ConstraintLt | ConstraintGt | ConstraintEq deriving Show
-data Constraint a = Constraint ConstraintType (SparseVec (Expr Z a)) (SparseVec (Expr Z a)) deriving Show
+data Constraint a = Constraint Ordering (SparseVec (Expr Z a)) (SparseVec (Expr Z a)) deriving Show
 
-data Bound a = Bound { var :: Expr Z a
-                     , lbound :: a
-                     , ubound :: a
-                     } deriving Show
+data Bound a = Bound { boundVar :: Expr Z a
+                     , boundL :: a
+                     , boundU :: a
+                     }
+instance Show a => Show (Bound a) where
+  show bound = show (boundL bound) ++ " <= " ++ name ++ " <= " ++ show (boundU bound)
+    where
+      name = safeGetSymNameFromExpr (boundVar bound)
 
-data System a = System { odes :: [Ode a]
-                       , costs :: [Cost a]
-                       , dts :: [Expr Z a]
+safeGetSymNameFromExpr :: Expr sh a -> String
+safeGetSymNameFromExpr (ESym _ name) = name
+safeGetSymNameFromExpr _ = trace "Warning - Bound has non-symbolic value" "{NOT A DESIGN VARIABLE}"
+
+data System a = System { sysOdes :: [Ode a]
+                       , sysCosts :: [Cost a]
+                       , sysDts :: [Expr Z a]
                        }
 
 data DesignVars a = DesignVars { dvStates :: [SparseVec a]
@@ -59,6 +68,7 @@ data MultipleShooting a = MultipleShooting { msSystem :: System a
                                            , msObjFun :: Expr Z a
                                            }
 
+
 numDvs :: MultipleShooting a -> Int
 numDvs = length . vectorizeDvs . msDesignVars
 
@@ -72,21 +82,28 @@ dvIdx ms val
 vectorizeDvs :: DesignVars a -> [a]
 vectorizeDvs (DesignVars {dvStates = states, dvActions = actions, dvParams = params}) =
   sparseListFromSv (svCats [svCats states, svCats actions]) ++ params
-  
+
+--vectorizedIndices :: Multipleshooting a -> DesignVars Int
+--vectorizedIndices ms
+--  | any ((/=) (head odeDims)) (tail odeDims) = error "vectorizedIndices got ODE dimension mismatch"
+--  | otherwise = DesignVars 
+--  where
+--    odeDims = map (\(Ode _ _ _ d) -> d) $ sysOdes (msSystem ms)
+    
 
 boundEq :: Eq (Expr Z a) => Expr Z a -> a -> Bound a
-boundEq x val = Bound { lbound = val
-                      , ubound = val
-                      , var = x
+boundEq x val = Bound { boundL = val
+                      , boundU = val
+                      , boundVar = x
                       }
 
 boundEqs :: Eq (Expr Z a) => SparseVec (Expr Z a) -> SparseVec a -> [Bound a]
 boundEqs xs vals = zipWith boundEq (sparseListFromSv xs) (sparseListFromSv vals)
 
 boundInterval :: Eq (Expr Z a) => Expr Z a -> (a, a) -> Bound a
-boundInterval x (lb, ub) = Bound { lbound = lb
-                                 , ubound = ub
-                                 , var = x
+boundInterval x (lb, ub) = Bound { boundL = lb
+                                 , boundU = ub
+                                 , boundVar = x
                                  }
 
 boundIntervals :: Eq (Expr Z a) => SparseVec (Expr Z a) -> [(a,a)] -> [Bound a]
@@ -102,7 +119,7 @@ multipleShooting sys params runtimeConstants odeError
                                                                    , dvActions = actions
                                                                    , dvParams = params
                                                                    }
-                                       , msDodeConstraints = dcs
+                                       , msDodeConstraints = dodeConstraints
                                        , msRuntimeConstants = runtimeConstants
                                        , msObjFun = objFun
                                        }
@@ -110,31 +127,29 @@ multipleShooting sys params runtimeConstants odeError
   where
     dimensionsMatch = (nOdes == nDts) && (nCosts == nOdes + 1) && (and $ zipWith (==) odeDims costDims)
 
-    odeDims = map (\(Ode _ d) -> d) (odes sys)
-    costDims = map (\(Cost _ d) -> d) (costs sys)
+    odeDims = map (\(Ode _ d) -> d) (sysOdes sys)
+    costDims = map (\(Cost _ d) -> d) (sysCosts sys)
 
-    nOdes = length (odes sys)
-    nCosts = length (costs sys)
-    nDts = length (dts sys)
+    nOdes  = length (sysOdes sys)
+    nCosts = length (sysCosts sys)
+    nDts   = length (sysDts sys)
 
     states  = zipWith (\(nx,_) k -> svec ("x_"++show k) nx) costDims [0..nCosts-1]
     actions = zipWith (\(_,nu) k -> svec ("u_"++show k) nu) costDims [0..nCosts-1]
 
-    dcs = map eqZero $ zipWith6 odeError (init states) (init actions) (tail states) (tail actions) (odes sys) (dts sys)
+    dodeConstraints = map eqZero $ zipWith6 odeError (init states) (init actions) (tail states) (tail actions)
+                      (sysOdes sys) (sysDts sys)
 
-    objFun = sum $ zipWith3 (\(Cost cost _) x u -> cost x u) (costs sys) states actions
+    objFun = sum $ zipWith3 (\(Cost cost _) x u -> cost x u) (sysCosts sys) states actions
 
 simpleSystem :: Ode a -> Cost a -> Expr Z a -> Int -> System a
-simpleSystem ode cost dt n = System { odes = replicate (n-1) ode
-                                    , costs = replicate n cost
-                                    , dts = replicate (n-1) dt
+simpleSystem ode cost dt n = System { sysOdes = replicate (n-1) ode
+                                    , sysCosts = replicate n cost
+                                    , sysDts = replicate (n-1) dt
                                     }
 
 replaceFinalCost :: Cost a -> System a -> System a
-replaceFinalCost cost sysIn = System { odes = odes sysIn
-                                     , costs = init (costs sysIn) ++ [cost]
-                                     , dts = dts sysIn
-                                     }
+replaceFinalCost cost sysIn = sysIn {sysCosts = init (sysCosts sysIn) ++ [cost]}
 
 eulerError :: Fractional (Expr Z a) => SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> Ode a -> Expr Z a -> SparseVec (Expr Z a)
 eulerError xk uk xkp1 _ (Ode ode _) dt = xkp1 - (xk + svScale dt f0)
@@ -157,10 +172,10 @@ simpsonsRuleError xk uk xkp1 ukp1 (Ode ode _) dt = xkp1 - xk - (svScale (dt/6.0)
     fourFm = svScale 4 fm
 
 eqZero :: SparseVec (Expr Z a) -> Constraint a
-eqZero g = Constraint ConstraintEq g (svZeros $ svSize g)
+eqZero g = Constraint EQ g (svZeros $ svSize g)
 
 ltZero :: Fractional a => SparseVec (Expr Z a) -> Constraint a
-ltZero g = Constraint ConstraintLt g (svZeros $ svSize g)
+ltZero g = Constraint LT g (svZeros $ svSize g)
 
 interpolateInitialGuess :: Fractional a => SparseVec a -> SparseVec a -> Int -> [SparseVec a]
 interpolateInitialGuess x0 xf n' = map (combine x0 xf) alphas
