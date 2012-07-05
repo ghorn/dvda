@@ -1,55 +1,40 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language FlexibleContexts #-}
 
-module Dvda.MultipleShooting ( Ode(..)
-                             , Cost(..)
-                             , MultipleShooting(..)
-                             , Constraint(..)
-                             , DesignVars(..)
-                             , Bound(..)
-                             , multipleShooting
-                             , simpleSystem
-                             , boundEqs
-                             , boundEq
-                             , boundInterval
-                             , boundIntervals
-                             , ltZero
-                             , replaceFinalCost
-                             , vectorizeDvs
-                             , dvIdx
-                             , numDvs
-                             , interpolateInitialGuess
-                             , simpsonsRuleError
-                             , eulerError
-                             ) where
+module Dvda.MultipleShooting.MultipleShooting ( Cost(..)
+                                              , MultipleShooting(..)
+                                              , Constraint'(..)
+                                              , DesignVars(..)
+                                              , multipleShooting
+                                              , simpleSystem
+                                              , boundEqs
+                                              , boundEq
+                                              , boundInterval
+                                              , boundIntervals
+                                              , ltZero
+                                              , replaceFinalCost
+                                              , vectorizeDvs
+                                              , dvIdx
+                                              , numDvs
+                                              , interpolateInitialGuess
+                                              , simpsonsRuleError
+                                              , eulerError
+                                              ) where
 
 import Text.Printf ( printf )
 import Data.List ( elemIndex, zipWith6 )
 import Data.Maybe ( isJust, fromJust )
-import Debug.Trace ( trace )
 import Data.Array.Repa ( Z(..) )
+import Debug.Trace ( trace )
 
 import Dvda ( svec )
 import Dvda.Expr ( Expr(..) )
-import Dvda.SparseLA ( SparseVec, svCats, svScale, svZeros, svSize, sparseListFromSv, svFromList )
+import Dvda.SparseLA ( SparseVec, svCats, svZeros, svSize, sparseListFromSv, svFromList )
+import Dvda.MultipleShooting.Types
 
-data Ode a = Ode (SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a)) (Int,Int)
 data Cost a = Cost (SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> Expr Z a) (Int,Int)
 
-data Constraint a = Constraint Ordering (SparseVec (Expr Z a)) (SparseVec (Expr Z a)) deriving Show
-
-data Bound a = Bound { boundVar :: Expr Z a
-                     , boundL :: a
-                     , boundU :: a
-                     }
-instance Show a => Show (Bound a) where
-  show bound = show (boundL bound) ++ " <= " ++ name ++ " <= " ++ show (boundU bound)
-    where
-      name = safeGetSymNameFromExpr (boundVar bound)
-
-safeGetSymNameFromExpr :: Expr sh a -> String
-safeGetSymNameFromExpr (ESym _ name) = name
-safeGetSymNameFromExpr _ = trace "Warning - Bound has non-symbolic value" "{NOT A DESIGN VARIABLE}"
+data Constraint' a = Constraint' Ordering (SparseVec (Expr Z a)) (SparseVec (Expr Z a)) deriving Show
 
 data System a = System { sysOdes :: [Ode a]
                        , sysCosts :: [Cost a]
@@ -63,11 +48,26 @@ data DesignVars a = DesignVars { dvStates :: [SparseVec a]
 
 data MultipleShooting a = MultipleShooting { msSystem :: System a
                                            , msDesignVars :: DesignVars (Expr Z a)
-                                           , msDodeConstraints :: [Constraint a]
-                                           , msRuntimeConstants :: [Expr Z a]
+                                           , msDodeConstraints :: [Constraint' a]
+                                           , msConstants :: [Expr Z a]
                                            , msObjFun :: Expr Z a
                                            }
 
+
+
+data Bound a = Bound { boundVar :: Expr Z a
+                     , boundL :: a
+                     , boundU :: a
+                     }
+
+instance Show a => Show (Bound a) where
+  show bound = show (boundL bound) ++ " <= " ++ name ++ " <= " ++ show (boundU bound)
+    where
+      name = safeGetSymNameFromExpr (boundVar bound)
+
+safeGetSymNameFromExpr :: Expr sh a -> String
+safeGetSymNameFromExpr (ESym _ name) = name
+safeGetSymNameFromExpr _ = trace "Warning - Bound has non-symbolic value" "{NOT A DESIGN VARIABLE}"
 
 numDvs :: MultipleShooting a -> Int
 numDvs = length . vectorizeDvs . msDesignVars
@@ -113,14 +113,14 @@ boundIntervals xs bnds = zipWith boundInterval (sparseListFromSv xs) bnds
 multipleShooting :: Fractional (Expr Z a) => System a -> [Expr Z a] -> [Expr Z a]
                     -> (SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> Ode a -> Expr Z a -> SparseVec (Expr Z a))
                     -> MultipleShooting a
-multipleShooting sys params runtimeConstants odeError
+multipleShooting sys params constants odeError
   | dimensionsMatch = MultipleShooting { msSystem = sys
                                        , msDesignVars = DesignVars { dvStates = states
                                                                    , dvActions = actions
                                                                    , dvParams = params
                                                                    }
                                        , msDodeConstraints = dodeConstraints
-                                       , msRuntimeConstants = runtimeConstants
+                                       , msConstants = constants
                                        , msObjFun = objFun
                                        }
   | otherwise = error $ printf "Error in multipleShooting: lengths of odes (%d), costs (%d), dts (%d) are not consistent" nOdes nCosts nDts
@@ -151,31 +151,11 @@ simpleSystem ode cost dt n = System { sysOdes = replicate (n-1) ode
 replaceFinalCost :: Cost a -> System a -> System a
 replaceFinalCost cost sysIn = sysIn {sysCosts = init (sysCosts sysIn) ++ [cost]}
 
-eulerError :: Fractional (Expr Z a) => SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> Ode a -> Expr Z a -> SparseVec (Expr Z a)
-eulerError xk uk xkp1 _ (Ode ode _) dt = xkp1 - (xk + svScale dt f0)
-  where
-    f0 = ode xk uk
+eqZero :: SparseVec (Expr Z a) -> Constraint' a
+eqZero g = Constraint' EQ g (svZeros $ svSize g)
 
-simpsonsRuleError :: Fractional (Expr Z a) => SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> Ode a -> Expr Z a -> SparseVec (Expr Z a)
-simpsonsRuleError xk uk xkp1 ukp1 (Ode ode _) dt = xkp1 - xk - (svScale (dt/6.0) (f0 + fourFm + f1))
-  where
-    f0 = ode xk uk
-    f1 = ode xkp1 ukp1
-
-    um = svScale 0.5 (uk + ukp1)
-    xm = xm' - xm''
-      where
-        xm' = svScale 0.5 (xk + xkp1)
-        xm'' = svScale (0.125 * dt) (f1 - f0)
-
-    fm = ode xm um
-    fourFm = svScale 4 fm
-
-eqZero :: SparseVec (Expr Z a) -> Constraint a
-eqZero g = Constraint EQ g (svZeros $ svSize g)
-
-ltZero :: Fractional a => SparseVec (Expr Z a) -> Constraint a
-ltZero g = Constraint LT g (svZeros $ svSize g)
+ltZero :: Fractional a => SparseVec (Expr Z a) -> Constraint' a
+ltZero g = Constraint' LT g (svZeros $ svSize g)
 
 interpolateInitialGuess :: Fractional a => SparseVec a -> SparseVec a -> Int -> [SparseVec a]
 interpolateInitialGuess x0 xf n' = map (combine x0 xf) alphas
@@ -184,4 +164,3 @@ interpolateInitialGuess x0 xf n' = map (combine x0 xf) alphas
     alphas = map (/ (n-1)) $ map fromIntegral [0..n'-1]
     combine v0 vf alpha =
       svFromList $ zipWith (\x y -> alpha*x + (1-alpha)*y) (sparseListFromSv v0) (sparseListFromSv vf)
-
