@@ -8,7 +8,8 @@ module Dvda.MultipleShooting.MSMonad ( setStates
                                      , setDxdt
                                      , setCost
                                      , setDt
---                                     , getTimeStep
+                                     , setOutput
+                                     , getTimeStep
                                      , addConstraint
                                      , setBound
                                      , runOneStep
@@ -21,11 +22,11 @@ import qualified Data.HashMap.Lazy as HM
 import qualified Data.HashSet as HS
 import Data.List ( nub, sort ) --, union )
 import Data.Maybe ( isJust, isNothing )
-import Control.Monad ( when )
+import Control.Monad ( when, zipWithM_ )
 import Control.Monad.State ( State )
 import qualified Control.Monad.State as State
-import Debug.Trace ( trace )
-import Numeric.LinearAlgebra ( Element )
+--import Debug.Trace ( trace )
+--import Numeric.LinearAlgebra ( Element )
 import Text.Printf ( printf )
 
 import Dvda ( sym )
@@ -46,6 +47,7 @@ setStates names' = do
                             let names = failDuplicates names'
                                 syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
                             State.put $ step {stepStates = Left (Just (zip syms names))}
+                            zipWithM_ setOutput syms names
                             return syms
 
 setActions :: [String] -> State (Step a) [Expr Z a]
@@ -57,6 +59,7 @@ setActions names' = do
                              let names = failDuplicates names'
                                  syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
                              State.put $ step {stepActions = Left (Just (zip syms names))}
+                             zipWithM_ setOutput syms names
                              return syms
 
 setParams :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step a) [Expr Z a]
@@ -74,7 +77,16 @@ setConstants names = do
   let syms = map sym (failDuplicates names)
   State.put $ step {stepConstants = Just (HS.fromList syms)}
   return syms
-  
+
+setOutput :: Expr Z a -> String -> State (Step a) ()
+setOutput var name = do
+  step <- State.get
+  let hm = stepOutputs step
+      err = error $ "ERROR: already have an output with name: \"" ++ name ++ "\""
+  if (any (`elem` "~!@#$%^&*()+`-=[]{}\\|;:,.<>/?") name)
+    then (error $ "ERROR: setOutput saw illegal octave variable character in string: \"" ++ name ++ "\"")
+    else State.put $ step {stepOutputs = HM.insertWith err name [var] hm}
+
 setDt :: Expr Z a -> State (Step a) ()
 setDt expr = do
   step  <- State.get
@@ -108,16 +120,16 @@ setBound var@(ESym _ _) (lb, ub) bnd = do
       newbnd = (lb,ub,bnd)
       oldBounds = stepBounds step
 
-      err old new = error $ printf "ERROR: setBound called twice on %s (old bound: %s, new bound: %s)" (show var) (show old) (show newbnd)
+      err old = error $ printf "ERROR: setBound called twice on %s (old bound: %s, new bound: %s)" (show var) (show old) (show newbnd)
 
   let putNewBnd = case bnd of
         (TIMESTEP j) -> if j /= k
                         then Nothing
                         else case (HM.lookup var (stepBounds step)) of
-                          Just oldbnd@(_, _, TIMESTEP _) -> err oldbnd newbnd
+                          Just oldbnd@(_, _, TIMESTEP _) -> err oldbnd
                           _ -> Just newbnd
         ALWAYS -> case (HM.lookup var (stepBounds step)) of
-          Just oldbnd@(_,_,ALWAYS) -> err oldbnd newbnd
+          Just oldbnd@(_,_,ALWAYS) -> err oldbnd
           Just (_,_,TIMESTEP _) -> Nothing
           Nothing -> Just newbnd
 
@@ -151,6 +163,7 @@ runOneStep userStep k
                                           , stepParams = Nothing
                                           , stepConstants = Nothing
                                           , stepIdx = k
+                                          , stepOutputs = HM.empty
                                           }
 
 execDxdt :: Num (Expr Z a)
@@ -169,4 +182,5 @@ execDxdt userStep k x u = case stepDxdt $ State.execState userStep step0 of
                  , stepParams = Nothing
                  , stepConstants = Nothing
                  , stepIdx = k
+                 , stepOutputs = HM.empty
                  }

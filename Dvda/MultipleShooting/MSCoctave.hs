@@ -9,7 +9,6 @@ module Dvda.MultipleShooting.MSCoctave ( msCoctave
 import Data.Array.Repa ( Z(..) )
 import qualified Data.HashMap.Lazy as HM
 import qualified Data.HashSet as HS
-import Data.List ( transpose )
 import Data.List ( zipWith6 )
 import Data.Maybe ( fromJust, catMaybes )
 import Control.Monad.State ( State )
@@ -58,6 +57,9 @@ msCoctave userStep odeError n funDir name = do
   _ <- writeSourceFile constraintsSource funDir (name ++ "_constraints.m")
   _ <- writeSourceFile       setupSource funDir (name ++ "_setup.m")
   _ <- writeSourceFile      structSource funDir (name ++ "_struct.m")
+  _ <- writeSourceFile        timeSource funDir (name ++ "_time.m")
+  _ <- writeSourceFile      outputSource funDir (name ++ "_outputs.m")
+  _ <- writeSourceFile        plotSource funDir (name ++ "_plot.m")
   return ()
   where
     steps = map (runOneStep userStep) [0..n-1]
@@ -85,6 +87,8 @@ msCoctave userStep odeError n funDir name = do
     constants = HS.toList $ foldr g HS.empty (map stepConstants steps)
 
     boundMap = foldr HM.union HM.empty (map stepBounds steps)
+
+    outputMap = foldl (HM.unionWith (++)) HM.empty (map stepOutputs steps)
     ------------------------------------------------------------------------------------
     cost = case catMaybes $ map stepCost steps of [] -> error "need to set cost function"
                                                   cs -> sum cs
@@ -117,8 +121,18 @@ msCoctave userStep odeError n funDir name = do
        inputs_ (dvs :* constants)
        outputs_ (cineq :* ceq :* cineqJacob :* ceqJacob)
 
+    timeFg = runFunGraph $ do
+      inputs_ (dvs :* constants)
+      outputs_ $ init $ scanl (+) (EConst (CSingleton Z 0)) dts
+
+    outputFg = runFunGraph $ do
+      inputs_ (dvs :* constants)
+      outputs_ $ HM.elems outputMap
+
     costSource        = toOctaveSource costFg        (name ++ "_cost")
     constraintsSource = toOctaveSource constraintsFg (name ++ "_constraints")
+    outputSource      = toOctaveSource outputFg      (name ++ "outputs")
+    timeSource        = toOctaveSource timeFg        (name ++ "_time")
 
     (lbs, ubs, _) = unzip3 $ map getBnd dvs
       where
@@ -147,10 +161,31 @@ msCoctave userStep odeError n funDir name = do
     structSource =
       unlines $
       ["function ret = " ++ name ++ "_struct(designVars,constants)"
-      , "" ]
-      ++ toStruct (head stateNames) (transpose states)
-      ++ toStruct (head actionNames) (transpose actions)
-      ++ toStruct (map show params) (map (\x -> [x]) params)
+      , ""
+      , "ret.time = " ++ name ++ "_time(designVars, constants);"
+      , "outs = " ++ name ++ "_outputs(designVars, constants);"
+      , concat $ zipWith (\name' k -> "ret." ++name'++ " = outs("++show k++",:);\n") (HM.keys outputMap) [(1::Int)..]
+      ] ++ toStruct (map show params) (map (\x -> [x]) params)
+
+    plotSource =
+      unlines $
+      [ "function " ++ name ++ "_plot(designVars, constants)\n"
+      , "x = " ++ name ++ "_struct(designVars, constants);\n"
+      , init $ unlines $ zipWith f (HM.keys outputMap) [(1::Int)..]
+      ]
+      where
+        rows = ceiling $ sqrt $ (fromIntegral ::Int -> Double) $ HM.size outputMap
+        cols = (HM.size outputMap `div` rows) + 1
+        f name' k = unlines $
+                    [ "subplot(" ++ show rows ++ "," ++ show cols ++ ","++show k++");"
+                    , "plot( x.time, x." ++ name' ++ " );"
+                    , "xlabel('time');"
+                    , "ylabel('" ++ name'' ++ "');"
+                    , "title('"  ++ name'' ++ "');"
+                    ]
+          where
+            name'' = foldl (\acc x -> if x == '_' then acc ++ "\\_" else acc ++ [x]) "" name'
+
 
 spring :: State (Step Double) ()
 spring = do
@@ -170,6 +205,8 @@ spring = do
 
   setBound x (0,0) (TIMESTEP (n'-1))
   setBound v (0,0) (TIMESTEP (n'-1))
+
+  setOutput (x*v) "x_v"
   
 
 n' :: Int

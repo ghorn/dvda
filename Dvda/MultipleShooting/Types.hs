@@ -32,6 +32,7 @@ data Step a = Step { stepStates :: Either (Maybe [(Expr Z a, String)]) [Expr Z a
                    , stepBounds :: HashMap (Expr Z a) (a,a, BCTime)
                    , stepConstraints :: [Constraint a]
                    , stepIdx :: Int
+                   , stepOutputs :: HashMap String [Expr Z a]
                    }
 
 data Ode a = Ode (SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> SparseVec (Expr Z a)) (Int,Int)
