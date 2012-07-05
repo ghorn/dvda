@@ -139,7 +139,7 @@ msCoctave userStep odeError n funDir name = do
 
     costSource        = toOctaveSource        costFg (name ++ "_cost")
     constraintsSource = toOctaveSource constraintsFg (name ++ "_constraints")
-    outputSource      = toOctaveSource      outputFg (name ++ "outputs")
+    outputSource      = toOctaveSource      outputFg (name ++ "_outputs")
     timeSource        = toOctaveSource        timeFg (name ++ "_time")
     simSource         = toOctaveSource         simFg (name ++ "_sim")
 
@@ -166,6 +166,7 @@ msCoctave userStep odeError n funDir name = do
     dvsToIdx = fromJust . flip HM.lookup (HM.fromList (zip dvs [(1::Int)..]))
     toStruct = zipWith (\name' vars -> "ret." ++ name' ++ " = designVars(" ++ show (map dvsToIdx vars) ++ ");\n")
 
+    -- take vector of design variables and vector of constants and return nice matlab struct
     structSource =
       unlines $
       ["function ret = " ++ name ++ "_struct(designVars,constants)"
