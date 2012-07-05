@@ -60,6 +60,7 @@ msCoctave userStep odeError n funDir name = do
   _ <- writeSourceFile        timeSource funDir (name ++ "_time.m")
   _ <- writeSourceFile      outputSource funDir (name ++ "_outputs.m")
   _ <- writeSourceFile        plotSource funDir (name ++ "_plot.m")
+  _ <- writeSourceFile         simSource funDir (name ++ "_sim.m")
   return ()
   where
     steps = map (runOneStep userStep) [0..n-1]
@@ -129,10 +130,18 @@ msCoctave userStep odeError n funDir name = do
       inputs_ (dvs :* constants)
       outputs_ $ HM.elems outputMap
 
-    costSource        = toOctaveSource costFg        (name ++ "_cost")
+    simFg = runFunGraph $ do
+      let x' = head states
+          u' = head actions
+          dxdt' = fromJust $ stepDxdt $ head steps
+      inputs_ (x' :* u' :* constants)
+      outputs_ dxdt'
+
+    costSource        = toOctaveSource        costFg (name ++ "_cost")
     constraintsSource = toOctaveSource constraintsFg (name ++ "_constraints")
-    outputSource      = toOctaveSource outputFg      (name ++ "outputs")
-    timeSource        = toOctaveSource timeFg        (name ++ "_time")
+    outputSource      = toOctaveSource      outputFg (name ++ "outputs")
+    timeSource        = toOctaveSource        timeFg (name ++ "_time")
+    simSource         = toOctaveSource         simFg (name ++ "_sim")
 
     (lbs, ubs, _) = unzip3 $ map getBnd dvs
       where
@@ -153,7 +162,6 @@ msCoctave userStep odeError n funDir name = do
       , "lb = " ++ show lbs ++ "';"
       , "ub = " ++ show ubs ++ "';"
       ]
-
 
     dvsToIdx = fromJust . flip HM.lookup (HM.fromList (zip dvs [(1::Int)..]))
     toStruct = zipWith (\name' vars -> "ret." ++ name' ++ " = designVars(" ++ show (map dvsToIdx vars) ++ ");\n")
