@@ -38,13 +38,19 @@ failDuplicates names
   | length names == length (nub names) = names
   | otherwise = error $ "ERROR: saw duplicate names in: " ++ show (sort names)
 
+checkOctaveName :: String -> String
+checkOctaveName name
+  | any (`elem` "~!@#$%^&*()+`-=[]{}\\|;:,.<>/?") name =
+    error $ "ERROR: setOutput saw illegal octave variable character in string: \"" ++ name ++ "\""
+  | otherwise = name
+
 setStates :: [String] -> State (Step a) [Expr Z a]
 setStates names' = do
   step <- State.get
   case stepStates step of (Right states) -> return states
                           (Left (Just _)) -> error "states already set, don't call setStates twice"
                           (Left Nothing) -> do
-                            let names = failDuplicates names'
+                            let names = failDuplicates (map checkOctaveName names')
                                 syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
                             State.put $ step {stepStates = Left (Just (zip syms names))}
                             zipWithM_ setOutput syms names
@@ -56,7 +62,7 @@ setActions names' = do
   case stepActions step of (Right actions) -> return actions
                            (Left (Just _)) -> error "actions already set, don't call setActions twice"
                            (Left Nothing) -> do
-                             let names = failDuplicates names'
+                             let names = failDuplicates (map checkOctaveName names')
                                  syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
                              State.put $ step {stepActions = Left (Just (zip syms names))}
                              zipWithM_ setOutput syms names
@@ -66,7 +72,7 @@ setParams :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step a) 
 setParams names = do
   step  <- State.get
   when (isJust (stepParams step)) $ error "params already set, don't call setParams twice"
-  let syms = map sym (failDuplicates names)
+  let syms = map sym (failDuplicates (map checkOctaveName names))
   State.put $ step {stepParams = Just (HS.fromList syms)}
   return syms
 
@@ -74,7 +80,7 @@ setConstants :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step 
 setConstants names = do
   step  <- State.get
   when (isJust (stepConstants step)) $ error "constants already set, don't call setConstants twice"
-  let syms = map sym (failDuplicates names)
+  let syms = map sym (failDuplicates (map checkOctaveName names))
   State.put $ step {stepConstants = Just (HS.fromList syms)}
   return syms
 
@@ -83,9 +89,7 @@ setOutput var name = do
   step <- State.get
   let hm = stepOutputs step
       err = error $ "ERROR: already have an output with name: \"" ++ name ++ "\""
-  if (any (`elem` "~!@#$%^&*()+`-=[]{}\\|;:,.<>/?") name)
-    then (error $ "ERROR: setOutput saw illegal octave variable character in string: \"" ++ name ++ "\"")
-    else State.put $ step {stepOutputs = HM.insertWith err name [var] hm}
+  State.put $ step {stepOutputs = HM.insertWith err (checkOctaveName name) [var] hm}
 
 setDt :: Expr Z a -> State (Step a) ()
 setDt expr = do
