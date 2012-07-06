@@ -139,7 +139,12 @@ setBound var@(ESym _ _) (lb, ub) bnd = do
 
   when (isJust putNewBnd) $
     State.put $ step {stepBounds = HM.insert var newbnd oldBounds}
-setBound _ _ _ = error "WARNING - setBound called on non-design variable, use addConstraint instead"
+setBound _ _ _ = do
+  -- if execDxdt has put the x/u, they won't be symbolic - ignore them
+  step <- State.get
+  case stepStates step of
+    Left _ -> error "WARNING - setBound called on non-design variable, use addConstraint instead"
+    _ -> return ()
 
 
 addConstraint :: Expr Z a -> Ordering -> Expr Z a -> State (Step a) ()
