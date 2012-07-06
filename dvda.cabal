@@ -46,8 +46,9 @@ Flag stressTest
 Library
   Exposed-modules:   Dvda
                      Dvda.BinUn
-                     Dvda.Config
+                     Dvda.CallNative
                      Dvda.Codegen
+                     Dvda.Config
 --                     Dvda.Dot
                      Dvda.Dual
                      Dvda.Examples
