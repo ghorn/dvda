@@ -10,6 +10,7 @@ module Dvda.MultipleShooting.MSMonad ( setStates
                                      , setDt
                                      , setOutput
                                      , getTimeStep
+                                     , setPeriodic
                                      , addConstraint
                                      , setBound
                                      , runOneStep
@@ -101,6 +102,11 @@ getTimeStep :: State (Step a) Int
 getTimeStep = do
   step <- State.get
   return (stepIdx step)
+
+setPeriodic :: (Eq (Expr Z a), Hashable (Expr Z a)) => Expr Z a -> State (Step a) ()
+setPeriodic var = do
+  step <- State.get
+  State.put $ step {stepPeriodic = HS.insert var (stepPeriodic step)}
   
 -------------------------------------------
 
@@ -173,10 +179,10 @@ runOneStep userStep k
                                           , stepConstants = Nothing
                                           , stepIdx = k
                                           , stepOutputs = HM.empty
+                                          , stepPeriodic = HS.empty
                                           }
 
-execDxdt :: Num (Expr Z a)
-            => State (Step a) b -> Int -> [Expr Z a] -> [Expr Z a] -> [Expr Z a]
+execDxdt :: Num (Expr Z a) => State (Step a) b -> Int -> [Expr Z a] -> [Expr Z a] -> [Expr Z a]
 execDxdt userStep k x u = case stepDxdt $ State.execState userStep step0 of
   Nothing -> error "ERROR: need to set dxdt"
   Just dxdt -> dxdt
@@ -192,4 +198,5 @@ execDxdt userStep k x u = case stepDxdt $ State.execState userStep step0 of
                  , stepConstants = Nothing
                  , stepIdx = k
                  , stepOutputs = HM.empty
+                 , stepPeriodic = HS.empty
                  }

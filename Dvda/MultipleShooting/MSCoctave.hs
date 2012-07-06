@@ -104,9 +104,25 @@ msCoctave userStep odeError n funDir name = do
         dodeConstraints = map (Constraint (EConst (CSingleton Z 0)) EQ) $ concat $
                           zipWith6 odeError (init states) (init actions) (tail states) (tail actions)
                           (map (execDxdt userStep) [0..]) dts
-    
-        allConstraints = dodeConstraints ++ (concatMap stepConstraints steps)
 
+        allConstraints = dodeConstraints ++ (concatMap stepConstraints steps) ++ periodicConstraints
+
+        periodicConstraints
+          | HS.size notXU > 0 = error $ "ERROR: can't set periodic constraints for non states/actions:" ++ show notXU
+          | otherwise = foldl g' [] $ map f' (transpose states ++ transpose actions)
+          where
+            pcSets = map stepPeriodic steps
+            dvSet = HS.fromList (concat states ++ concat actions)
+            notXU = HS.difference (foldl HS.union HS.empty pcSets) dvSet
+            pc0 = head pcSets
+            pcf = last pcSets
+
+            -- match up states/actions by making sure they're in the same state/action list
+            f' xu = (HS.toList $ HS.filter (`elem` xu) pc0, HS.toList $ HS.filter (`elem` xu) pcf)
+            g' acc ( [],   _) = acc
+            g' acc (  _,  []) = acc
+            g' acc ([x], [y]) = acc ++ [Constraint x EQ y]
+            g'   _ (  _,   _) = error "ERROR: too many matching periodic constraints"
 
     -------------------------------------------------------------------------------------
     dvs = concat states ++ concat actions ++ params
@@ -238,7 +254,9 @@ spring = do
   [k, b] <- setConstants ["k", "b"]
   setDxdt [v, -k*x - b*v + u]
   setDt 0.1
-  setCost (2*x*x + 3*v*v + 10*u*u)
+  let cost = 2*x*x + 3*v*v + 10*u*u
+  setCost cost
+  setOutput cost "cost"
 
   setBound x (5,5) (TIMESTEP 0)
   setBound v (0,0) (TIMESTEP 0)
@@ -247,14 +265,13 @@ spring = do
   setBound v (-10,10) ALWAYS
   setBound u (-200, 100) ALWAYS
 
-  setBound x (0,0) (TIMESTEP (n'-1))
   setBound v (0,0) (TIMESTEP (n'-1))
 
-  setOutput (x*v) "x_v"
-  
+  setPeriodic x
 
 n' :: Int
 n' = 20
 
 run :: IO ()
-run = msCoctave spring eulerError' n' "../Documents/MATLAB/" "cartpole"
+run = msCoctave spring simpsonsRuleError' n' "../Documents/MATLAB/" "cartpole"
+--run = msCoctave spring eulerError' n' "../Documents/MATLAB/" "cartpole"
