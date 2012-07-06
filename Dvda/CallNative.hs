@@ -6,6 +6,7 @@
 {-# Language GADTs #-}
 
 module Dvda.CallNative ( toNative
+                       , nativeCall
                        , nativeDiff
                        , nativeGrad
                        , nativeJacob
@@ -135,6 +136,15 @@ toNative fg@(FunGraph _ _ _ outs) xs = snd $ traverseOutputs replacementMap fg o
  where
    replacementMap = toReplacements fg xs
 
+
+-- | Convenience function for natively computing function
+--   This is expected to be very slow. Using code generation instead is recommended
+nativeCall :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
+              => (Expr Z a -> [Expr Z a]) -> Expr Z a -> [Expr Z a]
+nativeCall f = toNative $ runFunGraph $ do
+  let x = sym "x"
+  inputs_ x
+  outputs_ (f x)
 
 -- | Convenience function for natively computing jacobian, requires you to pass the number of inputs.
 --   This is expected to be very slow. Using code generation instead is recommended
