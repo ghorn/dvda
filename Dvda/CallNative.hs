@@ -6,6 +6,9 @@
 {-# Language GADTs #-}
 
 module Dvda.CallNative ( toNative
+                       , nativeDiff
+                       , nativeGrad
+                       , nativeJacob
                        ) where
 
 import Data.Hashable ( Hashable )
@@ -20,6 +23,7 @@ import Dvda
 import Dvda.BinUn ( BinOp(Mul), applyBinary, applyUnary )
 import Dvda.Expr ( Expr(..), Const(..), dim )
 import Dvda.Graph ( FunGraph(..), DvdaDim(..), DynamicExpr, fgLookup, fgExprFromKey )
+import Dvda.SymMonad ( rad )
 
 class (Hashable (INumT b), Eq (INumT b), Element (INumT b)) => NativeInputs b where
   type INumT b
@@ -130,3 +134,34 @@ toNative :: (Show a, NativeInputs b, NativeOutput c, a ~ INumT b, a ~ ONumT c) =
 toNative fg@(FunGraph _ _ _ outs) xs = snd $ traverseOutputs replacementMap fg outs
  where
    replacementMap = toReplacements fg xs
+
+
+-- | Convenience function for natively computing jacobian, requires you to pass the number of inputs.
+--   This is expected to be very slow. Using code generation instead is recommended
+nativeJacob :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
+               => Int -> ([Expr Z a] -> [Expr Z a]) -> [Expr Z a] -> [[Expr Z a]]
+nativeJacob n f = toNative $ runFunGraph $ do
+  let xs = map (\k -> sym ("x_"++show k)) [0..(n-1::Int)]
+  inputs_ xs
+  ys <- mapM (flip rad xs) (f xs)
+  outputs_ ys
+
+-- | Convenience function for natively computing gradient, requires you to pass the number of inputs.
+--   This is expected to be very slow. Using code generation instead is recommended
+nativeGrad :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
+              => Int -> ([Expr Z a] -> Expr Z a) -> [Expr Z a] -> [Expr Z a]
+nativeGrad n f = toNative $ runFunGraph $ do
+  let xs = map (\k -> sym ("x_"++show k)) [0..(n-1::Int)]
+  inputs_ xs
+  ys <- rad (f xs) xs
+  outputs_ ys
+  
+-- | Convenience function for natively computing a derivative.
+--   This is expected to be very slow. Using code generation instead is recommended
+nativeDiff :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
+              => (Expr Z a -> Expr Z a) -> Expr Z a -> Expr Z a
+nativeDiff f = toNative $ runFunGraph $ do
+  let x = sym "x"
+  inputs_ x
+  [y] <- rad (f x) [x]
+  outputs_ y
