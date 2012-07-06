@@ -9,14 +9,13 @@ module Dvda.MultipleShooting.MSCoctave ( msCoctave
 import Data.Array.Repa ( Z(..) )
 import qualified Data.HashMap.Lazy as HM
 import qualified Data.HashSet as HS
-import Data.List ( zipWith6 )
+import Data.List ( zipWith6, transpose, elemIndex )
 import Data.Maybe ( fromJust, catMaybes )
 import Control.Monad.State ( State )
 
 import Dvda
 import Dvda.Expr ( Expr(..), Const(..) )
 import Dvda.SymMonad ( rad )
---import Dvda.SparseLA ( SparseVec )
 import Dvda.MultipleShooting.MSMonad
 import Dvda.MultipleShooting.Types
 import Dvda.OctaveSyntax ( toOctaveSource )
@@ -53,14 +52,16 @@ msCoctave
      -> FilePath
      -> IO ()
 msCoctave userStep odeError n funDir name = do
-  _ <- writeSourceFile        costSource funDir (name ++ "_cost.m")
-  _ <- writeSourceFile constraintsSource funDir (name ++ "_constraints.m")
-  _ <- writeSourceFile       setupSource funDir (name ++ "_setup.m")
-  _ <- writeSourceFile      structSource funDir (name ++ "_struct.m")
-  _ <- writeSourceFile        timeSource funDir (name ++ "_time.m")
-  _ <- writeSourceFile      outputSource funDir (name ++ "_outputs.m")
-  _ <- writeSourceFile        plotSource funDir (name ++ "_plot.m")
-  _ <- writeSourceFile         simSource funDir (name ++ "_sim.m")
+  _ <- writeSourceFile           costSource funDir $ name ++ "_cost.m"
+  _ <- writeSourceFile    constraintsSource funDir $ name ++ "_constraints.m"
+  _ <- writeSourceFile          setupSource funDir $ name ++ "_setup.m"
+  _ <- writeSourceFile         structSource funDir $ name ++ "_struct.m"
+  _ <- writeSourceFile unstructConstsSource funDir $ name ++ "_unstructConstants.m"
+  _ <- writeSourceFile       unstructSource funDir $ name ++ "_unstruct.m"
+  _ <- writeSourceFile           timeSource funDir $ name ++ "_time.m"
+  _ <- writeSourceFile         outputSource funDir $ name ++ "_outputs.m"
+  _ <- writeSourceFile           plotSource funDir $ name ++ "_plot.m"
+  _ <- writeSourceFile            simSource funDir $ name ++ "_sim.m"
   return ()
   where
     steps = map (runOneStep userStep) [0..n-1]
@@ -163,9 +164,6 @@ msCoctave userStep odeError n funDir name = do
       , "ub = " ++ show ubs ++ "';"
       ]
 
-    dvsToIdx = fromJust . flip HM.lookup (HM.fromList (zip dvs [(1::Int)..]))
-    toStruct = zipWith (\name' vars -> "ret." ++ name' ++ " = designVars(" ++ show (map dvsToIdx vars) ++ ");\n")
-
     -- take vector of design variables and vector of constants and return nice matlab struct
     structSource =
       unlines $
@@ -174,7 +172,44 @@ msCoctave userStep odeError n funDir name = do
       , "ret.time = " ++ name ++ "_time(designVars, constants);"
       , "outs = " ++ name ++ "_outputs(designVars, constants);"
       , concat $ zipWith (\name' k -> "ret." ++name'++ " = outs("++show k++",:);\n") (HM.keys outputMap) [(1::Int)..]
-      ] ++ toStruct (map show params) (map (\x -> [x]) params)
+      ] ++
+      toStruct dvs "designVars" (map show params) (map (\x -> [x]) params) ++
+      toStruct constants "constants" (map show constants) (map (\x -> [x]) constants)
+        where
+          dvsToIdx dvs' = fromJust . flip HM.lookup (HM.fromList (zip dvs' [(1::Int)..]))
+          toStruct dvs' nm = zipWith (\name' vars -> "ret." ++ name' ++ " = " ++ nm ++ "(" ++ show (map (dvsToIdx dvs') vars) ++ ");\n")
+
+
+    -- take nice matlab structs and return vectors of design variables and constants
+    unstructSource =
+      unlines $
+      [ "function dvs = " ++ name ++ "_unstruct(dvStruct)\n"
+      , "dvs = zeros(" ++ show (length dvs) ++ ", 1);"
+      , ""
+      , concatMap fromParam params
+      , concat $ zipWith fromXUS (head  stateNames) (transpose states)
+      , concat $ zipWith fromXUS (head actionNames) (transpose actions)
+      ]
+      where
+        fromParam e@(ESym _ nm) =
+          "dvs(" ++ show (1 + (fromJust $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ nm ++ ";\n"
+        fromParam _ = error "param not ESym"
+
+        fromXU nm e k =
+          "dvs(" ++ show (1 + (fromJust $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ nm ++ "(" ++ show k ++ ");\n"
+        fromXUS name' xs = (concat $ zipWith (fromXU name') xs [(1::Int)..]) ++ "\n"
+
+    unstructConstsSource =
+      unlines $
+      [ "function constants = " ++ name ++ "_unstructConstants(constStruct)\n"
+      , "constants = zeros(" ++ show (length constants) ++ ", 1);"
+      , ""
+      , concatMap fromConst constants
+      ]
+      where
+        fromConst e@(ESym _ nm) =
+          "constants(" ++ show (1 + (fromJust $ e `elemIndex` constants)) ++ ") = constStruct." ++ nm ++ ";\n"
+        fromConst _ = error "const not ESym"
 
     plotSource =
       unlines $
