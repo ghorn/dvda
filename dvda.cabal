@@ -6,7 +6,7 @@ Author:              Greg Horn
 Maintainer:          gregmainland@gmail.edu
 Stability:           Experimental
 Category:            Numerical, Math
-Build-type:          Simple
+Build-type:          Custom
 Synopsis:            Efficient automatic differentiation
 Cabal-version:       >= 1.6
 Description: {
@@ -62,6 +62,7 @@ Library
                      Dvda.OctaveSyntax
                      Dvda.SparseLA
                      Dvda.SymMonad
+                     Dvda.CallNative
 --                     Dvda.CFunction
 --                     Dvda.Codegen.CBuilder
 --                     Dvda.Codegen.CCallWrapper
@@ -86,15 +87,30 @@ Library
                      plugins >= 1.5 && < 1.6,
                      deepseq >= 1.3 && < 1.4,
                      hmatrix >= 0.14 && < 0.15
+		     
 --                     latc >= 0.1 && < 0.2
 --                     unix
 --                     text,
---                     QuickCheck,
 
   Ghc-options:       -Wall
 --  Ghc-options:       -O2 -Wall -threaded
   GHC-Prof-Options: -prof -fprof-auto
 
+
+flag test
+  description: Build test program.
+  default:     False
+
+Test-suite test
+  type:		   exitcode-stdio-1.0
+  hs-source-dirs:  test, .
+  main-is:         Test.hs
+  build-depends:   base,                      
+                   QuickCheck == 2.4.*,
+                   ad,
+                   test-framework-quickcheck2,
+                   test-framework
+  ghc-options:     -Wall
 
 -- Executable stressTest
 --   if flag(stressTest)
