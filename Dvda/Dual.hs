@@ -5,6 +5,8 @@
 {-# Language TypeFamilies #-}
 
 module Dvda.Dual ( Dual(..)
+                 , fad
+                 , fad'
                  ) where
 
 import Data.Ratio ( numerator, denominator )
@@ -58,3 +60,11 @@ instance Floating a => Floating (Dual a) where
   asinh (Dual x x') = Dual (asinh x) $ x'/ sqrt (1 + x*x)
   acosh (Dual x x') = Dual (acosh x) $ x'/( sqrt (x - 1) * sqrt (x + 1) )
   atanh (Dual x x') = Dual (atanh x) $ x'/(1 - x*x)
+
+-- | Forward derivative propogation. fad' [sin x, 2*x] == [cos x, 2]
+fad' :: Num a => (Dual a -> [Dual a]) -> a -> [a]
+fad' f x = map dualPerturbation $ f (Dual x 1)
+
+-- | Forward derivative propogation. fad sin x == cos x
+fad :: Num a => (Dual a -> Dual a) -> a -> a
+fad f x = dualPerturbation $ f (Dual x 1)
