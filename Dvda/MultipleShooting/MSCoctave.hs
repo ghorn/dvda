@@ -11,7 +11,6 @@ import qualified Data.HashMap.Lazy as HM
 import qualified Data.HashSet as HS
 import Data.List ( zipWith6, transpose, elemIndex )
 import Data.Maybe ( fromJust, catMaybes )
-import Control.Monad.State ( State )
 
 import Dvda
 import Dvda.Expr ( Expr(..), Const(..) )

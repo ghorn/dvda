@@ -1,7 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language FlexibleContexts #-}
 
-module Dvda.MultipleShooting.MSMonad ( setStates
+module Dvda.MultipleShooting.MSMonad ( State
+                                     , setStates
                                      , setActions
                                      , setParams
                                      , setConstants
