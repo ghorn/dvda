@@ -1,15 +1,19 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language FlexibleContexts #-}
 
-module Dvda.MultipleShooting.MSMonad ( setStates
+module Dvda.MultipleShooting.MSMonad ( State
+                                     , setStates
                                      , setActions
-                                     , setParams
-                                     , setConstants
+                                     , addParam
+                                     , addParams
+                                     , addConstant
+                                     , addConstants
                                      , setDxdt
                                      , setCost
                                      , setDt
-                                     , setOutput
+                                     , addOutput
                                      , getTimeStep
+                                     , setPeriodic
                                      , addConstraint
                                      , setBound
                                      , runOneStep
@@ -40,8 +44,8 @@ failDuplicates names
 
 checkOctaveName :: String -> String
 checkOctaveName name
-  | any (`elem` "~!@#$%^&*()+`-=[]{}\\|;:,.<>/?") name =
-    error $ "ERROR: setOutput saw illegal octave variable character in string: \"" ++ name ++ "\""
+  | any (`elem` "\"'~!@#$%^&*()+`-=[]{}\\|;:,.<>/?") name =
+    error $ "ERROR: addOutput saw illegal octave variable character in string: \"" ++ name ++ "\""
   | otherwise = name
 
 setStates :: [String] -> State (Step a) [Expr Z a]
@@ -53,7 +57,7 @@ setStates names' = do
                             let names = failDuplicates (map checkOctaveName names')
                                 syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
                             State.put $ step {stepStates = Left (Just (zip syms names))}
-                            zipWithM_ setOutput syms names
+                            zipWithM_ addOutput syms names
                             return syms
 
 setActions :: [String] -> State (Step a) [Expr Z a]
@@ -65,27 +69,37 @@ setActions names' = do
                              let names = failDuplicates (map checkOctaveName names')
                                  syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
                              State.put $ step {stepActions = Left (Just (zip syms names))}
-                             zipWithM_ setOutput syms names
+                             zipWithM_ addOutput syms names
                              return syms
 
-setParams :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step a) [Expr Z a]
-setParams names = do
+addParam :: (Eq (Expr Z a), Hashable (Expr Z a)) => String -> State (Step a) (Expr Z a)
+addParam name = do
+  [blah] <- addParams [name]
+  return blah
+
+addConstant :: (Eq (Expr Z a), Hashable (Expr Z a)) => String -> State (Step a) (Expr Z a)
+addConstant name = do
+  [blah] <- addParams [name]
+  return blah
+
+addParams :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step a) [Expr Z a]
+addParams names = do
   step  <- State.get
-  when (isJust (stepParams step)) $ error "params already set, don't call setParams twice"
-  let syms = map sym (failDuplicates (map checkOctaveName names))
-  State.put $ step {stepParams = Just (HS.fromList syms)}
+  let syms = map (sym . checkOctaveName) names
+      params0 = stepParams step
+  State.put $ step {stepParams = HS.union params0 (HS.fromList syms)}
   return syms
 
-setConstants :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step a) [Expr Z a]
-setConstants names = do
+addConstants :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step a) [Expr Z a]
+addConstants names = do
   step  <- State.get
-  when (isJust (stepConstants step)) $ error "constants already set, don't call setConstants twice"
-  let syms = map sym (failDuplicates (map checkOctaveName names))
-  State.put $ step {stepConstants = Just (HS.fromList syms)}
+  let syms = map (sym . checkOctaveName) names
+      constants0 = stepConstants step
+  State.put $ step {stepConstants = HS.union constants0 (HS.fromList syms)}
   return syms
 
-setOutput :: Expr Z a -> String -> State (Step a) ()
-setOutput var name = do
+addOutput :: Expr Z a -> String -> State (Step a) ()
+addOutput var name = do
   step <- State.get
   let hm = stepOutputs step
       err = error $ "ERROR: already have an output with name: \"" ++ name ++ "\""
@@ -101,6 +115,11 @@ getTimeStep :: State (Step a) Int
 getTimeStep = do
   step <- State.get
   return (stepIdx step)
+
+setPeriodic :: (Eq (Expr Z a), Hashable (Expr Z a)) => Expr Z a -> State (Step a) ()
+setPeriodic var = do
+  step <- State.get
+  State.put $ step {stepPeriodic = HS.insert var (stepPeriodic step)}
   
 -------------------------------------------
 
@@ -139,7 +158,12 @@ setBound var@(ESym _ _) (lb, ub) bnd = do
 
   when (isJust putNewBnd) $
     State.put $ step {stepBounds = HM.insert var newbnd oldBounds}
-setBound _ _ _ = error "WARNING - setBound called on non-design variable, use addConstraint instead"
+setBound _ _ _ = do
+  -- if execDxdt has put the x/u, they won't be symbolic - ignore them
+  step <- State.get
+  case stepStates step of
+    Left _ -> error "WARNING - setBound called on non-design variable, use addConstraint instead"
+    _ -> return ()
 
 
 addConstraint :: Expr Z a -> Ordering -> Expr Z a -> State (Step a) ()
@@ -164,14 +188,14 @@ runOneStep userStep k
                                           , stepDt = Nothing
                                           , stepBounds = HM.empty
                                           , stepConstraints = []
-                                          , stepParams = Nothing
-                                          , stepConstants = Nothing
+                                          , stepParams = HS.empty
+                                          , stepConstants = HS.empty
                                           , stepIdx = k
                                           , stepOutputs = HM.empty
+                                          , stepPeriodic = HS.empty
                                           }
 
-execDxdt :: Num (Expr Z a)
-            => State (Step a) b -> Int -> [Expr Z a] -> [Expr Z a] -> [Expr Z a]
+execDxdt :: Num (Expr Z a) => State (Step a) b -> Int -> [Expr Z a] -> [Expr Z a] -> [Expr Z a]
 execDxdt userStep k x u = case stepDxdt $ State.execState userStep step0 of
   Nothing -> error "ERROR: need to set dxdt"
   Just dxdt -> dxdt
@@ -183,8 +207,9 @@ execDxdt userStep k x u = case stepDxdt $ State.execState userStep step0 of
                  , stepCost = Nothing
                  , stepBounds = HM.empty
                  , stepConstraints = []
-                 , stepParams = Nothing
-                 , stepConstants = Nothing
+                 , stepParams = HS.empty
+                 , stepConstants = HS.empty
                  , stepIdx = k
                  , stepOutputs = HM.empty
+                 , stepPeriodic = HS.empty
                  }

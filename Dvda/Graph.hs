@@ -38,8 +38,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
 import Data.Array.Repa ( Shape(rank,listOfShape), DIM0, DIM1, DIM2, Z(..) )
-import Control.Monad.State ( MonadState, StateT, get, put )
-import Data.Functor.Identity ( Identity )
+import Control.Monad.State ( State, get, put )
 
 import Dvda.Expr ( Expr(..), Const(..), dim, fullShow' )
 
@@ -118,7 +117,7 @@ symSet _ (EJacob _ _) = error "don't take symSet of EJacob"
 -- | Try to insert the Expr into the hashmap performing CSE.
 --   If the Expr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
-insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
+insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> State (FunGraph a b c) (Expr sh a)
 insert (ERef _ _) = error "don't insert ERef into graph, ya goon"
 insert (EConst _) = error "don't insert EConst into graph, ya goon"
 insert expr = do

@@ -21,8 +21,7 @@ module Dvda.SymMonad ( (:*)(..)
                      ) where
 
 import Control.Monad ( foldM, liftM )
-import Control.Monad.State ( MonadState, StateT, get, put, runState )
-import Data.Functor.Identity ( Identity )
+import Control.Monad.State ( State, get, put, runState )
 import Data.Array.Repa ( DIM0, DIM1, DIM2 )
 import Data.Hashable ( Hashable )
 import Data.Maybe ( fromJust )
@@ -30,7 +29,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Numeric.LinearAlgebra ( Element, Vector, Matrix )
 import qualified Numeric.LinearAlgebra as LA
-import Debug.Trace ( trace )
+--import Debug.Trace ( trace )
 
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
@@ -40,7 +39,7 @@ import Dvda.Expr ( Expr(..), Const(..), dim, fullShow' )
 ---- | take all sub expressions of an Expr and turn them into nodes
 ----   return an Expr that is just a ref
 node :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, DvdaDim sh) => 
-         Expr sh a -> StateT (FunGraph a b c) Identity (Expr sh a)
+         Expr sh a -> State (FunGraph a b c) (Expr sh a)
 node (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
 node (EJacob _ _) = error "can't do node EJacob yet"
 node e@(ERef _ _) = return e
@@ -71,7 +70,7 @@ node (EGrad x_ arg_) = do
 
 -- gradient of expression w.r.t. list of args
 rad :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh0, DvdaDim sh) =>
-       Expr sh0 a -> [Expr sh a] -> StateT (FunGraph a b c) Identity [Expr sh a]
+       Expr sh0 a -> [Expr sh a] -> State (FunGraph a b c) [Expr sh a]
 rad expr' args' = do
   expr <- node expr'
   args'' <- mapM node args'
@@ -85,8 +84,9 @@ rad expr' args' = do
   
   let getSens arg = case HM.lookup (makeDynamic arg) sensitivities of
         Just sens -> node $ fromDynamic (dim arg) sens
-        Nothing -> trace "WARNING: taking deriviative df/dx where f is not a function of x" $
-                   return $ EConst (CSingleton (dim arg) 0)
+--        Nothing -> trace "WARNING: taking deriviative df/dx where f is not a function of x" $
+--                   return $ EConst (CSingleton (dim arg) 0)
+        Nothing -> return $ EConst (CSingleton (dim arg) 0)
   mapM getSens args
 
 
@@ -94,7 +94,7 @@ rad expr' args' = do
 -- if there is a conflict, add the two sensitivities together
 unionWithPlus :: (Hashable a, Eq a, Num (Vector a), LA.Container Vector a, Floating a) =>
                  HM.HashMap (DynamicExpr a) (DynamicExpr a) -> HM.HashMap (DynamicExpr a) (DynamicExpr a)
-                 -> StateT (FunGraph a b c) Identity (HM.HashMap (DynamicExpr a) (DynamicExpr a))
+                 -> State (FunGraph a b c) (HM.HashMap (DynamicExpr a) (DynamicExpr a))
 unionWithPlus xs ys = foldM addCommon union0 commonDExprs
   where
     -- the gexprs that occur in both maps
@@ -119,7 +119,7 @@ unionWithPlus xs ys = foldM addCommon union0 commonDExprs
 
 
 lookupSymSet :: (Eq a, Hashable a, Element a, DvdaDim sh) =>
-                Expr sh a -> StateT (FunGraph a b c) Identity (Maybe (HS.HashSet (DynamicExpr a)))
+                Expr sh a -> State (FunGraph a b c) (Maybe (HS.HashSet (DynamicExpr a)))
 lookupSymSet expr = do
   fg <- get
   case fgLookup expr fg of Just (_,symSet) -> return (Just symSet)
@@ -128,7 +128,7 @@ lookupSymSet expr = do
 
 getSensitivities :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh) =>
                     HS.HashSet (DynamicExpr a) -> Expr sh a -> Expr sh a
-                    -> StateT (FunGraph a b c) Identity (HM.HashMap (DynamicExpr a) (DynamicExpr a))
+                    -> State (FunGraph a b c) (HM.HashMap (DynamicExpr a) (DynamicExpr a))
 getSensitivities _ (EGrad  _ _) _ = error "don't call getSensitivities on EGrad"
 getSensitivities _ (EJacob _ _) _ = error "don't call getSensitivities on EJacob"
 getSensitivities _ (EDeriv _ _) _ = error "don't call getSensitivities on EDeriv"
@@ -202,7 +202,7 @@ infixr 6 :*
 class MkFunGraph a where
   type NumT a
   type GenT a
-  mkNodes :: a -> StateT (FunGraph (NumT a) b c) Identity a
+  mkNodes :: a -> State (FunGraph (NumT a) b c) a
 
 instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
          MkFunGraph (Expr DIM0 a) where
@@ -250,32 +250,32 @@ instance (MkFunGraph a, MkFunGraph b, NumT a ~ NumT b) => MkFunGraph (a :* b) wh
     y' <- mkNodes y
     return (x' :* y')
 
-inputs :: MkFunGraph b => b -> StateT (FunGraph (NumT b) b c) Identity b
+inputs :: MkFunGraph b => b -> State (FunGraph (NumT b) b c) b
 inputs exprs_ = do
   exprs <- mkNodes exprs_
   FunGraph hm im _ outs <- get
   put $ FunGraph hm im exprs outs
   return exprs
 
-outputs :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b c) Identity c
+outputs :: MkFunGraph c => c -> State (FunGraph (NumT c) b c) c
 outputs exprs_ = do
   exprs <- mkNodes exprs_
   FunGraph hm im ins _ <- get
   put $ FunGraph hm im ins exprs
   return exprs
 
-inputs_ :: MkFunGraph b => b -> StateT (FunGraph (NumT b) b c) Identity ()
+inputs_ :: MkFunGraph b => b -> State (FunGraph (NumT b) b c) ()
 inputs_ exprs = do
   _ <- inputs exprs
   return ()
 
-outputs_ :: MkFunGraph c => c -> StateT (FunGraph (NumT c) b c) Identity ()
+outputs_ :: MkFunGraph c => c -> State (FunGraph (NumT c) b c) ()
 outputs_ exprs = do
   _ <- outputs exprs
   return ()
 
 ------------------ utility function -----------------
-runFunGraph :: StateT (FunGraph a b c) Identity d -> FunGraph a b c
+runFunGraph :: State (FunGraph a b c) d -> FunGraph a b c
 runFunGraph f = snd $ runState f emptyFunGraph
 
 makeFunGraph :: (MkFunGraph b, MkFunGraph c, NumT b ~ NumT c) =>
