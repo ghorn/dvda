@@ -29,7 +29,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Numeric.LinearAlgebra ( Element, Vector, Matrix )
 import qualified Numeric.LinearAlgebra as LA
-import Debug.Trace ( trace )
+--import Debug.Trace ( trace )
 
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
@@ -84,8 +84,9 @@ rad expr' args' = do
   
   let getSens arg = case HM.lookup (makeDynamic arg) sensitivities of
         Just sens -> node $ fromDynamic (dim arg) sens
-        Nothing -> trace "WARNING: taking deriviative df/dx where f is not a function of x" $
-                   return $ EConst (CSingleton (dim arg) 0)
+--        Nothing -> trace "WARNING: taking deriviative df/dx where f is not a function of x" $
+--                   return $ EConst (CSingleton (dim arg) 0)
+        Nothing -> return $ EConst (CSingleton (dim arg) 0)
   mapM getSens args
 
 
