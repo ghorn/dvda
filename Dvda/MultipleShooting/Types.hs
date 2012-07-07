@@ -24,8 +24,8 @@ data Constraint a = Constraint (Expr Z a) Ordering (Expr Z a) deriving Show
 
 data Step a = Step { stepStates :: Either (Maybe [(Expr Z a, String)]) [Expr Z a]
                    , stepActions :: Either (Maybe [(Expr Z a, String)]) [Expr Z a]
-                   , stepParams :: Maybe (HashSet (Expr Z a))
-                   , stepConstants :: Maybe (HashSet (Expr Z a))
+                   , stepParams :: HashSet (Expr Z a)
+                   , stepConstants :: HashSet (Expr Z a)
                    , stepDxdt :: Maybe [Expr Z a]
                    , stepCost :: Maybe (Expr Z a)
                    , stepDt :: Maybe (Expr Z a)

@@ -82,10 +82,8 @@ msCoctave userStep odeError n funDir name = do
               then actions'
               else error "ERROR: different actions in different timesteps"
 
-    g Nothing hs = hs
-    g (Just next) hs = HS.union hs next
-    params    = HS.toList $ foldr g HS.empty (map stepParams    steps)
-    constants = HS.toList $ foldr g HS.empty (map stepConstants steps)
+    params    = HS.toList $ foldr HS.union HS.empty (map stepParams    steps)
+    constants = HS.toList $ foldr HS.union HS.empty (map stepConstants steps)
 
     boundMap = foldr HM.union HM.empty (map stepBounds steps)
 
@@ -250,12 +248,12 @@ spring :: State (Step Double) ()
 spring = do
   [x, v] <- setStates ["x","v"]
   [u] <- setActions ["u"]
-  [k, b] <- setConstants ["k", "b"]
+  [k, b] <- addConstants ["k", "b"]
   setDxdt [v, -k*x - b*v + u]
   setDt 0.1
   let cost = 2*x*x + 3*v*v + 10*u*u
   setCost cost
-  setOutput cost "cost"
+  addOutput cost "cost"
 
   setBound x (5,5) (TIMESTEP 0)
   setBound v (0,0) (TIMESTEP 0)
