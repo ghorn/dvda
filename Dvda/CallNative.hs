@@ -10,6 +10,7 @@ module Dvda.CallNative ( toNative
                        , nativeDiff
                        , nativeGrad
                        , nativeJacob
+                       , nativeRun
                        ) where
 
 import Data.Hashable ( Hashable )
@@ -19,6 +20,7 @@ import qualified Data.IntMap as IM
 import Data.List ( mapAccumL )
 import Data.Maybe ( fromJust, catMaybes )
 import Numeric.LinearAlgebra ( Element, Container )
+import Data.Array.Repa (Z(..))
 
 import Dvda
 import Dvda.BinUn ( BinOp(Mul), applyBinary, applyUnary )
@@ -137,8 +139,9 @@ toNative fg@(FunGraph _ _ _ outs) xs = snd $ traverseOutputs replacementMap fg o
    replacementMap = toReplacements fg xs
 
 
--- | Convenience function for natively computing function
---   This is expected to be very slow. Using code generation instead is recommended
+-- | Convenience function for natively computing function This is
+--   expected to be very slow. Using code generation instead is
+--   recommended
 nativeCall :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
               => (Expr Z a -> [Expr Z a]) -> Expr Z a -> [Expr Z a]
 nativeCall f = toNative $ runFunGraph $ do
@@ -146,8 +149,29 @@ nativeCall f = toNative $ runFunGraph $ do
   inputs_ x
   outputs_ (f x)
 
--- | Convenience function for natively computing jacobian, requires you to pass the number of inputs.
---   This is expected to be very slow. Using code generation instead is recommended
+-- | Lift a unary function over @Floating a => a@ to a function over
+-- @Floating a => Expr Z a@
+liftNative :: (Hashable a, Eq a, Show a, Element a, Floating a, 
+               Num (Vector a), Container Vector a, 
+               Floating b, b ~ Expr Z a) => (b -> b) -> Expr Z a -> Expr Z a
+liftNative f x = case nativeCall (return . f) x of
+                   [] -> error "Function didn't return."
+                   (v:_) -> v
+
+-- | Evaluate a unary function over @Floating a => a@ using Dvda's
+-- internal machinery.  The typeclass constraints should make sure the
+-- error doesn't happen, but it could anyway.
+nativeRun :: (Hashable a, Eq a, Show a, Element a, Floating a, 
+              Num (Vector a), Container Vector a, 
+              Floating b, b ~ Expr Z a) => (b -> b) -> a -> a
+nativeRun f x = case liftNative f (EConst (CSingleton Z x)) of
+                  (EConst (CSingleton Z v)) -> v
+                  _ -> error "Function must be unary over class Floating."
+
+
+-- | Convenience function for natively computing jacobian, requires
+-- you to pass the number of inputs.  This is expected to be very
+-- slow. Using code generation instead is recommended
 nativeJacob :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
                => Int -> ([Expr Z a] -> [Expr Z a]) -> [Expr Z a] -> [[Expr Z a]]
 nativeJacob n f = toNative $ runFunGraph $ do
@@ -156,8 +180,9 @@ nativeJacob n f = toNative $ runFunGraph $ do
   ys <- mapM (flip rad xs) (f xs)
   outputs_ ys
 
--- | Convenience function for natively computing gradient, requires you to pass the number of inputs.
---   This is expected to be very slow. Using code generation instead is recommended
+-- | Convenience function for natively computing gradient, requires
+-- you to pass the number of inputs.  This is expected to be very
+-- slow. Using code generation instead is recommended
 nativeGrad :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
               => Int -> ([Expr Z a] -> Expr Z a) -> [Expr Z a] -> [Expr Z a]
 nativeGrad n f = toNative $ runFunGraph $ do
@@ -166,8 +191,9 @@ nativeGrad n f = toNative $ runFunGraph $ do
   ys <- rad (f xs) xs
   outputs_ ys
   
--- | Convenience function for natively computing a derivative.
---   This is expected to be very slow. Using code generation instead is recommended
+-- | Convenience function for natively computing a derivative.  This
+-- is expected to be very slow. Using code generation instead is
+-- recommended
 nativeDiff :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
               => (Expr Z a -> Expr Z a) -> Expr Z a -> Expr Z a
 nativeDiff f = toNative $ runFunGraph $ do

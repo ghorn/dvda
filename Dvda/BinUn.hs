@@ -34,14 +34,14 @@ data UnOp = Abs
           | Cosh
           | ATanh
           | ASinh
-          | ACosh deriving (Eq, Show)
+          | ACosh deriving (Eq, Show, Enum, Bounded)
 
 data BinOp = Add
            | Sub
            | Mul
            | Div
            | Pow
-           | LogBase deriving (Eq, Show)
+           | LogBase deriving (Eq, Show, Enum, Bounded)
 
 instance Hashable UnOp where
   hash Abs    = 0
