@@ -63,7 +63,6 @@ Library
                      Dvda.OctaveSyntax
                      Dvda.SparseLA
                      Dvda.SymMonad
-                     Dvda.CallNative
 --                     Dvda.CFunction
 --                     Dvda.Codegen.CBuilder
 --                     Dvda.Codegen.CCallWrapper
