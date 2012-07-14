@@ -17,7 +17,9 @@ module Dvda.SymMonad ( (:*)(..)
                      , runFunGraph
                      , rad
                      , getSensitivities
+                     , recover
                      , fullShow
+                     , runDeriv
                      ) where
 
 import Control.Monad ( foldM, liftM )
@@ -310,3 +312,22 @@ makeFunGraph ins outs = runFunGraph $ do
 
 fullShow :: (Show a, Element a, DvdaDim sh) => FunGraph a b c -> Expr sh a -> String
 fullShow fg expr = fullShow' (Just (\sh k -> fromJust $ fgExprFromKey sh k fg)) expr
+
+recover :: DvdaDim sh => FunGraph a b c -> Expr sh a -> Expr sh a
+recover fg (ERef sh k) = recover fg (fromJust $ fgExprFromKey sh k fg)
+recover _ e@(EDimensionless _) = e
+recover _ e@(ESym _ _) = e
+recover _ e@(EConst _) = e
+recover fg (EUnary op x) = EUnary op (recover fg x)
+recover fg (EBinary op x y) = EBinary op (recover fg x) (recover fg y)
+recover fg (EDeriv x y) = EDeriv (recover fg x) (recover fg y)
+recover fg (EGrad  x y) = EGrad  (recover fg x) (recover fg y)
+recover fg (EJacob  x y) = EJacob  (recover fg x) (recover fg y)
+recover fg (EScale  x y) = EScale  (recover fg x) (recover fg y)
+
+
+runDeriv :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh)
+            => Expr sh a -> [Expr sh a] -> [Expr sh a]
+runDeriv expr args = map (recover fg) deda
+  where
+    (deda, fg) = runState (rad expr args) emptyFunGraph

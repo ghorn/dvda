@@ -7,6 +7,7 @@ module Dvda.Examples ( run
                      , bigGraph
                      , smallGraph
                      , runCallNative
+                     , composed
                      ) where
 
 import Data.Array.Repa.Index
@@ -140,3 +141,11 @@ showoff = do
   putStrLn "--------------------------------------------------------------"
 --  putStrLn $ funGraphSummary' bigGraph
   previewGraph bigGraph
+
+composed :: [Expr Z Double]
+composed = runDeriv z [t]
+  where
+    t = sym "t"
+    x = symDependent "x" t
+    y = symDependent "y" x
+    z = symDependent "z" y
