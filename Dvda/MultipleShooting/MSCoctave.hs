@@ -13,7 +13,7 @@ import Data.List ( zipWith6, transpose, elemIndex )
 import Data.Maybe ( fromJust, catMaybes )
 
 import Dvda
-import Dvda.Expr ( Expr(..), Const(..) )
+import Dvda.Expr ( Expr(..), Const(..), Sym(..) )
 import Dvda.SymMonad ( rad )
 import Dvda.MultipleShooting.MSMonad
 import Dvda.MultipleShooting.Types
@@ -204,7 +204,7 @@ msCoctave userStep odeError n funDir name = do
       , concat $ zipWith fromXUS (head actionNames) (transpose actions)
       ]
       where
-        fromParam e@(ESym _ nm) =
+        fromParam e@(ESym _ (Sym nm)) =
           "dvs(" ++ show (1 + (fromJust $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ nm ++ ";\n"
         fromParam _ = error "param not ESym"
 
@@ -220,7 +220,7 @@ msCoctave userStep odeError n funDir name = do
       , concatMap fromConst constants
       ]
       where
-        fromConst e@(ESym _ nm) =
+        fromConst e@(ESym _ (Sym nm)) =
           "constants(" ++ show (1 + (fromJust $ e `elemIndex` constants)) ++ ") = constStruct." ++ nm ++ ";\n"
         fromConst _ = error "const not ESym"
 

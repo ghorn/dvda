@@ -37,10 +37,10 @@ import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
-import Data.Array.Repa ( Shape(rank,listOfShape), DIM0, DIM1, DIM2, Z(..) )
+import Data.Array.Repa ( Shape, DIM0, DIM1, DIM2, Z(..) )
 import Control.Monad.State ( State, get, put )
 
-import Dvda.Expr ( Expr(..), Const(..), dim, fullShow' )
+import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim, fullShow' )
 
 --------------------- dynamic Expr stuff ---------------------------
 data DynamicExpr a = DynamicExpr0 (Expr DIM0 a)
@@ -103,6 +103,7 @@ fgExprFromKey sh k (FunGraph _ im _ _) = fmap (fromDynamic sh) (IM.lookup k im)
                
 symSet :: (Eq a, Hashable a, Element a, DvdaDim sh) =>
           FunGraph a b c -> Expr sh a -> HS.HashSet (DynamicExpr a)
+symSet fg e@(ESym sh (SymDependent _ _ dep)) = HS.union (HS.singleton (makeDynamic e)) (symSet fg (ESym sh dep))
 symSet _ e@(ESym _ _)          = HS.singleton (makeDynamic e)
 symSet fg (ERef sh k)          = snd $ fromJust $ fgReverseLookup sh k fg
 symSet _ (EDimensionless _)    = HS.empty
@@ -180,7 +181,7 @@ emptyFunGraph = FunGraph HM.empty IM.empty inerr outerr
     outerr = error "must specify outputs"
 
 
-previewGraph :: Show a => FunGraph a b c -> IO ()
+previewGraph :: (Show a, Element a) => FunGraph a b c -> IO ()
 previewGraph fungraph = do
   preview $ toFGLGraph fungraph
   threadDelay 10000
@@ -205,20 +206,18 @@ toFGLGraph (FunGraph hm _ _ _) = mkGraph lnodes ledges
         gc (EGrad _ _)  = error "don't call getChildren on EGrad"
 
 
-instance Show a => Labellable (DynamicExpr a) where
+instance (Show a, Element a) => Labellable (DynamicExpr a) where
   toLabelValue (DynamicExpr0 e) = tlv e
   toLabelValue (DynamicExpr1 e) = tlv e
   toLabelValue (DynamicExpr2 e) = tlv e
   
-tlv :: (Show a, Shape sh) => Expr sh a -> Data.GraphViz.Attributes.Complete.Label
-tlv (EBinary op _ _) = toLabelValue $ show op
-tlv (EUnary op _)    = toLabelValue $ show op
-tlv (ESym sh name) 
-  | rank sh == 0 = toLabelValue name
-  | otherwise    = toLabelValue $ name ++ "{" ++ (tail . init . show . reverse) (listOfShape sh) ++ "}"
-tlv (EScale {})        = toLabelValue "scale"
+tlv :: (Show a, Shape sh, Element a) => Expr sh a -> Data.GraphViz.Attributes.Complete.Label
+tlv (EBinary op _ _)          = toLabelValue $ show op
+tlv (EUnary op _)             = toLabelValue $ show op
+tlv s@(ESym _ _)              = toLabelValue (show s)
+tlv (EScale {})               = toLabelValue "scale"
 tlv (EConst (CSingleton _ c)) = toLabelValue $ show c
-tlv (EConst (CVec _ _)) = toLabelValue "vec"
-tlv (EConst (CMat _ _)) = toLabelValue "mat"
-tlv (EConst (CTensor _ _)) = toLabelValue "tensor"
+tlv (EConst (CVec _ _))       = toLabelValue "vec"
+tlv (EConst (CMat _ _))       = toLabelValue "mat"
+tlv (EConst (CTensor _ _))    = toLabelValue "tensor"
 tlv _ = error "don't try to preview one of those, ya goon"

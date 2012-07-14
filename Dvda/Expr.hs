@@ -6,6 +6,7 @@
 
 module Dvda.Expr ( Expr(..)
                  , Const(..)
+                 , Sym(..)
                  , sym
                  , svec
                  , smat
@@ -22,6 +23,7 @@ module Dvda.Expr ( Expr(..)
                  , dim
                  , isVal
                  , fullShow'
+                 , symDependent
                  ) where
 
 import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList), rank )
@@ -64,8 +66,16 @@ data Const sh a where
   CMat :: DIM2 -> Matrix a -> Const DIM2 a
   CTensor :: sh -> Vector a -> Const sh a
 
+data Sym = Sym String                  -- doesn't depend on independent variable, or is an independent variable
+         | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
+           deriving Eq
+
+instance Show Sym where
+  show (Sym name) = name
+  show (SymDependent name k s) = name ++ replicate k '\'' ++ "(" ++ show s ++ ")"
+
 data Expr sh a where
-  ESym :: sh -> String -> Expr sh a
+  ESym :: sh -> Sym -> Expr sh a
   EConst :: Const sh a -> Expr sh a
   EDimensionless :: a -> Expr sh a
   EUnary :: UnOp -> Expr sh a -> Expr sh a
@@ -99,8 +109,8 @@ fullShow' Nothing (ERef sh k)
   | rank sh == 0 = "{ref:" ++ show k ++ "}"
   | otherwise    = "{ref:" ++ show k ++ ",(" ++ showShapeR sh ++ ")}"
 fullShow' _ (EDimensionless x) = show x
-fullShow' _ (ESym sh name) = case rank sh of 0 -> name
-                                             _ -> name++"{"++showShapeR sh++"}"
+fullShow' _ (ESym sh s) = case rank sh of 0 -> show s
+                                          _ -> show s++"{"++showShapeR sh++"}"
 fullShow' _ (EConst x) = show x
 fullShow' chaseRef (EUnary op x) = showUnary (fullShow' chaseRef x) op
 fullShow' chaseRef (EBinary op x y) =
@@ -115,9 +125,12 @@ fullShow' chaseRef (EBinary op x y) =
       (Just cr, ERef sh k) -> pareny (cr sh k)
       _ -> id
       
--- fullShow' chaseRef (EScale x y) = paren (fullShow' chaseRef x) ++ "*" ++ paren (fullShow' chaseRef y)
 fullShow' chaseRef (EDeriv x y) = "deriv(" ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
+fullShow' _ (EScale _ _) = error "fullShow' not instanced for EScale because of shape problem"
+--fullShow' chaseRef (EScale x y) = paren (fullShow' chaseRef x) ++ "*" ++ paren (fullShow' chaseRef y)
+fullShow' _ (EGrad  _ _) = error "fullShow' not instanced for EGrad because of shape problem"
 --fullShow' chaseRef (EGrad  x y) = "grad("  ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
+fullShow' _ (EJacob _ _) = error "fullShow' not instanced for EJacob because of shape problem"
 --fullShow' chaseRef (EJacob x y) = "jacob(" ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
 
 instance (Shape sh, Show a, Element a) => Show (Expr sh a) where
@@ -175,6 +188,10 @@ instance (Hashable a, Shape sh, Element a) => Hashable (Expr sh a) where
   hash (EDeriv x y)       = 35 `combine` hash x `combine` hash y
   hash (EGrad x y)        = 36 `combine` hash x `combine` hash y
   hash (EJacob x y)       = 37 `combine` hash x `combine` hash y
+
+instance Hashable Sym where
+  hash (Sym name) = 38 `combine` hash name
+  hash (SymDependent name k s) = 39 `combine` hash name `combine` k `combine` hash s
 
 
 ------------------------ symbolic stuff --------------------
@@ -324,15 +341,19 @@ instance (Shape sh, Floating a, Eq a, Num (Vector a), LA.Container Vector a) =>
 ------------------------------ convenience functions -------------------------
 -- | symbolic scalar
 sym :: String -> Expr DIM0 a
-sym = ESym Z
+sym = (ESym Z) . Sym
+
+symDependent :: String -> Expr DIM0 a -> Expr DIM0 a
+symDependent name (ESym _ s)  = ESym Z (SymDependent name 0 s)
+symDependent _ _ = error "symDependent got non ESym dependency"
 
 -- | symbolic dense vector
 vsym :: Int -> String -> Expr DIM1 a
-vsym k = ESym (Z :. k)
+vsym k = (ESym (Z :. k)) . Sym
 
 -- | symbolic dense matrix
 msym :: (Int,Int) -> String -> Expr DIM2 a
-msym (r,c) = ESym (Z :. r :. c)
+msym (r,c) = (ESym (Z :. r :. c)) . Sym
 
 -- | symbolic dense constant vector
 vec :: Storable a => [a] -> Expr DIM1 a

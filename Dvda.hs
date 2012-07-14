@@ -23,6 +23,7 @@ module Dvda ( -- * primitives
             , scale
 --            , dot
             , diff
+            , runDeriv
               -- * symbolic expression type
             , Expr
             , fullShow

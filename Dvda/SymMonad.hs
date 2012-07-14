@@ -22,19 +22,19 @@ module Dvda.SymMonad ( (:*)(..)
 
 import Control.Monad ( foldM, liftM )
 import Control.Monad.State ( State, get, put, runState )
-import Data.Array.Repa ( DIM0, DIM1, DIM2 )
+import Data.Array.Repa ( DIM0, DIM1, DIM2, Z(..) )
 import Data.Hashable ( Hashable )
 import Data.Maybe ( fromJust )
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Numeric.LinearAlgebra ( Element, Vector, Matrix )
 import qualified Numeric.LinearAlgebra as LA
---import Debug.Trace ( trace )
+-- import Debug.Trace
 
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
-import Dvda.Expr ( Expr(..), Const(..), dim, fullShow' )
+import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim, fullShow' )
 
 ---- | take all sub expressions of an Expr and turn them into nodes
 ----   return an Expr that is just a ref
@@ -44,6 +44,9 @@ node (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
 node (EJacob _ _) = error "can't do node EJacob yet"
 node e@(ERef _ _) = return e
 node e@(EConst _) = return e
+node e@(ESym _ (SymDependent _ _ dep)) = do
+  _ <- node (ESym Z dep)
+  insert e
 node e@(ESym _ _) = insert e
 node (EUnary op x') = do
   x <- node x'
@@ -125,7 +128,6 @@ lookupSymSet expr = do
   case fgLookup expr fg of Just (_,symSet) -> return (Just symSet)
                            Nothing -> return Nothing
 
-
 getSensitivities :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh) =>
                     HS.HashSet (DynamicExpr a) -> Expr sh a -> Expr sh a
                     -> State (FunGraph a b c) (HM.HashMap (DynamicExpr a) (DynamicExpr a))
@@ -139,6 +141,27 @@ getSensitivities args (ERef sh k) sens  = do
   fg <- get
   let expr = fromJust $ fgExprFromKey sh k fg
   getSensitivities args expr sens
+getSensitivities args primal@(ESym sh (SymDependent name k dep')) sens = do
+  let dprimal = makeDynamic primal
+      primalMap =
+        if HS.member dprimal args
+        then HM.fromList [(dprimal, makeDynamic sens)]
+        -- don't backprop if there aren't any interesting symbols farther in the tree
+        else HM.empty
+
+      dep = ESym sh dep'
+
+  depSymSet <- liftM fromJust $ lookupSymSet dep
+
+  let commonSyms = HS.intersection args depSymSet
+
+  dependentMap <- case HS.size commonSyms of
+    0 -> return HM.empty
+    _ -> getSensitivities commonSyms dep (sens*primal')
+      where
+        primal' = ESym sh (SymDependent name (k+1) dep')
+
+  return $ HM.union primalMap dependentMap
 getSensitivities args primal@(ESym _ _) sens = do
   let dprimal = makeDynamic primal
   if HS.member dprimal args
