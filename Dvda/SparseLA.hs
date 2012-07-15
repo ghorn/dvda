@@ -55,6 +55,7 @@ instance Num a => Num (SparseMat a) where
   x * y = fromJust $ smMul x y
   abs = smMap abs
   signum = smMap signum
+  fromInteger = error "fromInteger not declared for Num SparseMat"
 
 -- puts zeroes where there aren't entries
 denseListFromSv :: Num a => SparseVec a -> [a]
@@ -137,6 +138,7 @@ instance Num a => Num (SparseVec a) where
   x * y = fromJust $ svMul x y
   abs = svMap abs
   signum = svMap signum
+  fromInteger = error "fromInteger not declared for Num SparseVec"
 
 svFromList :: [a] -> SparseVec a
 svFromList xs = svFromSparseList (zip [0..] xs) (length xs)
