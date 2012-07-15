@@ -20,7 +20,6 @@ import qualified Data.IntMap as IM
 import Data.List ( mapAccumL )
 import Data.Maybe ( fromJust, catMaybes )
 import Numeric.LinearAlgebra ( Element, Container )
-import Data.Array.Repa (Z(..))
 
 import Dvda
 import Dvda.BinUn ( BinOp(Mul), applyBinary, applyUnary )

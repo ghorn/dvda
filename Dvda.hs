@@ -54,7 +54,7 @@ module Dvda ( -- * primitives
             , DIM0
             , DIM1
             , DIM2
-            , Z
+            , Z(..)
             , (:.)
             , Matrix
             , Vector
