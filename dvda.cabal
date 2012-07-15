@@ -1,5 +1,5 @@
 Name:                dvda
-Version:             0.1.2
+Version:             0.2.0
 License:             BSD3
 License-file:        LICENSE
 Author:              Greg Horn
@@ -8,7 +8,7 @@ Stability:           Experimental
 Category:            Numerical, Math
 Build-type:          Custom
 Synopsis:            Efficient automatic differentiation
-Cabal-version:       >= 1.6
+Cabal-version:       >= 1.8
 Description: {
 dvda == DVDA Verifiably Differentiates Algorithmically
 .

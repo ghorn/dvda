@@ -6,7 +6,6 @@ module Dvda.MultipleShooting.MSCoctave ( msCoctave
                                        , run
                                        ) where
 
-import Data.Array.Repa ( Z(..) )
 import qualified Data.HashMap.Lazy as HM
 import qualified Data.HashSet as HS
 import Data.List ( zipWith6, transpose, elemIndex )
