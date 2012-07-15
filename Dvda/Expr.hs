@@ -337,6 +337,9 @@ instance (Shape sh, Floating a, Eq a, Num (Vector a), LA.Container Vector a) =>
 sym :: String -> Expr DIM0 a
 sym = (ESym Z) . Sym
 
+-- | Symbolic scalar which is a function of some independent variable, like time.
+-- .
+-- This lets you do d(f(g(t)))/dt == f'(g(t))*g'(t)
 symDependent :: String -> Expr DIM0 a -> Expr DIM0 a
 symDependent name (ESym _ s)  = ESym Z (SymDependent name 0 s)
 symDependent _ _ = error "symDependent got non ESym dependency"
