@@ -21,7 +21,6 @@ module Dvda.Graph ( FunGraph(..)
                   , funGraphSummary
                   , funGraphSummary'
                   , showNodes
-                  , fullShowNodes
                   , asIfExpr
                   ) where
 
@@ -37,10 +36,10 @@ import qualified Data.HashSet as HS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
-import Data.Array.Repa ( Shape, DIM0, DIM1, DIM2, Z(..) )
+import Data.Array.Repa ( Shape, DIM0, DIM1, DIM2 )
 import Control.Monad.State ( State, get, put )
 
-import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim, fullShow' )
+import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim )
 
 --------------------- dynamic Expr stuff ---------------------------
 data DynamicExpr a = DynamicExpr0 (Expr DIM0 a)
@@ -139,11 +138,6 @@ funGraphSummary (FunGraph hm _ b c) =
                  , "outputs: " ++ show c
                  , "number of nodes: " ++ show (HM.size hm)
                  ]
-
-fullShowNodes :: (Show a, Element a) => FunGraph a b c -> String
-fullShowNodes fg@(FunGraph _ im _ _) = init $ unlines $ map (\(a,b) -> show a ++ ": " ++ fs (fromDynamic Z b)) (IM.toList im)
-  where
-    fs expr = fullShow' (Just (\sh k -> fromJust $ fgExprFromKey sh k fg)) expr
 
 showNodes :: (Show a, Element a) => FunGraph a b c -> String
 showNodes (FunGraph _ im _ _) = init $ unlines (map show (IM.toList im))

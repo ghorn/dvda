@@ -19,6 +19,7 @@ module Dvda.SymMonad ( (:*)(..)
                      , getSensitivities
                      , recover
                      , fullShow
+                     , fullShowNodes
                      , runDeriv
                      ) where
 
@@ -29,6 +30,7 @@ import Data.Hashable ( Hashable )
 import Data.Maybe ( fromJust )
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
+import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element, Vector, Matrix )
 import qualified Numeric.LinearAlgebra as LA
 -- import Debug.Trace
@@ -36,7 +38,7 @@ import qualified Numeric.LinearAlgebra as LA
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
-import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim, fullShow' )
+import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim )
 
 ---- | take all sub expressions of an Expr and turn them into nodes
 ----   return an Expr that is just a ref
@@ -309,10 +311,17 @@ makeFunGraph ins outs = runFunGraph $ do
   inputs_ ins
   outputs_ outs
 
-
+-- | Show an Expr, looking up all ERefs
 fullShow :: (Show a, Element a, DvdaDim sh) => FunGraph a b c -> Expr sh a -> String
-fullShow fg expr = fullShow' (Just (\sh k -> fromJust $ fgExprFromKey sh k fg)) expr
+fullShow fg = show . (recover fg)
 
+fullShowNodes :: (Show a, Element a) => FunGraph a b c -> String
+fullShowNodes fg@(FunGraph _ im _ _) =
+  init $ unlines $ map (\(a,b) -> show a ++ ": " ++ (fullShow fg) (fromDynamic Z b)) (IM.toList im)
+
+-- | Take a FunGraph and an expression and traverse the expression.
+--   .
+--   Each time an ERef is found, look it up in the FunGraph and continue traversal
 recover :: DvdaDim sh => FunGraph a b c -> Expr sh a -> Expr sh a
 recover fg (ERef sh k) = recover fg (fromJust $ fgExprFromKey sh k fg)
 recover _ e@(EDimensionless _) = e
@@ -325,7 +334,7 @@ recover fg (EGrad  x y) = EGrad  (recover fg x) (recover fg y)
 recover fg (EJacob  x y) = EJacob  (recover fg x) (recover fg y)
 recover fg (EScale  x y) = EScale  (recover fg x) (recover fg y)
 
-
+-- | "Pure" gradient which which runs rad and then calls recover to substitute values for ERefs
 runDeriv :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh)
             => Expr sh a -> [Expr sh a] -> [Expr sh a]
 runDeriv expr args = map (recover fg) deda

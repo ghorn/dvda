@@ -27,6 +27,7 @@ module Dvda ( -- * primitives
               -- * symbolic expression type
             , Expr
             , fullShow
+            , fullShowNodes
               -- * construct FunGraphs
             , FunGraph
             , makeFunGraph

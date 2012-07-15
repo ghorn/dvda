@@ -16,7 +16,7 @@ import Control.Monad.State
 import Dvda
 import Dvda.Expr
 import Dvda.CallNative
-import Dvda.Graph ( FunGraph(..), fullShowNodes )
+import Dvda.Graph ( FunGraph(..) )
 
 exampleFunGraph :: State (FunGraph
                           Double (Exprs (DIM0 :* DIM1 :* DIM2) Double)
