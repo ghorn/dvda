@@ -24,6 +24,7 @@ module Dvda.Expr ( Expr(..)
                  , dim
                  , isVal
                  , symDependent
+                 , symDependentN
                  ) where
 
 import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList), rank )
@@ -344,8 +345,12 @@ sym = (ESym Z) . Sym
 -- .
 -- This lets you do d(f(g(t)))/dt == f'(g(t))*g'(t)
 symDependent :: String -> Expr DIM0 a -> Expr DIM0 a
-symDependent name (ESym _ s)  = ESym Z (SymDependent name 0 s)
-symDependent _ _ = error "symDependent got non ESym dependency"
+symDependent name s = symDependentN name s 0
+
+-- | same as symDependent but it can start as the Nth derivative
+symDependentN :: String -> Expr DIM0 a -> Int -> Expr DIM0 a
+symDependentN name (ESym _ s) n = ESym Z (SymDependent name n s)
+symDependentN _ _ _ = error "symDependent got non ESym dependency"
 
 -- | symbolic dense vector
 vsym :: Int -> String -> Expr DIM1 a

@@ -14,6 +14,7 @@
 module Dvda ( -- * primitives
               sym
             , symDependent
+            , symDependentN
             , vsym
             , msym
             , svec
