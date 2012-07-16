@@ -130,6 +130,9 @@ lookupSymSet expr = do
   case fgLookup expr fg of Just (_,symSet) -> return (Just symSet)
                            Nothing -> return Nothing
 
+{-# SPECIALIZE getSensitivities :: HS.HashSet (DynamicExpr Double) 
+                                   -> Expr DIM0 Double -> Expr DIM0 Double 
+                                   -> State (FunGraph Double b c) (HM.HashMap (DynamicExpr Double) (DynamicExpr Double)) #-}
 getSensitivities :: (Eq a, Floating a, Hashable a, DvdaDim sh) =>
                     HS.HashSet (DynamicExpr a) -> Expr sh a -> Expr sh a
                     -> State (FunGraph a b c) (HM.HashMap (DynamicExpr a) (DynamicExpr a))
