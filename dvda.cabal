@@ -87,9 +87,9 @@ Library
 --                     unix
 --                     text,
 
-  Ghc-options:       -Wall
---  Ghc-options:       -O2 -Wall -threaded
-  GHC-Prof-Options: -prof -fprof-auto
+  Ghc-options:       -Wall -O2 -threaded -fllvm -rtsopts
+  GHC-Prof-Options: -prof -fprof-auto -fprof-cafs
+  GHC-Shared-Options: -fPIC
 
 
 flag test
