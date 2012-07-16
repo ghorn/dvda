@@ -28,7 +28,6 @@ import Control.Monad.State ( State, get, put, runState )
 import Data.Array.Repa ( DIM0, DIM1, DIM2, Z(..) )
 import Data.Hashable ( Hashable )
 import Data.Maybe ( fromJust )
-import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element, Vector, Matrix )
@@ -39,6 +38,7 @@ import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
 import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim )
+import qualified Dvda.HashMap as HM
 
 ---- | take all sub expressions of an Expr and turn them into nodes
 ----   return an Expr that is just a ref

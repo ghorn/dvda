@@ -11,11 +11,11 @@ module Dvda.MultipleShooting.Types ( Step(..)
                                    , simpsonsRuleError'
                                    ) where
 
-import Data.HashMap.Lazy ( HashMap )
 import Data.HashSet ( HashSet )
 
 import Dvda ( Z )
 import Dvda.Expr ( Expr(..) )
+import Dvda.HashMap ( HashMap )
 import Dvda.SparseLA
 
 data BCTime = ALWAYS | TIMESTEP Int deriving (Show, Eq)

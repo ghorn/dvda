@@ -33,13 +33,13 @@ import Data.Hashable ( Hashable, hash, combine )
 import Data.Maybe ( fromJust )
 import Data.IntMap ( Key )
 import qualified Data.HashSet as HS
-import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
 import Data.Array.Repa ( Shape, DIM0, DIM1, DIM2 )
 import Control.Monad.State ( State, get, put )
 
 import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim )
+import qualified Dvda.HashMap as HM
 
 --------------------- dynamic Expr stuff ---------------------------
 data DynamicExpr a = DynamicExpr0 (Expr DIM0 a)

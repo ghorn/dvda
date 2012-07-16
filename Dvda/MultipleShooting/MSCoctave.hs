@@ -6,18 +6,18 @@ module Dvda.MultipleShooting.MSCoctave ( msCoctave
                                        , run
                                        ) where
 
-import qualified Data.HashMap.Lazy as HM
 import qualified Data.HashSet as HS
 import Data.List ( zipWith6, transpose, elemIndex )
 import Data.Maybe ( fromJust, catMaybes )
 
 import Dvda
+import Dvda.Codegen ( writeSourceFile )
 import Dvda.Expr ( Expr(..), Const(..), Sym(..) )
-import Dvda.SymMonad ( rad )
+import qualified Dvda.HashMap as HM
 import Dvda.MultipleShooting.MSMonad
 import Dvda.MultipleShooting.Types
 import Dvda.OctaveSyntax ( toOctaveSource )
-import Dvda.Codegen ( writeSourceFile )
+import Dvda.SymMonad ( rad )
 
 {-
     min f(x) st:

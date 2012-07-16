@@ -14,8 +14,6 @@ module Dvda.CallNative ( toNative
                        ) where
 
 import Data.Hashable ( Hashable )
-import Data.HashMap.Lazy ( HashMap )
-import qualified Data.HashMap.Lazy as HM
 import qualified Data.IntMap as IM
 import Data.List ( mapAccumL )
 import Data.Maybe ( fromJust, catMaybes )
@@ -25,6 +23,8 @@ import Dvda
 import Dvda.BinUn ( BinOp(Mul), applyBinary, applyUnary )
 import Dvda.Expr ( Expr(..), Const(..), dim )
 import Dvda.Graph ( FunGraph(..), DvdaDim(..), DynamicExpr, fgLookup, fgExprFromKey )
+import Dvda.HashMap ( HashMap )
+import qualified Dvda.HashMap as HM
 import Dvda.SymMonad ( rad )
 
 class (Hashable (INumT b), Eq (INumT b), Element (INumT b)) => NativeInputs b where
