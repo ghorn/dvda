@@ -60,7 +60,11 @@ msCoctave userStep odeError n funDir name = do
   _ <- writeSourceFile         outputSource funDir $ name ++ "_outputs.m"
   _ <- writeSourceFile           plotSource funDir $ name ++ "_plot.m"
   _ <- writeSourceFile            simSource funDir $ name ++ "_sim.m"
-  return ()
+  putStrLn $ "cost        " ++ showCollisions costFg
+  putStrLn $ "constraints " ++ showCollisions constraintsFg
+  putStrLn $ "time        " ++ showCollisions timeFg
+  putStrLn $ "output      " ++ showCollisions outputFg
+  putStrLn $ "sim         " ++ showCollisions simFg
   where
     steps = map (runOneStep userStep) [0..n-1]
     dts = map (fromJust . stepDt) steps
