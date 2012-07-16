@@ -63,8 +63,8 @@ type SymSet a = HS.HashSet (DynamicExpr a)
 type FgNode a = (Key, SymSet a)
 
 data FunGraph a b c = FunGraph
-                      (HM.HashMap (DynamicExpr a) (FgNode a)) -- main lookup
-                      (IM.IntMap (DynamicExpr a)) -- internal for reverse lookup
+                      !(HM.HashMap (DynamicExpr a) (FgNode a)) -- main lookup
+                      !(IM.IntMap (DynamicExpr a)) -- internal for reverse lookup
                       b
                       c --  deriving Show
                                          
