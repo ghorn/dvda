@@ -61,10 +61,10 @@ deriving instance Typeable2 Const
 deriving instance Typeable2 Expr
 
 data Const sh a where
-  CSingleton :: sh -> a -> Const sh a
-  CVec :: DIM1 -> Vector a -> Const DIM1 a
-  CMat :: DIM2 -> Matrix a -> Const DIM2 a
-  CTensor :: sh -> Vector a -> Const sh a
+  CSingleton :: !sh -> !a -> Const sh a
+  CVec :: !DIM1 -> !(Vector a) -> Const DIM1 a
+  CMat :: !DIM2 -> !(Matrix a) -> Const DIM2 a
+  CTensor :: !sh -> !(Vector a) -> Const sh a
 
 data Sym = Sym String                  -- doesn't depend on independent variable, or is an independent variable
          | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
@@ -77,17 +77,17 @@ instance Show Sym where
 data RefHash = RefHash Int deriving (Eq, Show)
 
 data Expr sh a where
-  ESym :: sh -> Sym -> Expr sh a
-  EConst :: Const sh a -> Expr sh a
-  EDimensionless :: a -> Expr sh a
-  EUnary :: UnOp -> Expr sh a -> Expr sh a
-  EBinary :: BinOp -> Expr sh a -> Expr sh a -> Expr sh a
-  EScale :: Expr DIM0 a -> Expr sh a -> Expr sh a
-  ERef :: sh -> RefHash -> Key -> Expr sh a
+  ESym :: !sh -> !String -> Expr sh a
+  EConst :: !(Const sh a) -> Expr sh a
+  EDimensionless :: !a -> Expr sh a
+  EUnary :: !UnOp -> !(Expr sh a) -> Expr sh a
+  EBinary :: !BinOp -> !(Expr sh a) -> Expr sh a -> Expr sh a
+  EScale :: !(Expr DIM0 a) -> !(Expr sh a) -> Expr sh a
+  ERef :: !sh -> !RefHash -> !Key -> Expr sh a
 
-  EDeriv :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
-  EGrad  :: Expr DIM0 a -> Expr sh a -> Expr sh a
-  EJacob :: Expr DIM1 a -> Expr DIM1 a -> Expr DIM2 a
+  EDeriv :: !(Expr DIM0 a) -> !(Expr DIM0 a) -> Expr DIM0 a
+  EGrad  :: !(Expr DIM0 a) -> !(Expr sh a) -> Expr sh a
+  EJacob :: !(Expr DIM1 a) -> !(Expr DIM1 a) -> Expr DIM2 a
 
 --------------------------------- show instances -----------------------------
 instance (Shape sh, Show a) => Show (Const sh a) where
