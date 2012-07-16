@@ -77,7 +77,7 @@ instance Show Sym where
 data RefHash = RefHash Int deriving (Eq, Show)
 
 data Expr sh a where
-  ESym :: !sh -> !String -> Expr sh a
+  ESym :: !sh -> !Sym -> Expr sh a
   EConst :: !(Const sh a) -> Expr sh a
   EDimensionless :: !a -> Expr sh a
   EUnary :: !UnOp -> !(Expr sh a) -> Expr sh a

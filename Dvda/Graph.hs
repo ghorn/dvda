@@ -123,7 +123,7 @@ insert expr = do
   let dexpr = makeDynamic expr
   fg@(FunGraph hm im ins outs) <- get
   case fgLookup expr fg of
-    Just (k',_) -> return (ERef (dim expr) k')
+    Just (k',_) -> return (ERef (dim expr) (RefHash (hash expr)) k')
     Nothing -> do let k = if IM.null im then 0 else 1 + fst (IM.findMax im) -- k = HM.size hm
                       hm' = HM.insert dexpr (k, symSet fg expr) hm
                       im' = IM.insert k dexpr im
