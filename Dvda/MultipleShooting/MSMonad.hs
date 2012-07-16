@@ -79,7 +79,7 @@ addParam name = do
 
 addConstant :: (Eq (Expr Z a), Hashable (Expr Z a)) => String -> State (Step a) (Expr Z a)
 addConstant name = do
-  [blah] <- addParams [name]
+  [blah] <- addConstants [name]
   return blah
 
 addParams :: (Eq (Expr Z a), Hashable (Expr Z a)) => [String] -> State (Step a) [Expr Z a]
