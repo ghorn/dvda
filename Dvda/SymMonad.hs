@@ -46,7 +46,7 @@ node :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, Dv
          Expr sh a -> State (FunGraph a b c) (Expr sh a)
 node (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
 node (EJacob _ _) = error "can't do node EJacob yet"
-node e@(ERef _ _) = return e
+node e@(ERef _ _ _) = return e
 node e@(EConst _) = return e
 node e@(ESym _ (SymDependent _ _ dep)) = do
   _ <- node (ESym Z dep)
@@ -83,7 +83,7 @@ rad expr' args' = do
   args'' <- mapM node args'
   fg <- get
 
-  let args = map (\(ERef sh k) -> fromJust $ fgExprFromKey sh k fg) args''
+  let args = map (\(ERef sh _ k) -> fromJust $ fgExprFromKey sh k fg) args''
       argSet = HS.fromList (map makeDynamic args)
 
   sensitivities <- getSensitivities argSet expr (EConst (CSingleton (dim expr) 1))
@@ -141,7 +141,7 @@ getSensitivities _ (EDeriv _ _) _ = error "don't call getSensitivities on EDeriv
 getSensitivities _ (EScale _ _) _ = error "cant' do getSensitivities on EScale yet (needs EinSum?)"
 getSensitivities _ (EDimensionless _) _ = return HM.empty
 getSensitivities _ (EConst _) _         = return HM.empty
-getSensitivities args (ERef sh k) sens  = do
+getSensitivities args (ERef sh _ k) sens  = do
   fg <- get
   let expr = fromJust $ fgExprFromKey sh k fg
   getSensitivities args expr sens
@@ -323,7 +323,7 @@ fullShowNodes fg@(FunGraph _ im _ _) =
 --   .
 --   Each time an ERef is found, look it up in the FunGraph and continue traversal
 recover :: DvdaDim sh => FunGraph a b c -> Expr sh a -> Expr sh a
-recover fg (ERef sh k) = recover fg (fromJust $ fgExprFromKey sh k fg)
+recover fg (ERef sh _ k) = recover fg (fromJust $ fgExprFromKey sh k fg)
 recover _ e@(EDimensionless _) = e
 recover _ e@(ESym _ _) = e
 recover _ e@(EConst _) = e

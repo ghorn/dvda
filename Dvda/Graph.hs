@@ -38,7 +38,7 @@ import Numeric.LinearAlgebra ( Element )
 import Data.Array.Repa ( Shape, DIM0, DIM1, DIM2 )
 import Control.Monad.State ( State, get, put )
 
-import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim )
+import Dvda.Expr ( Expr(..), Const(..), Sym(..), RefHash(..), dim )
 import qualified Dvda.HashMap as HM
 
 --------------------- dynamic Expr stuff ---------------------------
@@ -88,7 +88,7 @@ instance DvdaDim DIM2 where
   fromDynamic _ _ = error "DIM2: fromDynamic error"
 
 fgLookup :: (Eq a, Hashable a, Element a, DvdaDim sh) => Expr sh a -> FunGraph a b c -> Maybe (FgNode a)
-fgLookup (ERef sh k) fg = fgReverseLookup sh k fg
+fgLookup (ERef sh _ k) fg = fgReverseLookup sh k fg
 fgLookup expr (FunGraph hm _ _ _) = HM.lookup (makeDynamic expr) hm
 
 fgReverseLookup :: (Eq a, Hashable a, Element a, DvdaDim sh) => sh -> Key -> FunGraph a b c -> Maybe (FgNode a)
@@ -104,7 +104,7 @@ symSet :: (Eq a, Hashable a, Element a, DvdaDim sh) =>
           FunGraph a b c -> Expr sh a -> HS.HashSet (DynamicExpr a)
 symSet fg e@(ESym sh (SymDependent _ _ dep)) = HS.union (HS.singleton (makeDynamic e)) (symSet fg (ESym sh dep))
 symSet _ e@(ESym _ _)          = HS.singleton (makeDynamic e)
-symSet fg (ERef sh k)          = snd $ fromJust $ fgReverseLookup sh k fg
+symSet fg (ERef sh _ k)        = snd $ fromJust $ fgReverseLookup sh k fg
 symSet _ (EDimensionless _)    = HS.empty
 symSet _ (EConst _)            = HS.empty
 symSet fg (EUnary _ x)         = symSet fg x
@@ -118,18 +118,18 @@ symSet _ (EJacob _ _) = error "don't take symSet of EJacob"
 --   If the Expr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
 insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> State (FunGraph a b c) (Expr sh a)
-insert (ERef _ _) = error "don't insert ERef into graph, ya goon"
+insert (ERef _ _ _) = error "don't insert ERef into graph, ya goon"
 insert (EConst _) = error "don't insert EConst into graph, ya goon"
 insert expr = do
   let dexpr = makeDynamic expr
   fg@(FunGraph hm im ins outs) <- get
   case fgLookup expr fg of
-    Just (k',_) -> return (ERef (dim expr) k')
+    Just (k',_) -> return (ERef (dim expr) (RefHash (hash expr)) k')
     Nothing -> do let k = HM.size hm
                       hm' = HM.insert dexpr (k, symSet fg expr) hm
                       im' = IM.insert k dexpr im
                   put (FunGraph hm' im' ins outs)
-                  return (ERef (dim expr) k)
+                  return (ERef (dim expr) (RefHash (hash expr)) k)
 
 
 funGraphSummary :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String
@@ -190,7 +190,7 @@ toFGLGraph (FunGraph hm _ _ _) = mkGraph lnodes ledges
         gc :: Expr sh a -> [Key]
         gc (EBinary _ x y) = gc x ++ gc y
         gc (EUnary _ x) = gc x
-        gc (ERef _ k) = [k]
+        gc (ERef _ _ k) = [k]
         gc (ESym _ _) = []
         gc (EDimensionless _) = []
         gc (EScale x y) = gc x ++ gc y

@@ -7,6 +7,7 @@
 module Dvda.Expr ( Expr(..)
                  , Const(..)
                  , Sym(..)
+                 , RefHash(..)
                  , sym
                  , svec
                  , smat
@@ -51,7 +52,7 @@ dim (EDimensionless _) = error "EDimensionless doesn't have a dimension, ya goon
 dim (EUnary _ x) = dim x
 dim (EBinary _ x1 _) = dim x1
 dim (EScale _ y) = dim y
-dim (ERef sh _) = sh
+dim (ERef sh _ _) = sh
 dim (EDeriv _ _) = Z
 dim (EGrad _ args) = dim args
 dim (EJacob x args) = Z :. head (listOfShape (dim x)) :. head (listOfShape (dim args))
@@ -73,6 +74,8 @@ instance Show Sym where
   show (Sym name) = name
   show (SymDependent name k s) = name ++ replicate k '\'' ++ "(" ++ show s ++ ")"
 
+data RefHash = RefHash Int deriving (Eq, Show)
+
 data Expr sh a where
   ESym :: sh -> Sym -> Expr sh a
   EConst :: Const sh a -> Expr sh a
@@ -80,7 +83,7 @@ data Expr sh a where
   EUnary :: UnOp -> Expr sh a -> Expr sh a
   EBinary :: BinOp -> Expr sh a -> Expr sh a -> Expr sh a
   EScale :: Expr DIM0 a -> Expr sh a -> Expr sh a
-  ERef :: sh -> Key -> Expr sh a
+  ERef :: sh -> RefHash -> Key -> Expr sh a
 
   EDeriv :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
   EGrad  :: Expr DIM0 a -> Expr sh a -> Expr sh a
@@ -97,7 +100,7 @@ paren :: String -> String
 paren x = "("++ x ++")"
 
 instance (Shape sh, Show a, Element a) => Show (Expr sh a) where
-  show (ERef sh k)
+  show (ERef sh _ k)
     | rank sh == 0 = "{ref:" ++ show k ++ "}"
     | otherwise    = "{ref:" ++ show k ++ ",(" ++ showShapeR sh ++ ")}"
   show (EDimensionless x) = show x
@@ -144,7 +147,7 @@ instance (Shape sh, Eq a, Element a) => Eq (Expr sh a) where
   (==) (EDimensionless x0) (EDimensionless x1) = x0 == x1
   (==) (EUnary op0 x0) (EUnary op1 x1) = op0 == op1 && x0 == x1
   (==) (EScale x0 y0) (EScale x1 y1) = x0 == x1 && y0 == y1
-  (==) (ERef sh0 k0) (ERef sh1 k1) = sh0 == sh1 && k0 == k1
+  (==) (ERef sh0 h0 k0) (ERef sh1 h1 k1) = sh0 == sh1 && h0 == h1 && k0 == k1
   (==) (EDeriv x0 y0) (EDeriv x1 y1) = x0 == x1 && y0 == y1
   (==) (EGrad x0 y0) (EGrad x1 y1) = x0 == x1 && y0 == y1
   (==) (EJacob x0 y0) (EJacob x1 y1) = x0 == x1 && y0 == y1
@@ -177,7 +180,7 @@ instance (Hashable a, Shape sh, Element a) => Hashable (Expr sh a) where
         where
           unsorted = [hash x, hash y]
   hash (EScale x y)       = 33 `combine` hash x `combine` hash y
-  hash (ERef sh k)        = 34 `combine` hash (listOfShape sh) `combine` k
+  hash (ERef _ (RefHash h) _) = h
 
   hash (EDeriv x y)       = 35 `combine` hash x `combine` hash y
   hash (EGrad x y)        = 36 `combine` hash x `combine` hash y

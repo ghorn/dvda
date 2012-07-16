@@ -32,7 +32,7 @@ class (Hashable (INumT b), Eq (INumT b), Element (INumT b)) => NativeInputs b wh
   toReplacements :: FunGraph (INumT b) b c -> b -> HashMap (DynamicExpr (INumT b)) (DynamicExpr (INumT b))
 
 insToSyms :: DvdaDim sh => FunGraph a b c -> Expr sh a -> Expr sh a -> Maybe (DynamicExpr a, DynamicExpr a)
-insToSyms fg e@(ERef _ k) out = fmap (\x -> (makeDynamic x, makeDynamic out)) $ fgExprFromKey (dim e) k fg
+insToSyms fg e@(ERef _ _ k) out = fmap (\x -> (makeDynamic x, makeDynamic out)) $ fgExprFromKey (dim e) k fg
 insToSyms _ _ _ = Nothing
 
 instance (DvdaDim sh, Hashable a, Element a, Eq a) => NativeInputs (Expr sh a) where
@@ -102,7 +102,7 @@ eval _ _ (EDimensionless _) = error "WHO PUT AN EDimensionless IN THIS GRAPH"
 eval _ _ (EDeriv _ _) = error "WHO PUT AN EDeriv IN THIS GRAPH"
 eval _ _ (EGrad _ _) = error "WHO PUT AN EDeriv IN THIS GRAPH"
 eval _ _ (EJacob _ _) = error "WHO PUT AN EJacob IN THIS GRAPH"
-eval replacementMap fg expr@(ERef _ k) = eval replacementMap fg (fromJust $ fgExprFromKey (dim expr) k fg)
+eval replacementMap fg expr@(ERef _ _ k) = eval replacementMap fg (fromJust $ fgExprFromKey (dim expr) k fg)
 eval _ fg expr@(EConst _) = (fg, expr)
 eval replacementMap fg0 expr@(ESym _ _) = case HM.lookup (makeDynamic expr) replacementMap of
  Nothing -> (fg0, expr)
