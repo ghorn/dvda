@@ -29,7 +29,7 @@ class GenOctave a where
 instance GenOctave (Expr DIM0 Double) where
   numObjects _ = 1
   writeOutputs e outputK = printf "%% output %d\noutput%d = %s; %% Expr DIM0 Double\n" outputK outputK (writeExpr e)
-  writeInputs e@(ERef _ k) inputK = (printf "%% input %d\n%s\n" inputK decl, IM.singleton k decl)
+  writeInputs e@(ERef _ _ k) inputK = (printf "%% input %d\n%s\n" inputK decl, IM.singleton k decl)
     where
       decl = printf "%s = x%d;" (writeExpr e) inputK
   writeInputs e inputK = error $ "input " ++ show inputK ++ " is non-symbolic: " ++ show e
@@ -51,7 +51,7 @@ instance GenOctave [Expr DIM0 Double] where
   writeInputs exprs inputK = ((printf "%% input %d\n" inputK) ++ unlines (map snd keyDecls), IM.fromList keyDecls)
     where
       keyDecls = zipWith f [(1::Int)..] exprs
-      f outIdx e@(ERef _ k) = (k, printf "%s = x%d(%d);" (writeExpr e) inputK outIdx)
+      f outIdx e@(ERef _ _ k) = (k, printf "%s = x%d(%d);" (writeExpr e) inputK outIdx)
       f outIdx e = error $ "input " ++ show inputK ++ ", " ++ show outIdx ++" is non-symbolic: " ++ show e
 
 instance GenOctave [[Expr DIM0 Double]] where
@@ -70,7 +70,7 @@ instance GenOctave [[Expr DIM0 Double]] where
   writeInputs exprs inputK = ((printf "% input %d\n" inputK) ++ unlines (map snd keyDecls), IM.fromList keyDecls)
     where
       keyDecls = zipWith f [(r,c) | r <- [1..length exprs], c <- [1..(length (head exprs))]] (concat exprs)
-      f (rowIdx,colIdx) e@(ERef _ k) = (k, printf "%s = x%d(%d,%d);" (writeExpr e) inputK rowIdx colIdx)
+      f (rowIdx,colIdx) e@(ERef _ _ k) = (k, printf "%s = x%d(%d,%d);" (writeExpr e) inputK rowIdx colIdx)
       f outIdx e = error $ "input " ++ show inputK ++ ", " ++ show outIdx ++" is non-symbolic: " ++ show e
 
 instance (GenOctave a, GenOctave b) => GenOctave (a :* b) where
@@ -115,7 +115,7 @@ octaveUnary ATanh  = "atanh"
 octaveUnary ACosh  = "acosh"
 
 writeExpr :: (Show a, Element a) => Expr sh a -> String
-writeExpr (ERef _ k) = Config.nameHSVar k
+writeExpr (ERef _ _ k) = Config.nameHSVar k
 writeExpr (EBinary op x y) = writeExpr x ++ " " ++ octaveBinary op ++ " " ++ writeExpr y
 writeExpr (EUnary op x) = octaveUnary op ++ "( " ++ writeExpr x ++ " )"
 writeExpr (EScale x y) = "LA.scale " ++ writeExpr x ++ " " ++ writeExpr y

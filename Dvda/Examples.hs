@@ -7,6 +7,7 @@ module Dvda.Examples ( run
                      , bigGraph
                      , smallGraph
                      , runCallNative
+                     , composed
                      ) where
 
 import Data.Array.Repa.Index
@@ -15,7 +16,7 @@ import Control.Monad.State
 import Dvda
 import Dvda.Expr
 import Dvda.CallNative
-import Dvda.Graph ( FunGraph(..), fullShowNodes )
+import Dvda.Graph ( FunGraph(..) )
 
 exampleFunGraph :: State (FunGraph
                           Double (Exprs (DIM0 :* DIM1 :* DIM2) Double)
@@ -140,3 +141,11 @@ showoff = do
   putStrLn "--------------------------------------------------------------"
 --  putStrLn $ funGraphSummary' bigGraph
   previewGraph bigGraph
+
+composed :: [Expr Z Double]
+composed = runDeriv z [t]
+  where
+    t = sym "t"
+    x = symDependent "x" t
+    y = symDependent "y" x
+    z = symDependent "z" y

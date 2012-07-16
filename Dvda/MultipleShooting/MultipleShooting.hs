@@ -28,7 +28,7 @@ import Data.Array.Repa ( Z(..) )
 import Debug.Trace ( trace )
 
 import Dvda ( svec )
-import Dvda.Expr ( Expr(..) )
+import Dvda.Expr ( Expr(..), Sym(..) )
 import Dvda.SparseLA ( SparseVec, svCats, svZeros, svSize, sparseListFromSv, svFromList )
 import Dvda.MultipleShooting.Types
 
@@ -66,7 +66,7 @@ instance Show a => Show (Bound a) where
       name = safeGetSymNameFromExpr (boundVar bound)
 
 safeGetSymNameFromExpr :: Expr sh a -> String
-safeGetSymNameFromExpr (ESym _ name) = name
+safeGetSymNameFromExpr (ESym _ (Sym name)) = name
 safeGetSymNameFromExpr _ = trace "Warning - Bound has non-symbolic value" "{NOT A DESIGN VARIABLE}"
 
 numDvs :: MultipleShooting a -> Int

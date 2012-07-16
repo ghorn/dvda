@@ -17,24 +17,28 @@ module Dvda.SymMonad ( (:*)(..)
                      , runFunGraph
                      , rad
                      , getSensitivities
+                     , recover
                      , fullShow
+                     , fullShowNodes
+                     , runDeriv
                      ) where
 
 import Control.Monad ( foldM, liftM )
 import Control.Monad.State ( State, get, put, runState )
-import Data.Array.Repa ( DIM0, DIM1, DIM2 )
+import Data.Array.Repa ( DIM0, DIM1, DIM2, Z(..) )
 import Data.Hashable ( Hashable )
 import Data.Maybe ( fromJust )
-import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
+import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element, Vector, Matrix )
 import qualified Numeric.LinearAlgebra as LA
---import Debug.Trace ( trace )
+-- import Debug.Trace
 
 import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
 import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
-import Dvda.Expr ( Expr(..), Const(..), dim, fullShow' )
+import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim )
+import qualified Dvda.HashMap as HM
 
 ---- | take all sub expressions of an Expr and turn them into nodes
 ----   return an Expr that is just a ref
@@ -42,8 +46,11 @@ node :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, Dv
          Expr sh a -> State (FunGraph a b c) (Expr sh a)
 node (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
 node (EJacob _ _) = error "can't do node EJacob yet"
-node e@(ERef _ _) = return e
+node e@(ERef _ _ _) = return e
 node e@(EConst _) = return e
+node e@(ESym _ (SymDependent _ _ dep)) = do
+  _ <- node (ESym Z dep)
+  insert e
 node e@(ESym _ _) = insert e
 node (EUnary op x') = do
   x <- node x'
@@ -76,7 +83,7 @@ rad expr' args' = do
   args'' <- mapM node args'
   fg <- get
 
-  let args = map (\(ERef sh k) -> fromJust $ fgExprFromKey sh k fg) args''
+  let args = map (\(ERef sh _ k) -> fromJust $ fgExprFromKey sh k fg) args''
       argSet = HS.fromList (map makeDynamic args)
 
   sensitivities <- getSensitivities argSet expr (EConst (CSingleton (dim expr) 1))
@@ -125,7 +132,6 @@ lookupSymSet expr = do
   case fgLookup expr fg of Just (_,symSet) -> return (Just symSet)
                            Nothing -> return Nothing
 
-
 getSensitivities :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh) =>
                     HS.HashSet (DynamicExpr a) -> Expr sh a -> Expr sh a
                     -> State (FunGraph a b c) (HM.HashMap (DynamicExpr a) (DynamicExpr a))
@@ -135,10 +141,31 @@ getSensitivities _ (EDeriv _ _) _ = error "don't call getSensitivities on EDeriv
 getSensitivities _ (EScale _ _) _ = error "cant' do getSensitivities on EScale yet (needs EinSum?)"
 getSensitivities _ (EDimensionless _) _ = return HM.empty
 getSensitivities _ (EConst _) _         = return HM.empty
-getSensitivities args (ERef sh k) sens  = do
+getSensitivities args (ERef sh _ k) sens  = do
   fg <- get
   let expr = fromJust $ fgExprFromKey sh k fg
   getSensitivities args expr sens
+getSensitivities args primal@(ESym sh (SymDependent name k dep')) sens = do
+  let dprimal = makeDynamic primal
+      primalMap =
+        if HS.member dprimal args
+        then HM.fromList [(dprimal, makeDynamic sens)]
+        -- don't backprop if there aren't any interesting symbols farther in the tree
+        else HM.empty
+
+      dep = ESym sh dep'
+
+  depSymSet <- liftM fromJust $ lookupSymSet dep
+
+  let commonSyms = HS.intersection args depSymSet
+
+  dependentMap <- case HS.size commonSyms of
+    0 -> return HM.empty
+    _ -> getSensitivities commonSyms dep (sens*primal')
+      where
+        primal' = ESym sh (SymDependent name (k+1) dep')
+
+  return $ HM.union primalMap dependentMap
 getSensitivities args primal@(ESym _ _) sens = do
   let dprimal = makeDynamic primal
   if HS.member dprimal args
@@ -284,6 +311,32 @@ makeFunGraph ins outs = runFunGraph $ do
   inputs_ ins
   outputs_ outs
 
-
+-- | Show an Expr, looking up all ERefs
 fullShow :: (Show a, Element a, DvdaDim sh) => FunGraph a b c -> Expr sh a -> String
-fullShow fg expr = fullShow' (Just (\sh k -> fromJust $ fgExprFromKey sh k fg)) expr
+fullShow fg = show . (recover fg)
+
+fullShowNodes :: (Show a, Element a) => FunGraph a b c -> String
+fullShowNodes fg@(FunGraph _ im _ _) =
+  init $ unlines $ map (\(a,b) -> show a ++ ": " ++ (fullShow fg) (fromDynamic Z b)) (IM.toList im)
+
+-- | Take a FunGraph and an expression and traverse the expression.
+--   .
+--   Each time an ERef is found, look it up in the FunGraph and continue traversal
+recover :: DvdaDim sh => FunGraph a b c -> Expr sh a -> Expr sh a
+recover fg (ERef sh _ k) = recover fg (fromJust $ fgExprFromKey sh k fg)
+recover _ e@(EDimensionless _) = e
+recover _ e@(ESym _ _) = e
+recover _ e@(EConst _) = e
+recover fg (EUnary op x) = EUnary op (recover fg x)
+recover fg (EBinary op x y) = EBinary op (recover fg x) (recover fg y)
+recover fg (EDeriv x y) = EDeriv (recover fg x) (recover fg y)
+recover fg (EGrad  x y) = EGrad  (recover fg x) (recover fg y)
+recover fg (EJacob  x y) = EJacob  (recover fg x) (recover fg y)
+recover fg (EScale  x y) = EScale  (recover fg x) (recover fg y)
+
+-- | "Pure" gradient which which runs rad and then calls recover to substitute values for ERefs
+runDeriv :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh)
+            => Expr sh a -> [Expr sh a] -> [Expr sh a]
+runDeriv expr args = map (recover fg) deda
+  where
+    (deda, fg) = runState (rad expr args) emptyFunGraph

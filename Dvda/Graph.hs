@@ -21,7 +21,6 @@ module Dvda.Graph ( FunGraph(..)
                   , funGraphSummary
                   , funGraphSummary'
                   , showNodes
-                  , fullShowNodes
                   , asIfExpr
                   ) where
 
@@ -34,13 +33,13 @@ import Data.Hashable ( Hashable, hash, combine )
 import Data.Maybe ( fromJust )
 import Data.IntMap ( Key )
 import qualified Data.HashSet as HS
-import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
-import Data.Array.Repa ( Shape(rank,listOfShape), DIM0, DIM1, DIM2, Z(..) )
+import Data.Array.Repa ( Shape, DIM0, DIM1, DIM2 )
 import Control.Monad.State ( State, get, put )
 
-import Dvda.Expr ( Expr(..), Const(..), dim, fullShow' )
+import Dvda.Expr ( Expr(..), Const(..), Sym(..), RefHash(..), dim )
+import qualified Dvda.HashMap as HM
 
 --------------------- dynamic Expr stuff ---------------------------
 data DynamicExpr a = DynamicExpr0 (Expr DIM0 a)
@@ -89,7 +88,7 @@ instance DvdaDim DIM2 where
   fromDynamic _ _ = error "DIM2: fromDynamic error"
 
 fgLookup :: (Eq a, Hashable a, Element a, DvdaDim sh) => Expr sh a -> FunGraph a b c -> Maybe (FgNode a)
-fgLookup (ERef sh k) fg = fgReverseLookup sh k fg
+fgLookup (ERef sh _ k) fg = fgReverseLookup sh k fg
 fgLookup expr (FunGraph hm _ _ _) = HM.lookup (makeDynamic expr) hm
 
 fgReverseLookup :: (Eq a, Hashable a, Element a, DvdaDim sh) => sh -> Key -> FunGraph a b c -> Maybe (FgNode a)
@@ -103,8 +102,9 @@ fgExprFromKey sh k (FunGraph _ im _ _) = fmap (fromDynamic sh) (IM.lookup k im)
                
 symSet :: (Eq a, Hashable a, Element a, DvdaDim sh) =>
           FunGraph a b c -> Expr sh a -> HS.HashSet (DynamicExpr a)
+symSet fg e@(ESym sh (SymDependent _ _ dep)) = HS.union (HS.singleton (makeDynamic e)) (symSet fg (ESym sh dep))
 symSet _ e@(ESym _ _)          = HS.singleton (makeDynamic e)
-symSet fg (ERef sh k)          = snd $ fromJust $ fgReverseLookup sh k fg
+symSet fg (ERef sh _ k)        = snd $ fromJust $ fgReverseLookup sh k fg
 symSet _ (EDimensionless _)    = HS.empty
 symSet _ (EConst _)            = HS.empty
 symSet fg (EUnary _ x)         = symSet fg x
@@ -118,18 +118,18 @@ symSet _ (EJacob _ _) = error "don't take symSet of EJacob"
 --   If the Expr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
 insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> State (FunGraph a b c) (Expr sh a)
-insert (ERef _ _) = error "don't insert ERef into graph, ya goon"
+insert (ERef _ _ _) = error "don't insert ERef into graph, ya goon"
 insert (EConst _) = error "don't insert EConst into graph, ya goon"
 insert expr = do
   let dexpr = makeDynamic expr
   fg@(FunGraph hm im ins outs) <- get
   case fgLookup expr fg of
-    Just (k',_) -> return (ERef (dim expr) k')
-    Nothing -> do let k = if IM.null im then 0 else 1 + fst (IM.findMax im) -- k = HM.size hm
+    Just (k',_) -> return (ERef (dim expr) (RefHash (hash expr)) k')
+    Nothing -> do let k = if IM.null im then 0 else 1 + fst (IM.findMax im)
                       hm' = HM.insert dexpr (k, symSet fg expr) hm
                       im' = IM.insert k dexpr im
                   put (FunGraph hm' im' ins outs)
-                  return (ERef (dim expr) k)
+                  return (ERef (dim expr) (RefHash (hash expr)) k)
 
 
 funGraphSummary :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String
@@ -138,11 +138,6 @@ funGraphSummary (FunGraph hm _ b c) =
                  , "outputs: " ++ show c
                  , "number of nodes: " ++ show (HM.size hm)
                  ]
-
-fullShowNodes :: (Show a, Element a) => FunGraph a b c -> String
-fullShowNodes fg@(FunGraph _ im _ _) = init $ unlines $ map (\(a,b) -> show a ++ ": " ++ fs (fromDynamic Z b)) (IM.toList im)
-  where
-    fs expr = fullShow' (Just (\sh k -> fromJust $ fgExprFromKey sh k fg)) expr
 
 showNodes :: (Show a, Element a) => FunGraph a b c -> String
 showNodes (FunGraph _ im _ _) = init $ unlines (map show (IM.toList im))
@@ -180,7 +175,7 @@ emptyFunGraph = FunGraph HM.empty IM.empty inerr outerr
     outerr = error "must specify outputs"
 
 
-previewGraph :: Show a => FunGraph a b c -> IO ()
+previewGraph :: (Show a, Element a) => FunGraph a b c -> IO ()
 previewGraph fungraph = do
   preview $ toFGLGraph fungraph
   threadDelay 10000
@@ -195,7 +190,7 @@ toFGLGraph (FunGraph hm _ _ _) = mkGraph lnodes ledges
         gc :: Expr sh a -> [Key]
         gc (EBinary _ x y) = gc x ++ gc y
         gc (EUnary _ x) = gc x
-        gc (ERef _ k) = [k]
+        gc (ERef _ _ k) = [k]
         gc (ESym _ _) = []
         gc (EDimensionless _) = []
         gc (EScale x y) = gc x ++ gc y
@@ -205,20 +200,18 @@ toFGLGraph (FunGraph hm _ _ _) = mkGraph lnodes ledges
         gc (EGrad _ _)  = error "don't call getChildren on EGrad"
 
 
-instance Show a => Labellable (DynamicExpr a) where
+instance (Show a, Element a) => Labellable (DynamicExpr a) where
   toLabelValue (DynamicExpr0 e) = tlv e
   toLabelValue (DynamicExpr1 e) = tlv e
   toLabelValue (DynamicExpr2 e) = tlv e
   
-tlv :: (Show a, Shape sh) => Expr sh a -> Data.GraphViz.Attributes.Complete.Label
-tlv (EBinary op _ _) = toLabelValue $ show op
-tlv (EUnary op _)    = toLabelValue $ show op
-tlv (ESym sh name) 
-  | rank sh == 0 = toLabelValue name
-  | otherwise    = toLabelValue $ name ++ "{" ++ (tail . init . show . reverse) (listOfShape sh) ++ "}"
-tlv (EScale {})        = toLabelValue "scale"
+tlv :: (Show a, Shape sh, Element a) => Expr sh a -> Data.GraphViz.Attributes.Complete.Label
+tlv (EBinary op _ _)          = toLabelValue $ show op
+tlv (EUnary op _)             = toLabelValue $ show op
+tlv s@(ESym _ _)              = toLabelValue (show s)
+tlv (EScale {})               = toLabelValue "scale"
 tlv (EConst (CSingleton _ c)) = toLabelValue $ show c
-tlv (EConst (CVec _ _)) = toLabelValue "vec"
-tlv (EConst (CMat _ _)) = toLabelValue "mat"
-tlv (EConst (CTensor _ _)) = toLabelValue "tensor"
+tlv (EConst (CVec _ _))       = toLabelValue "vec"
+tlv (EConst (CMat _ _))       = toLabelValue "mat"
+tlv (EConst (CTensor _ _))    = toLabelValue "tensor"
 tlv _ = error "don't try to preview one of those, ya goon"

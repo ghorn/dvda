@@ -6,19 +6,18 @@ module Dvda.MultipleShooting.MSCoctave ( msCoctave
                                        , run
                                        ) where
 
-import Data.Array.Repa ( Z(..) )
-import qualified Data.HashMap.Lazy as HM
 import qualified Data.HashSet as HS
 import Data.List ( zipWith6, transpose, elemIndex )
 import Data.Maybe ( fromJust, catMaybes )
 
 import Dvda
-import Dvda.Expr ( Expr(..), Const(..) )
-import Dvda.SymMonad ( rad )
+import Dvda.Codegen ( writeSourceFile )
+import Dvda.Expr ( Expr(..), Const(..), Sym(..) )
+import qualified Dvda.HashMap as HM
 import Dvda.MultipleShooting.MSMonad
 import Dvda.MultipleShooting.Types
 import Dvda.OctaveSyntax ( toOctaveSource )
-import Dvda.Codegen ( writeSourceFile )
+import Dvda.SymMonad ( rad )
 
 {-
     min f(x) st:
@@ -204,7 +203,7 @@ msCoctave userStep odeError n funDir name = do
       , concat $ zipWith fromXUS (head actionNames) (transpose actions)
       ]
       where
-        fromParam e@(ESym _ nm) =
+        fromParam e@(ESym _ (Sym nm)) =
           "dvs(" ++ show (1 + (fromJust $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ nm ++ ";\n"
         fromParam _ = error "param not ESym"
 
@@ -220,7 +219,7 @@ msCoctave userStep odeError n funDir name = do
       , concatMap fromConst constants
       ]
       where
-        fromConst e@(ESym _ nm) =
+        fromConst e@(ESym _ (Sym nm)) =
           "constants(" ++ show (1 + (fromJust $ e `elemIndex` constants)) ++ ") = constStruct." ++ nm ++ ";\n"
         fromConst _ = error "const not ESym"
 

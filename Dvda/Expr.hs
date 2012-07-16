@@ -6,6 +6,8 @@
 
 module Dvda.Expr ( Expr(..)
                  , Const(..)
+                 , Sym(..)
+                 , RefHash(..)
                  , sym
                  , svec
                  , smat
@@ -21,7 +23,8 @@ module Dvda.Expr ( Expr(..)
                  , hess
                  , dim
                  , isVal
-                 , fullShow'
+                 , symDependent
+                 , symDependentN
                  ) where
 
 import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList), rank )
@@ -50,7 +53,7 @@ dim (EDimensionless _) = error "EDimensionless doesn't have a dimension, ya goon
 dim (EUnary _ x) = dim x
 dim (EBinary _ x1 _) = dim x1
 dim (EScale _ y) = dim y
-dim (ERef sh _) = sh
+dim (ERef sh _ _) = sh
 dim (EDeriv _ _) = Z
 dim (EGrad _ args) = dim args
 dim (EJacob x args) = Z :. head (listOfShape (dim x)) :. head (listOfShape (dim args))
@@ -63,6 +66,16 @@ data Const sh a where
   CVec :: !DIM1 -> !(Vector a) -> Const DIM1 a
   CMat :: !DIM2 -> !(Matrix a) -> Const DIM2 a
   CTensor :: !sh -> !(Vector a) -> Const sh a
+
+data Sym = Sym String                  -- doesn't depend on independent variable, or is an independent variable
+         | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
+           deriving Eq
+
+instance Show Sym where
+  show (Sym name) = name
+  show (SymDependent name k s) = name ++ replicate k '\'' ++ "(" ++ show s ++ ")"
+
+data RefHash = RefHash Int deriving (Eq, Show)
 
 data Expr sh a where
   ESym :: !sh -> !String -> Expr sh a
@@ -78,50 +91,48 @@ data Expr sh a where
   EJacob :: !(Expr DIM1 a) -> !(Expr DIM1 a) -> Expr DIM2 a
 
 --------------------------------- show instances -----------------------------
---deriving instance (Show sh, Show a, Element a) => Show (Const sh a)
 instance (Shape sh, Show a, Element a) => Show (Const sh a) where
   show (CSingleton _ x) = show x
   show (CVec sh v) = "CVec " ++ showShapeR sh ++ " " ++ show v
   show (CMat sh m) = "CMat " ++ showShapeR sh ++ " " ++ show m
   show (CTensor sh v) = "CTensor " ++ showShapeR sh ++ " " ++ show v
 
-
 paren :: String -> String
 paren x = "("++ x ++")"
 
--- fullShow' recursively shows the Expr type
--- if given Nothing, it will not chase references but only print "{ref:n}
--- if given (Just f), it will call f to lookup a node and call fullShow' recursively
---fullShow' :: (Shape sh, Show a, Element a) => Maybe (forall sh' . sh' -> Int -> Expr sh' a) -> Expr sh a -> String
-fullShow' :: (Shape sh, Show a, Element a) => Maybe (sh -> Int -> Expr sh a) -> Expr sh a -> String
-fullShow' cr@(Just chaseRef) (ERef sh k) = fullShow' cr (chaseRef sh k)
-fullShow' Nothing (ERef sh k)
-  | rank sh == 0 = "{ref:" ++ show k ++ "}"
-  | otherwise    = "{ref:" ++ show k ++ ",(" ++ showShapeR sh ++ ")}"
-fullShow' _ (EDimensionless x) = show x
-fullShow' _ (ESym sh name) = case rank sh of 0 -> name
-                                             _ -> name++"{"++showShapeR sh++"}"
-fullShow' _ (EConst x) = show x
-fullShow' chaseRef (EUnary op x) = showUnary (fullShow' chaseRef x) op
-fullShow' chaseRef (EBinary op x y) =
-  parenx x (fullShow' chaseRef x) ++ " " ++ showBinary op ++ " " ++ pareny y (fullShow' chaseRef y)
-  where
-    parenx x' = case (chaseRef, x') of
-      (_, EBinary xop _ _) -> if lassoc xop op then id else paren
-      (Just cr, ERef sh k) -> parenx (cr sh k)
-      _ -> id
-    pareny y' = case (chaseRef, y') of
-      (_, EBinary yop _ _) -> if rassoc op yop then id else paren
-      (Just cr, ERef sh k) -> pareny (cr sh k)
-      _ -> id
-      
--- fullShow' chaseRef (EScale x y) = paren (fullShow' chaseRef x) ++ "*" ++ paren (fullShow' chaseRef y)
-fullShow' chaseRef (EDeriv x y) = "deriv(" ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
---fullShow' chaseRef (EGrad  x y) = "grad("  ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
---fullShow' chaseRef (EJacob x y) = "jacob(" ++ fullShow' chaseRef x ++ ", " ++ fullShow' chaseRef y ++ ")"
-
 instance (Shape sh, Show a, Element a) => Show (Expr sh a) where
-  show = fullShow' Nothing
+  show (ERef sh _ k)
+    | rank sh == 0 = "{ref:" ++ show k ++ "}"
+    | otherwise    = "{ref:" ++ show k ++ ",(" ++ showShapeR sh ++ ")}"
+  show (EDimensionless x) = show x
+  show (ESym sh s)
+    | rank sh == 0 = show s
+    | otherwise    = show s++"{"++showShapeR sh++"}"
+  show (EConst x) = show x
+  show (EUnary op x) = showUnary (show x) op
+  show (EBinary op x y) = parenx x (show x) ++ " " ++ showBinary op ++ " " ++ pareny y (show y)
+    where
+      parenx (EBinary xop _ _) = if lassoc xop op then id else paren
+      parenx (EScale _ _)      = if lassoc Mul op then id else paren
+      parenx _ = id
+
+      pareny (EBinary yop _ _) = if rassoc op yop then id else paren
+      pareny (EScale _ _)      = if rassoc op Mul then id else paren
+      pareny _ = id
+  show (EScale x y) = parenx x (show x) ++ " " ++ showBinary Mul ++ " " ++ pareny y (show y)
+    where
+      parenx (EBinary xop _ _) = if lassoc xop Mul then id else paren
+      parenx (EScale _ _)      = if lassoc Mul Mul then id else paren
+      parenx _ = id
+
+      pareny (EBinary yop _ _) = if rassoc Mul yop then id else paren
+      pareny (EScale _ _)      = if rassoc Mul Mul then id else paren
+      pareny _ = id
+        
+  show (EDeriv x y) = "deriv(" ++ show x ++ ", " ++ show y ++ ")"
+  show (EGrad  x y) = "grad("  ++ show x ++ ", " ++ show y ++ ")"
+  show (EJacob x y) = "jacob(" ++ show x ++ ", " ++ show y ++ ")"
+
 
 --------------------------------- eq instances -------------------------
 instance (Shape sh, Element a, Eq a) => Eq (Const sh a) where
@@ -137,7 +148,7 @@ instance (Shape sh, Eq a, Element a) => Eq (Expr sh a) where
   (==) (EDimensionless x0) (EDimensionless x1) = x0 == x1
   (==) (EUnary op0 x0) (EUnary op1 x1) = op0 == op1 && x0 == x1
   (==) (EScale x0 y0) (EScale x1 y1) = x0 == x1 && y0 == y1
-  (==) (ERef sh0 k0) (ERef sh1 k1) = sh0 == sh1 && k0 == k1
+  (==) (ERef sh0 h0 k0) (ERef sh1 h1 k1) = sh0 == sh1 && h0 == h1 && k0 == k1
   (==) (EDeriv x0 y0) (EDeriv x1 y1) = x0 == x1 && y0 == y1
   (==) (EGrad x0 y0) (EGrad x1 y1) = x0 == x1 && y0 == y1
   (==) (EJacob x0 y0) (EJacob x1 y1) = x0 == x1 && y0 == y1
@@ -170,11 +181,15 @@ instance (Hashable a, Shape sh, Element a) => Hashable (Expr sh a) where
         where
           unsorted = [hash x, hash y]
   hash (EScale x y)       = 33 `combine` hash x `combine` hash y
-  hash (ERef sh k)        = 34 `combine` hash (listOfShape sh) `combine` k
+  hash (ERef _ (RefHash h) _) = h
 
   hash (EDeriv x y)       = 35 `combine` hash x `combine` hash y
   hash (EGrad x y)        = 36 `combine` hash x `combine` hash y
   hash (EJacob x y)       = 37 `combine` hash x `combine` hash y
+
+instance Hashable Sym where
+  hash (Sym name) = 38 `combine` hash name
+  hash (SymDependent name k s) = 39 `combine` hash name `combine` k `combine` hash s
 
 
 ------------------------ symbolic stuff --------------------
@@ -324,15 +339,26 @@ instance (Shape sh, Floating a, Eq a, Num (Vector a), LA.Container Vector a) =>
 ------------------------------ convenience functions -------------------------
 -- | symbolic scalar
 sym :: String -> Expr DIM0 a
-sym = ESym Z
+sym = (ESym Z) . Sym
+
+-- | Symbolic scalar which is a function of some independent variable, like time.
+-- .
+-- This lets you do d(f(g(t)))/dt == f'(g(t))*g'(t)
+symDependent :: String -> Expr DIM0 a -> Expr DIM0 a
+symDependent name s = symDependentN name s 0
+
+-- | same as symDependent but it can start as the Nth derivative
+symDependentN :: String -> Expr DIM0 a -> Int -> Expr DIM0 a
+symDependentN name (ESym _ s) n = ESym Z (SymDependent name n s)
+symDependentN _ _ _ = error "symDependent got non ESym dependency"
 
 -- | symbolic dense vector
 vsym :: Int -> String -> Expr DIM1 a
-vsym k = ESym (Z :. k)
+vsym k = (ESym (Z :. k)) . Sym
 
 -- | symbolic dense matrix
 msym :: (Int,Int) -> String -> Expr DIM2 a
-msym (r,c) = ESym (Z :. r :. c)
+msym (r,c) = (ESym (Z :. r :. c)) . Sym
 
 -- | symbolic dense constant vector
 vec :: Storable a => [a] -> Expr DIM1 a

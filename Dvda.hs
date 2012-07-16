@@ -13,6 +13,8 @@
 
 module Dvda ( -- * primitives
               sym
+            , symDependent
+            , symDependentN
             , vsym
             , msym
             , svec
@@ -23,9 +25,11 @@ module Dvda ( -- * primitives
             , scale
 --            , dot
             , diff
+            , runDeriv
               -- * symbolic expression type
             , Expr
             , fullShow
+            , fullShowNodes
               -- * construct FunGraphs
             , FunGraph
             , makeFunGraph
@@ -52,7 +56,7 @@ module Dvda ( -- * primitives
             , DIM0
             , DIM1
             , DIM2
-            , Z
+            , Z(..)
             , (:.)
             , Matrix
             , Vector
