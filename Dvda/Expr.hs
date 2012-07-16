@@ -59,23 +59,23 @@ deriving instance Typeable2 Const
 deriving instance Typeable2 Expr
 
 data Const sh a where
-  CSingleton :: sh -> a -> Const sh a
-  CVec :: DIM1 -> Vector a -> Const DIM1 a
-  CMat :: DIM2 -> Matrix a -> Const DIM2 a
-  CTensor :: sh -> Vector a -> Const sh a
+  CSingleton :: !sh -> !a -> Const sh a
+  CVec :: !DIM1 -> !(Vector a) -> Const DIM1 a
+  CMat :: !DIM2 -> !(Matrix a) -> Const DIM2 a
+  CTensor :: !sh -> !(Vector a) -> Const sh a
 
 data Expr sh a where
-  ESym :: sh -> String -> Expr sh a
-  EConst :: Const sh a -> Expr sh a
-  EDimensionless :: a -> Expr sh a
-  EUnary :: UnOp -> Expr sh a -> Expr sh a
-  EBinary :: BinOp -> Expr sh a -> Expr sh a -> Expr sh a
-  EScale :: Expr DIM0 a -> Expr sh a -> Expr sh a
-  ERef :: sh -> Key -> Expr sh a
+  ESym :: !sh -> !String -> Expr sh a
+  EConst :: !(Const sh a) -> Expr sh a
+  EDimensionless :: !a -> Expr sh a
+  EUnary :: !UnOp -> !(Expr sh a) -> Expr sh a
+  EBinary :: !BinOp -> !(Expr sh a) -> Expr sh a -> Expr sh a
+  EScale :: !(Expr DIM0 a) -> !(Expr sh a) -> Expr sh a
+  ERef :: !sh -> !Key -> Expr sh a
 
-  EDeriv :: Expr DIM0 a -> Expr DIM0 a -> Expr DIM0 a
-  EGrad  :: Expr DIM0 a -> Expr sh a -> Expr sh a
-  EJacob :: Expr DIM1 a -> Expr DIM1 a -> Expr DIM2 a
+  EDeriv :: !(Expr DIM0 a) -> !(Expr DIM0 a) -> Expr DIM0 a
+  EGrad  :: !(Expr DIM0 a) -> !(Expr sh a) -> Expr sh a
+  EJacob :: !(Expr DIM1 a) -> !(Expr DIM1 a) -> Expr DIM2 a
 
 --------------------------------- show instances -----------------------------
 --deriving instance (Show sh, Show a, Element a) => Show (Const sh a)
