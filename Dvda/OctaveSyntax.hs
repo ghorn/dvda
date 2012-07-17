@@ -7,7 +7,6 @@ module Dvda.OctaveSyntax ( GenOctave
                          , toOctaveSource
                          ) where
 
-import Data.Maybe ( fromJust )
 import Data.List ( intersperse )
 import Data.IntMap ( Key )
 import qualified Data.IntMap as IM
@@ -131,11 +130,15 @@ writeExpr (EGrad _ _)  = error "EGrad shouldn't be handled here"
 
 writeAssignment :: (Show a, Element a) => IM.IntMap String -> (Key, DynamicExpr a) -> (String, String)
 writeAssignment inputMap (k, dexpr)
-  | asIfExpr isSym dexpr = (fromJust $ IM.lookup k inputMap, drop 13 (show dexpr))
+  | asIfExpr isSym dexpr = (imLookupErr, drop 13 (show dexpr))
   | otherwise = (sassign k ++ asIfExpr writeExpr dexpr ++ ";", drop 13 (show dexpr))
   where
     isSym (ESym _ _) = True
     isSym _ = False
+
+    imLookupErr = case IM.lookup k inputMap of
+      (Just x) -> x
+      Nothing -> error $ printf "OctaveSyntax.writeAssignment has no value for key %d, val: %s" k (show dexpr)
 
 
 toOctaveSource :: (Show a, Element a, GenOctave b, GenOctave c) =>

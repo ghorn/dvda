@@ -8,7 +8,7 @@ module Dvda.MultipleShooting.MSCoctave ( msCoctave
 
 import qualified Data.HashSet as HS
 import Data.List ( zipWith6, transpose, elemIndex )
-import Data.Maybe ( fromJust, catMaybes )
+import Data.Maybe ( catMaybes )
 
 import Dvda
 import Dvda.Codegen ( writeSourceFile )
@@ -67,15 +67,16 @@ msCoctave userStep odeError n funDir name = do
   putStrLn $ "sim         " ++ showCollisions simFg
   where
     steps = map (runOneStep userStep) [0..n-1]
-    dts = map (fromJust . stepDt) steps
+    dts = map ((fromJustErr "dts error") . stepDt) steps
     
     fromLeft (Left x) = x
     fromLeft (Right _) = error "ERROR: fromLeft got Right"
-    states'  = map (fst . unzip . fromJust . fromLeft . stepStates ) steps -- fromJust checked in runOneStep
-    actions' = map (fst . unzip . fromJust . fromLeft . stepActions) steps -- fromJust checked in runOneStep
 
-    stateNames  = map (snd . unzip . fromJust . fromLeft . stepStates ) steps  -- fromJust checked in runOneStep
-    actionNames = map (snd . unzip . fromJust . fromLeft . stepActions) steps  -- fromJust checked in runOneStep    
+    -- fromJust checked in runOneStep for states', actions', stateNames, actionNames
+    states'  = map (fst . unzip . (fromJustErr "states' error") . fromLeft . stepStates ) steps
+    actions' = map (fst . unzip . (fromJustErr "actions' error") . fromLeft . stepActions) steps
+    stateNames  = map (snd . unzip . (fromJustErr "stateNames error") . fromLeft . stepStates ) steps
+    actionNames = map (snd . unzip . (fromJustErr "actionNames error") . fromLeft . stepActions) steps
     
     -- ensure that state/action (names) are the same in all steps
     states = if all (head stateNames  ==) stateNames
@@ -150,7 +151,8 @@ msCoctave userStep odeError n funDir name = do
     simFg = runFunGraph $ do
       let x' = head states
           u' = head actions
-          dxdt' = fromJust $ stepDxdt $ head steps
+          dxdt' = fromJustErr "dxdt' error" $ stepDxdt $ head steps
+
       inputs_ (x' :* u' :* constants)
       outputs_ dxdt'
 
@@ -163,7 +165,7 @@ msCoctave userStep odeError n funDir name = do
     (lbs, ubs, _) = unzip3 $ map getBnd dvs
       where
         getBnd dv = case HM.lookup dv boundMap of
-          Nothing -> error $ "please set bounds for " ++ show dv
+          Nothing -> error $ "ERROR: please set bounds for " ++ show dv
           Just bnd -> bnd
 
     setupSource =
@@ -192,7 +194,8 @@ msCoctave userStep odeError n funDir name = do
       toStruct dvs "designVars" (map show params) (map (\x -> [x]) params) ++
       toStruct constants "constants" (map show constants) (map (\x -> [x]) constants)
         where
-          dvsToIdx dvs' = fromJust . flip HM.lookup (HM.fromList (zip dvs' [(1::Int)..]))
+          dvsToIdx dvs' = (fromJustErr "toStruct error") . (flip HM.lookup (HM.fromList (zip dvs' [(1::Int)..])))
+
           toStruct dvs' nm = zipWith (\name' vars -> "ret." ++ name' ++ " = " ++ nm ++ "(" ++ show (map (dvsToIdx dvs') vars) ++ ");\n")
 
 
@@ -208,11 +211,11 @@ msCoctave userStep odeError n funDir name = do
       ]
       where
         fromParam e@(ESym _ (Sym nm)) =
-          "dvs(" ++ show (1 + (fromJust $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ nm ++ ";\n"
+          "dvs(" ++ show (1 + (fromJustErr "fromParam error" $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ nm ++ ";\n"
         fromParam _ = error "param not ESym"
 
         fromXU nm e k =
-          "dvs(" ++ show (1 + (fromJust $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ nm ++ "(" ++ show k ++ ");\n"
+          "dvs(" ++ show (1 + (fromJustErr "fromXU error" $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ nm ++ "(" ++ show k ++ ");\n"
         fromXUS name' xs = (concat $ zipWith (fromXU name') xs [(1::Int)..]) ++ "\n"
 
     unstructConstsSource =
@@ -224,7 +227,7 @@ msCoctave userStep odeError n funDir name = do
       ]
       where
         fromConst e@(ESym _ (Sym nm)) =
-          "constants(" ++ show (1 + (fromJust $ e `elemIndex` constants)) ++ ") = constStruct." ++ nm ++ ";\n"
+          "constants(" ++ show (1 + (fromJustErr "fromConst error" $ e `elemIndex` constants)) ++ ") = constStruct." ++ nm ++ ";\n"
         fromConst _ = error "const not ESym"
 
     plotSource =
@@ -245,6 +248,10 @@ msCoctave userStep odeError n funDir name = do
                     ]
           where
             name'' = foldl (\acc x -> if x == '_' then acc ++ "\\_" else acc ++ [x]) "" name'
+
+fromJustErr :: String -> Maybe a -> a
+fromJustErr _ (Just x) = x
+fromJustErr message Nothing = error $ "fromJustErr got Nothing, message: \"" ++ message ++ "\""
 
 
 spring :: State (Step Double) ()
