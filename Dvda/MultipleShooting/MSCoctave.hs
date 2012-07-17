@@ -153,7 +153,7 @@ msCoctave userStep odeError n funDir name = do
           u' = head actions
           dxdt' = fromJustErr "dxdt' error" $ stepDxdt $ head steps
 
-      inputs_ (x' :* u' :* constants)
+      inputs_ (x' :* u' :* params :* constants)
       outputs_ dxdt'
 
     costSource        = toOctaveSource        costFg (name ++ "_cost")
