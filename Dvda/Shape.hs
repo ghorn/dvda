@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# Language StandaloneDeriving #-}
+{-# Language DeriveDataTypeable #-}
 
 -- | This was blatantly lifted from Repa, it includes trimmed down Data.Array.Repa.Shape and Data.Array.Repa.Index
 module Dvda.Shape
@@ -17,9 +19,11 @@ module Dvda.Shape
        , DIM0, DIM1, DIM2, DIM3, DIM4, DIM5
        ) where
 
+import Data.Data ( Data, Typeable, Typeable2 )
+
 -- Shape ----------------------------------------------------------------------
 -- | Class of types that can be used as array shapes and indices.
-class Eq sh => Shape sh where
+class (Eq sh, Typeable sh, Data sh) => Shape sh where
 
         -- | Get the number of dimensions in a shape.
         rank    :: sh -> Int
@@ -49,12 +53,17 @@ stage   = "Data.Array.Repa.Index"
 -- | An index of dimension zero
 data Z  = Z
         deriving (Show, Read, Eq, Ord)
+deriving instance Typeable Z
+deriving instance Data Z
 
 -- | Our index type, used for both shapes and indices.
 infixl 3 :.
 data tail :. head
         = !tail :. !head
         deriving (Show, Read, Eq, Ord)
+deriving instance Typeable2 (:.)
+deriving instance (Data a, Data b) => Data (a :. b)
+
 
 -- Common dimensions
 type DIM0       = Z
