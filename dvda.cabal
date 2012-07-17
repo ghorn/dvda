@@ -61,6 +61,7 @@ Library
                      Dvda.MultipleShooting.MultipleShooting
                      Dvda.MultipleShooting.Types
                      Dvda.OctaveSyntax
+                     Dvda.Shape
                      Dvda.SparseLA
                      Dvda.SymMonad
 --                     Dvda.CFunction

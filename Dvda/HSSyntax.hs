@@ -9,7 +9,6 @@ module Dvda.HSSyntax ( writeHSSource
                      ) where
 
 import Data.List ( intersperse )
-import Data.Array.Repa ( DIM0, DIM1, DIM2 )
 import Data.IntMap ( Key )
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
@@ -18,6 +17,7 @@ import Dvda.Expr ( Expr(..), Const(..) )
 import Dvda.SymMonad ( (:*)(..) )
 import Dvda.Graph ( FunGraph(..), DynamicExpr, DvdaDim, asIfExpr )
 import Dvda.BinUn ( BinOp(..), UnOp(..) )
+import Dvda.Shape ( DIM0, DIM1, DIM2 )
 import qualified Dvda.Config as Config
 
 class GenHaskell a where

@@ -65,9 +65,9 @@ module Dvda ( -- * primitives
 import Dvda.Expr
 import Dvda.Graph
 --import Dvda.HSBuilder
+import Dvda.Shape ( DIM0, DIM1, DIM2, Z(..), Shape, (:.) )
 import Dvda.SymMonad
 
-import Data.Array.Repa ( DIM0, DIM1, DIM2, Z(..), Shape, (:.) )
 import Numeric.LinearAlgebra ( Matrix, Vector )
 
 -- | Just a nice way to write (Exprs (DIM0 :* DIM1 :* DIM2) Double)

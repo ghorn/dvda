@@ -35,11 +35,11 @@ import Data.IntMap ( Key )
 import qualified Data.HashSet as HS
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element )
-import Data.Array.Repa ( Shape, DIM0, DIM1, DIM2 )
 import Control.Monad.State ( State, get, put )
+import qualified Dvda.HashMap as HM
 
 import Dvda.Expr ( Expr(..), Const(..), Sym(..), RefHash(..), dim )
-import qualified Dvda.HashMap as HM
+import Dvda.Shape ( Shape, DIM0, DIM1, DIM2 )
 
 --------------------- dynamic Expr stuff ---------------------------
 data DynamicExpr a = DynamicExpr0 (Expr DIM0 a)

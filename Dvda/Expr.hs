@@ -27,7 +27,6 @@ module Dvda.Expr ( Expr(..)
                  , symDependentN
                  ) where
 
-import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList), rank )
 import Numeric.LinearAlgebra ( Matrix, Vector, Element )
 import qualified Numeric.LinearAlgebra as LA
 import Foreign.Storable ( Storable )
@@ -38,6 +37,7 @@ import Data.Typeable ( Typeable2 )
 
 import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative, lassoc, rassoc )
 import Dvda.Config ( simplifyCommutativeOps )
+import Dvda.Shape (DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList), rank )
 import Dvda.SparseLA ( SparseVec, SparseMat, svFromList, smFromLists )
 
 showShapeR :: Shape sh => sh -> String

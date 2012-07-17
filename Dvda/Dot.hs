@@ -7,7 +7,7 @@
 module Dvda.Dot ( Dot(..)
                 ) where
 
-import Data.Array.Repa(DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape)
+import Dvda.Shape (DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape)
 
 
 class (Shape sh1, Shape sh2, Shape (DotT sh1 sh2)) => Dot sh1 sh2 where

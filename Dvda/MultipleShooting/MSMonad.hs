@@ -20,7 +20,6 @@ module Dvda.MultipleShooting.MSMonad ( State
                                      , execDxdt
                                      ) where
 
-import Data.Array.Repa ( Z(..) )
 import Data.Hashable ( Hashable )
 import qualified Data.HashSet as HS
 import Data.List ( nub, sort ) --, union )
@@ -36,6 +35,7 @@ import Dvda ( sym )
 import Dvda.Expr ( Expr(..) )
 import qualified Dvda.HashMap as HM
 import Dvda.MultipleShooting.Types
+import Dvda.Shape ( Z(..) )
 
 failDuplicates :: [String] -> [String]
 failDuplicates names

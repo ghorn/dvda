@@ -24,13 +24,13 @@ module Dvda.MultipleShooting.MultipleShooting ( Cost(..)
 import Text.Printf ( printf )
 import Data.List ( elemIndex, zipWith6 )
 import Data.Maybe ( isJust, fromJust )
-import Data.Array.Repa ( Z(..) )
 import Debug.Trace ( trace )
 
 import Dvda ( svec )
 import Dvda.Expr ( Expr(..), Sym(..) )
 import Dvda.SparseLA ( SparseVec, svCats, svZeros, svSize, sparseListFromSv, svFromList )
 import Dvda.MultipleShooting.Types
+import Dvda.Shape ( Z(..) )
 
 data Cost a = Cost (SparseVec (Expr Z a) -> SparseVec (Expr Z a) -> Expr Z a) (Int,Int)
 

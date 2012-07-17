@@ -20,7 +20,6 @@ module Dvda.CFunction ( -- * Creation
 --                      , callCL
                       ) where
 
-import Data.Array.Repa ( DIM0 )
 --import Data.List ( nub )
 import System.Posix.DynamicLinker
 import Foreign.Ptr ( FunPtr )
@@ -32,6 +31,7 @@ import qualified Dvda.Config as Config
 import Dvda.Codegen.CCallWrapper ( callCFunction )
 import Dvda.Codegen.CBuilder ( buildCFunction )
 import Dvda.Graph
+import Dvda.Shape ( DIM0 )
 import Dvda.SymMonad
 import Dvda.Expr
 

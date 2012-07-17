@@ -25,20 +25,20 @@ module Dvda.SymMonad ( (:*)(..)
 
 import Control.Monad ( foldM, liftM )
 import Control.Monad.State ( State, get, put, runState )
-import Data.Array.Repa ( DIM0, DIM1, DIM2, Z(..) )
 import Data.Hashable ( Hashable )
 import Data.Maybe ( fromJust )
 import qualified Data.HashSet as HS
 import qualified Data.IntMap as IM
 import Numeric.LinearAlgebra ( Element, Vector, Matrix )
 import qualified Numeric.LinearAlgebra as LA
+import qualified Dvda.HashMap as HM
 -- import Debug.Trace
 
-import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.BinUn ( applyUnary, applyBinary )
-import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
+import Dvda.Dual ( Dual(..), dualPerturbation )
 import Dvda.Expr ( Expr(..), Const(..), Sym(..), dim )
-import qualified Dvda.HashMap as HM
+import Dvda.Graph ( FunGraph(..), DynamicExpr(..), DvdaDim(..), insert, emptyFunGraph, fgLookup, fgExprFromKey )
+import Dvda.Shape ( DIM0, DIM1, DIM2, Z(..) )
 
 ---- | take all sub expressions of an Expr and turn them into nodes
 ----   return an Expr that is just a ref

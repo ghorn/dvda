@@ -10,7 +10,6 @@ module Dvda.Examples ( run
                      , composed
                      ) where
 
-import Data.Array.Repa.Index
 import Control.Monad.State
 
 import Dvda
