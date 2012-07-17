@@ -29,8 +29,6 @@ import Data.Hashable ( Hashable )
 import Data.Maybe ( fromJust )
 import qualified Data.HashSet as HS
 import qualified Data.IntMap as IM
-import Numeric.LinearAlgebra ( Element, Vector, Matrix )
-import qualified Numeric.LinearAlgebra as LA
 import qualified Dvda.HashMap as HM
 -- import Debug.Trace
 
@@ -42,7 +40,7 @@ import Dvda.Shape ( DIM0, DIM1, DIM2, Z(..) )
 
 ---- | take all sub expressions of an Expr and turn them into nodes
 ----   return an Expr that is just a ref
-node :: (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, DvdaDim sh) => 
+node :: (Hashable a, Eq a, Floating a, DvdaDim sh) => 
          Expr sh a -> State (FunGraph a b c) (Expr sh a)
 node (EDimensionless _) = error "don't put EDimensionless in graph, ya goon"
 node (EJacob _ _) = error "can't do node EJacob yet"
@@ -76,7 +74,7 @@ node (EGrad x_ arg_) = do
 
 
 -- gradient of expression w.r.t. list of args
-rad :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh0, DvdaDim sh) =>
+rad :: (Eq a, Floating a, Hashable a, DvdaDim sh0, DvdaDim sh) =>
        Expr sh0 a -> [Expr sh a] -> State (FunGraph a b c) [Expr sh a]
 rad expr' args' = do
   expr <- node expr'
@@ -99,7 +97,7 @@ rad expr' args' = do
 
 -- | combine two (DynamicExpr a, DynamicExpr a) hashmaps
 -- if there is a conflict, add the two sensitivities together
-unionWithPlus :: (Hashable a, Eq a, Num (Vector a), LA.Container Vector a, Floating a) =>
+unionWithPlus :: (Hashable a, Eq a, Floating a) =>
                  HM.HashMap (DynamicExpr a) (DynamicExpr a) -> HM.HashMap (DynamicExpr a) (DynamicExpr a)
                  -> State (FunGraph a b c) (HM.HashMap (DynamicExpr a) (DynamicExpr a))
 unionWithPlus xs ys = foldM addCommon union0 commonDExprs
@@ -125,14 +123,14 @@ unionWithPlus xs ys = foldM addCommon union0 commonDExprs
       return (HM.insert commonDExpr xysens hm)
 
 
-lookupSymSet :: (Eq a, Hashable a, Element a, DvdaDim sh) =>
+lookupSymSet :: (Eq a, Hashable a, DvdaDim sh) =>
                 Expr sh a -> State (FunGraph a b c) (Maybe (HS.HashSet (DynamicExpr a)))
 lookupSymSet expr = do
   fg <- get
   case fgLookup expr fg of Just (_,symSet) -> return (Just symSet)
                            Nothing -> return Nothing
 
-getSensitivities :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh) =>
+getSensitivities :: (Eq a, Floating a, Hashable a, DvdaDim sh) =>
                     HS.HashSet (DynamicExpr a) -> Expr sh a -> Expr sh a
                     -> State (FunGraph a b c) (HM.HashMap (DynamicExpr a) (DynamicExpr a))
 getSensitivities _ (EGrad  _ _) _ = error "don't call getSensitivities on EGrad"
@@ -228,37 +226,37 @@ infixr 6 :*
 ---------------------------------- input/output class ---------------------------------------------
 class MkFunGraph a where
   type NumT a
-  type GenT a
+--  type GenT a
   mkNodes :: a -> State (FunGraph (NumT a) b c) a
 
-instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
+instance (Hashable a, Eq a, Floating a) =>
          MkFunGraph (Expr DIM0 a) where
   type NumT (Expr DIM0 a) = a
-  type GenT (Expr DIM0 a) = a
+--  type GenT (Expr DIM0 a) = a
   mkNodes = node
 
-instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
+instance (Hashable a, Eq a, Floating a) =>
          MkFunGraph (Expr DIM1 a) where
   type NumT (Expr DIM1 a) = a
-  type GenT (Expr DIM1 a) = Vector a
+--  type GenT (Expr DIM1 a) = Vector a
   mkNodes = node
 
-instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a) =>
+instance (Hashable a, Eq a, Floating a) =>
          MkFunGraph (Expr DIM2 a) where
   type NumT (Expr DIM2 a) = a
-  type GenT (Expr DIM2 a) = Matrix a
+--  type GenT (Expr DIM2 a) = Matrix a
   mkNodes = node
 
-instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkFunGraph (Expr sh a), DvdaDim sh) =>
+instance (Hashable a, Eq a, Floating a, MkFunGraph (Expr sh a), DvdaDim sh) =>
          MkFunGraph [Expr sh a] where
   type NumT [Expr sh a] = a
-  type GenT [Expr sh a] = [GenT (Expr sh a)]
+--  type GenT [Expr sh a] = [GenT (Expr sh a)]
   mkNodes = mapM node
 
-instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, MkFunGraph (Expr sh a), DvdaDim sh) =>
+instance (Hashable a, Eq a, Floating a, MkFunGraph (Expr sh a), DvdaDim sh) =>
          MkFunGraph [[Expr sh a]] where
   type NumT [[Expr sh a]] = a
-  type GenT [[Expr sh a]] = [[GenT (Expr sh a)]]
+--  type GenT [[Expr sh a]] = [[GenT (Expr sh a)]]
   mkNodes = mapM (mapM node)
 
 --instance (Show a, MkFunGraph a) => MkFunGraph [a] where
@@ -271,7 +269,7 @@ instance (Hashable a, Eq a, Floating a, Num (Vector a), LA.Container Vector a, M
 
 instance (MkFunGraph a, MkFunGraph b, NumT a ~ NumT b) => MkFunGraph (a :* b) where
   type NumT (a :* b) = NumT a
-  type GenT (a :* b) = GenT a :* GenT b
+--  type GenT (a :* b) = GenT a :* GenT b
   mkNodes (x :* y) = do
     x' <- mkNodes x
     y' <- mkNodes y
@@ -312,10 +310,10 @@ makeFunGraph ins outs = runFunGraph $ do
   outputs_ outs
 
 -- | Show an Expr, looking up all ERefs
-fullShow :: (Show a, Element a, DvdaDim sh) => FunGraph a b c -> Expr sh a -> String
+fullShow :: (Show a, DvdaDim sh) => FunGraph a b c -> Expr sh a -> String
 fullShow fg = show . (recover fg)
 
-fullShowNodes :: (Show a, Element a) => FunGraph a b c -> String
+fullShowNodes :: Show a => FunGraph a b c -> String
 fullShowNodes fg@(FunGraph _ im _ _) =
   init $ unlines $ map (\(a,b) -> show a ++ ": " ++ (fullShow fg) (fromDynamic Z b)) (IM.toList im)
 
@@ -335,7 +333,7 @@ recover fg (EJacob  x y) = EJacob  (recover fg x) (recover fg y)
 recover fg (EScale  x y) = EScale  (recover fg x) (recover fg y)
 
 -- | "Pure" gradient which which runs rad and then calls recover to substitute values for ERefs
-runDeriv :: (Eq a, Floating a, Num (Vector a), Hashable a, LA.Container Vector a, DvdaDim sh)
+runDeriv :: (Eq a, Floating a, Hashable a, DvdaDim sh)
             => Expr sh a -> [Expr sh a] -> [Expr sh a]
 runDeriv expr args = map (recover fg) deda
   where

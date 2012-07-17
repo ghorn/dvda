@@ -14,7 +14,6 @@ import System.Directory
 import Control.Monad(when)
 import qualified System.Plugins.Make as Make
 import qualified System.Plugins.Load as Load
-import Numeric.LinearAlgebra ( Element )
 
 import Dvda.Codegen ( writeSourceFile )
 import Dvda.HSSyntax ( GenHaskell, writeHSSource )
@@ -24,21 +23,21 @@ import qualified Dvda.Config as Config
 
 
 -- | take in a pure function and symbolic inputs, return JIT compiled function
-buildHSFunctionPure :: (Show (NumT c), Element (NumT c), H.Hashable (NumT c), MkFunGraph c,
+buildHSFunctionPure :: (Show (NumT c), H.Hashable (NumT c), MkFunGraph c,
                         MkFunGraph b, NumT b ~ NumT c, GenHaskell b, GenHaskell c) =>
                        (b -> c) -> b -> IO (GenT b -> GenT c)
 buildHSFunctionPure fg xs = buildHSFunction xs (fg xs)
 
 
 -- | take in symbolic inputs and outputs, return JIT compiled function
-buildHSFunction :: (Show (NumT b), Element (NumT b), H.Hashable (NumT b), MkFunGraph b,
+buildHSFunction :: (Show (NumT b), H.Hashable (NumT b), MkFunGraph b,
                     MkFunGraph c, NumT c ~ NumT b, GenHaskell b, GenHaskell c) =>
                    b -> c -> IO (GenT b -> GenT c)
 buildHSFunction inputs outputs = buildHSFunctionFromGraph $ makeFunGraph inputs outputs
 
 
 -- | take in FunGraph, return JIT compiled function
-buildHSFunctionFromGraph :: (Show a, Element a, H.Hashable a, GenHaskell b, GenHaskell c) =>
+buildHSFunctionFromGraph :: (Show a, H.Hashable a, GenHaskell b, GenHaskell c) =>
                             FunGraph a b c -> IO (GenT b -> GenT c)
 buildHSFunctionFromGraph fg = do
   topDir <- dvdaDir

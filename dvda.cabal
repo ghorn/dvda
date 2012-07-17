@@ -80,12 +80,10 @@ Library
                      fgl >= 5.4 && < 5.5,
                      mtl >= 2.0 && < 2.1,
                      directory >= 1.1 && < 1.2,
+                     latc
 --                     process >= 1.1 && < 1.2,
 --                     text >= 0.11 && < 0.12,
 --                     plugins >= 1.5 && < 1.6,
-                     hmatrix >= 0.14 && < 0.15
-		     
---                     latc >= 0.1 && < 0.2
 --                     unix
 --                     text,
 

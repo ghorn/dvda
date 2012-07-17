@@ -28,7 +28,6 @@ import Control.Monad ( when, zipWithM_ )
 import Control.Monad.State ( State )
 import qualified Control.Monad.State as State
 --import Debug.Trace ( trace )
---import Numeric.LinearAlgebra ( Element )
 import Text.Printf ( printf )
 
 import Dvda ( sym )

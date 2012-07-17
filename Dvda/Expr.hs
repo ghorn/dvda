@@ -27,9 +27,8 @@ module Dvda.Expr ( Expr(..)
                  , symDependentN
                  ) where
 
-import Numeric.LinearAlgebra ( Matrix, Vector, Element )
-import qualified Numeric.LinearAlgebra as LA
-import Foreign.Storable ( Storable )
+import Numeric.LATC.NestedList ( Matrix, Vector, vbinary, mbinary )
+import qualified Numeric.LATC.NestedList as NL
 import Data.IntMap ( Key )
 import Data.Hashable ( Hashable, hash, combine )
 import Data.List ( sort )
@@ -91,7 +90,7 @@ data Expr sh a where
   EJacob :: Expr DIM1 a -> Expr DIM1 a -> Expr DIM2 a
 
 --------------------------------- show instances -----------------------------
-instance (Shape sh, Show a, Element a) => Show (Const sh a) where
+instance (Shape sh, Show a) => Show (Const sh a) where
   show (CSingleton _ x) = show x
   show (CVec sh v) = "CVec " ++ showShapeR sh ++ " " ++ show v
   show (CMat sh m) = "CMat " ++ showShapeR sh ++ " " ++ show m
@@ -100,7 +99,7 @@ instance (Shape sh, Show a, Element a) => Show (Const sh a) where
 paren :: String -> String
 paren x = "("++ x ++")"
 
-instance (Shape sh, Show a, Element a) => Show (Expr sh a) where
+instance (Shape sh, Show a) => Show (Expr sh a) where
   show (ERef sh _ k)
     | rank sh == 0 = "{ref:" ++ show k ++ "}"
     | otherwise    = "{ref:" ++ show k ++ ",(" ++ showShapeR sh ++ ")}"
@@ -135,14 +134,14 @@ instance (Shape sh, Show a, Element a) => Show (Expr sh a) where
 
 
 --------------------------------- eq instances -------------------------
-instance (Shape sh, Element a, Eq a) => Eq (Const sh a) where
+instance (Shape sh, Eq a) => Eq (Const sh a) where
   (==) (CSingleton sh0 x0) (CSingleton sh1 x1) = sh0 == sh1 && x0 == x1
   (==) (CVec sh0 v0) (CVec sh1 v1) = sh0 == sh1 && v0 == v1
-  (==) (CMat sh0 m0) (CMat sh1 m1) = sh0 == sh1 && (LA.flatten m0) == (LA.flatten m1)
+  (==) (CMat sh0 m0) (CMat sh1 m1) = sh0 == sh1 && m0 == m1
   (==) (CTensor sh0 v0) (CTensor sh1 v1) = sh0 == sh1 && v0 == v1
   (==) _ _ = False
   
-instance (Shape sh, Eq a, Element a) => Eq (Expr sh a) where
+instance (Shape sh, Eq a) => Eq (Expr sh a) where
   (==) (ESym sh0 name0) (ESym sh1 name1) = sh0 == sh1 && name0 == name1
   (==) (EConst c0) (EConst c1) = c0 == c1
   (==) (EDimensionless x0) (EDimensionless x1) = x0 == x1
@@ -160,14 +159,14 @@ instance (Shape sh, Eq a, Element a) => Eq (Expr sh a) where
   (==) _ _ = False
 
 ------------------------- hashable instances --------------------
-instance (Hashable a, Shape sh, Element a) => Hashable (Const sh a) where
+instance (Hashable a, Shape sh) => Hashable (Const sh a) where
   hash (CSingleton sh x) = 24 `combine` hash (listOfShape sh) `combine` hash x
-  hash (CVec sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (25 `combine` hash (listOfShape sh)) v
-  hash (CMat sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (26 `combine` hash (listOfShape sh)) (LA.flatten v)
-  hash (CTensor sh v) = LA.foldVector (\x acc -> acc `combine` hash x) (27 `combine` hash (listOfShape sh)) v
+  hash (CVec sh v) = 25 `combine` hash (listOfShape sh) `combine` hash v
+  hash (CMat sh m) = 26 `combine` hash (listOfShape sh) `combine` hash m
+  hash (CTensor sh v) = 27 `combine` hash (listOfShape sh) `combine` hash v
 
 
-instance (Hashable a, Shape sh, Element a) => Hashable (Expr sh a) where
+instance (Hashable a, Shape sh) => Hashable (Expr sh a) where
   hash (ESym sh name)     = 28 `combine` hash (listOfShape sh) `combine` hash name
   hash (EConst c)         = 29 `combine` hash c
   hash (EDimensionless x) = 30 `combine` hash x
@@ -199,7 +198,7 @@ isVal x (EConst (CSingleton _ y)) = x == y
 isVal _ _ = False
 
 -- | first layer of binary simplification: infer dimension of EDimensionless if possible
-makeBinary :: (Eq a, Num (Vector a), LA.Container Vector a, Shape sh) =>
+makeBinary :: (Eq a, Num a, Shape sh) =>
               BinOp -> (a -> a -> a) -> Expr sh a -> Expr sh a -> Expr sh a
 -- | can't infer dimension, just apply operation
 makeBinary _  f (EDimensionless x) (EDimensionless y) = EDimensionless (f x y)
@@ -211,7 +210,7 @@ makeBinary op f x y = makeBinary' op f x y
 
 
 -- | second layer of binary simplification: check dimensions
-makeBinary' :: (Eq a, Num (Vector a), LA.Container Vector a, Shape sh) =>
+makeBinary' :: (Eq a, Num a, Shape sh) =>
                BinOp -> (a -> a -> a) -> Expr sh a -> Expr sh a -> Expr sh a
 makeBinary' op f x y
   | shx == shy  = makeBinary'' op f x y
@@ -232,7 +231,7 @@ makeBinary' op f x y
 --                                         0/x == 0
 --                                         x - 0 == 0
 --                                         0 - x == neg x
-makeBinary'' :: (Eq a, Num (Vector a), LA.Container Vector a, Shape sh) =>
+makeBinary'' :: (Eq a, Num a, Shape sh) =>
                 BinOp -> (a -> a -> a) -> Expr sh a -> Expr sh a -> Expr sh a
 makeBinary'' Mul f x y
   | isVal 0 x = x
@@ -257,54 +256,49 @@ makeBinary'' op f x y = makeBinary''' op f x y
 
 
 -- | fourth layer of binary simplification: make reasonable simplifications
-makeBinary''' :: (Num (Vector a), LA.Container Vector a) =>
+makeBinary''' :: Num a =>
                  BinOp -> (a -> a -> a) -> Expr sh a -> Expr sh a -> Expr sh a
 -- apply vectorized operations
 makeBinary''' Add _ (EConst (CVec sh x)) (EConst (CVec _ y)) = EConst $ CVec sh (x + y)
 makeBinary''' Sub _ (EConst (CVec sh x)) (EConst (CVec _ y)) = EConst $ CVec sh (x - y)
 makeBinary''' Mul _ (EConst (CVec sh x)) (EConst (CVec _ y)) = EConst $ CVec sh (x * y)
-makeBinary''' Div _ (EConst (CVec sh x)) (EConst (CVec _ y)) = EConst $ CVec sh (x / y)
 makeBinary''' Add _ (EConst (CMat sh x)) (EConst (CMat _ y)) = EConst $ CMat sh (x + y)
 makeBinary''' Sub _ (EConst (CMat sh x)) (EConst (CMat _ y)) = EConst $ CMat sh (x - y)
 makeBinary''' Mul _ (EConst (CMat sh x)) (EConst (CMat _ y)) = EConst $ CMat sh (x * y)
-makeBinary''' Div _ (EConst (CMat sh x)) (EConst (CMat _ y)) = EConst $ CMat sh (x / y)
 makeBinary''' Add _ (EConst (CTensor sh x)) (EConst (CTensor _ y)) = EConst $ CTensor sh (x + y)
 makeBinary''' Sub _ (EConst (CTensor sh x)) (EConst (CTensor _ y)) = EConst $ CTensor sh (x - y)
 makeBinary''' Mul _ (EConst (CTensor sh x)) (EConst (CTensor _ y)) = EConst $ CTensor sh (x * y)
-makeBinary''' Div _ (EConst (CTensor sh x)) (EConst (CTensor _ y)) = EConst $ CTensor sh (x / y)
 makeBinary''' _ f (EConst x') (EConst y') = EConst $ czipWith x' y'
   where
     -- zip like things
     czipWith (CSingleton sh x) (CSingleton _ y) = CSingleton sh (f x y)
-    czipWith (CTensor    sh x) (CTensor    _ y) = CTensor    sh (LA.zipVectorWith f x y)
-    czipWith (CVec       sh x) (CVec       _ y) = CVec       sh (LA.zipVectorWith f x y)
-    czipWith (CMat       sh x) (CMat       _ y) = CMat       sh (LA.reshape (LA.cols x) z)
-      where
-        z = LA.zipVectorWith f (LA.flatten x) (LA.flatten y)
+    czipWith (CTensor    sh x) (CTensor    _ y) = CTensor    sh (vbinary f x y)
+    czipWith (CVec       sh x) (CVec       _ y) = CVec       sh (vbinary f x y)
+    czipWith (CMat       sh x) (CMat       _ y) = CMat       sh (mbinary f x y)
     -- broadcast singletons
-    czipWith (CSingleton _ x) (CTensor   sh y) = CTensor    sh (LA.mapVector (f x) y)
-    czipWith (CSingleton _ x) (CVec      sh y) = CVec       sh (LA.mapVector (f x) y)
-    czipWith (CSingleton _ x) (CMat      sh y) = CMat       sh (LA.mapMatrix (f x) y)
-    czipWith (CTensor   sh x) (CSingleton _ y) = CTensor    sh (LA.mapVector (`f` y) x)
-    czipWith (CVec      sh x) (CSingleton _ y) = CVec       sh (LA.mapVector (`f` y) x)
-    czipWith (CMat      sh x) (CSingleton _ y) = CMat       sh (LA.mapMatrix (`f` y) x)
+    czipWith (CSingleton _ x) (CTensor   sh y) = CTensor    sh (NL.map (f x) y)
+    czipWith (CSingleton _ x) (CVec      sh y) = CVec       sh (NL.map (f x) y)
+    czipWith (CSingleton _ x) (CMat      sh y) = CMat       sh (NL.mmap (f x) y)
+    czipWith (CTensor   sh x) (CSingleton _ y) = CTensor    sh (NL.map (`f` y) x)
+    czipWith (CVec      sh x) (CSingleton _ y) = CVec       sh (NL.map (`f` y) x)
+    czipWith (CMat      sh x) (CSingleton _ y) = CMat       sh (NL.mmap (`f` y) x)
     czipWith _ _ = error "czipWith called on unlike constants"
 -- | otherwise make symbolic binary
 makeBinary''' op _ x y = EBinary op x y
 
 
 -- | apply unary operations on constants
-makeUnary :: Storable a => UnOp -> (a -> a) -> Expr sh a -> Expr sh a
+makeUnary :: UnOp -> (a -> a) -> Expr sh a -> Expr sh a
 makeUnary _ f (EDimensionless x) = EDimensionless (f x)
 makeUnary _ f' (EConst x') = EConst $ cmap f' x'
   where
     cmap f (CSingleton sh x) = CSingleton sh (f x)
-    cmap f (CTensor    sh x) = CTensor    sh (LA.mapVector f x)
-    cmap f (CVec       sh x) = CVec       sh (LA.mapVector f x)
-    cmap f (CMat       sh x) = CMat       sh (LA.mapMatrix f x)
+    cmap f (CTensor    sh x) = CTensor    sh (NL.map f x)
+    cmap f (CVec       sh x) = CVec       sh (NL.map f x)
+    cmap f (CMat       sh x) = CMat       sh (NL.mmap f x)
 makeUnary op _ x = EUnary op x
 
-instance (Shape sh, Num a, Eq a, Num (Vector a), LA.Container Vector a) =>
+instance (Shape sh, Num a, Eq a) =>
          Num (Expr sh a) where
   (*) = makeBinary Mul (*)
   (+) = makeBinary Add (+)
@@ -314,12 +308,12 @@ instance (Shape sh, Num a, Eq a, Num (Vector a), LA.Container Vector a) =>
   fromInteger = EDimensionless . fromInteger
   negate = makeUnary Neg negate
 
-instance (Shape sh, Fractional a, Eq a, Num (Vector a), LA.Container Vector a) =>
+instance (Shape sh, Fractional a, Eq a) =>
          Fractional (Expr sh a) where
   (/) = makeBinary Div (/)
   fromRational = EDimensionless . fromRational
 
-instance (Shape sh, Floating a, Eq a, Num (Vector a), LA.Container Vector a) =>
+instance (Shape sh, Floating a, Eq a) =>
          Floating (Expr sh a) where
   pi    = EDimensionless pi
   (**)  = makeBinary Pow (**)
@@ -361,13 +355,13 @@ msym :: (Int,Int) -> String -> Expr DIM2 a
 msym (r,c) = (ESym (Z :. r :. c)) . Sym
 
 -- | symbolic dense constant vector
-vec :: Storable a => [a] -> Expr DIM1 a
-vec xs = EConst $ CVec (shapeOfList [length xs]) (LA.fromList xs)
+vec :: [a] -> Expr DIM1 a
+vec xs = EConst $ CVec (shapeOfList [length xs]) (NL.fromList xs)
 
 -- | symbolic dense constant matrix
-mat :: Element a => (Int,Int) -> [[a]] -> Expr DIM2 a
+mat :: (Int,Int) -> [[a]] -> Expr DIM2 a
 mat (r,c) xs 
-  | r*c == sum (map length xs) && r == length xs = EConst $ CMat (shapeOfList [c,r]) (LA.fromLists xs)
+  | r*c == sum (map length xs) && r == length xs = EConst $ CMat (shapeOfList [c,r]) (NL.fromLists xs)
   | otherwise = error $ "bad dims in mat!"++
                 "\ngiven (r,c):  " ++ show (r,c) ++
                 "\nactual (r,c): " ++ show (length xs, map length xs)

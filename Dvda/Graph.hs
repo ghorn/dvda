@@ -34,7 +34,6 @@ import Data.Maybe ( fromJust )
 import Data.IntMap ( Key )
 import qualified Data.HashSet as HS
 import qualified Data.IntMap as IM
-import Numeric.LinearAlgebra ( Element )
 import Control.Monad.State ( State, get, put )
 import qualified Dvda.HashMap as HM
 
@@ -51,12 +50,12 @@ asIfExpr f (DynamicExpr0 e) = f e
 asIfExpr f (DynamicExpr1 e) = f e
 asIfExpr f (DynamicExpr2 e) = f e
                                                          
-instance (Element a, Hashable a) => Hashable (DynamicExpr a) where
+instance Hashable a => Hashable (DynamicExpr a) where
   hash (DynamicExpr0 expr) = 0 `combine` (hash expr)
   hash (DynamicExpr1 expr) = 1 `combine` (hash expr)
   hash (DynamicExpr2 expr) = 2 `combine` (hash expr)
 
-deriving instance (Eq a, Element a) => Eq (DynamicExpr a)
+deriving instance Eq a => Eq (DynamicExpr a)
 
 type SymSet a = HS.HashSet (DynamicExpr a)
 type FgNode a = (Key, SymSet a)
@@ -67,7 +66,7 @@ data FunGraph a b c = FunGraph
                       b
                       c --  deriving Show
                                          
-instance (Hashable a, Hashable b, Hashable c, Element a)  => Hashable (FunGraph a b c) where
+instance (Hashable a, Hashable b, Hashable c)  => Hashable (FunGraph a b c) where
   hash (FunGraph _ im inskeys outskeys) = hash (IM.toList im, inskeys, outskeys)
 
 class Shape sh => DvdaDim sh where
@@ -87,11 +86,11 @@ instance DvdaDim DIM2 where
   fromDynamic _ (DynamicExpr2 expr) = expr
   fromDynamic _ _ = error "DIM2: fromDynamic error"
 
-fgLookup :: (Eq a, Hashable a, Element a, DvdaDim sh) => Expr sh a -> FunGraph a b c -> Maybe (FgNode a)
+fgLookup :: (Eq a, Hashable a, DvdaDim sh) => Expr sh a -> FunGraph a b c -> Maybe (FgNode a)
 fgLookup (ERef sh _ k) fg = fgReverseLookup sh k fg
 fgLookup expr (FunGraph hm _ _ _) = HM.lookup (makeDynamic expr) hm
 
-fgReverseLookup :: (Eq a, Hashable a, Element a, DvdaDim sh) => sh -> Key -> FunGraph a b c -> Maybe (FgNode a)
+fgReverseLookup :: (Eq a, Hashable a, DvdaDim sh) => sh -> Key -> FunGraph a b c -> Maybe (FgNode a)
 fgReverseLookup sh k fg = do
   expr <- fgExprFromKey sh k fg
   fgLookup expr fg
@@ -100,7 +99,7 @@ fgExprFromKey :: DvdaDim sh => sh -> Key -> FunGraph a b c -> Maybe (Expr sh a)
 fgExprFromKey sh k (FunGraph _ im _ _) = fmap (fromDynamic sh) (IM.lookup k im)
 
                
-symSet :: (Eq a, Hashable a, Element a, DvdaDim sh) =>
+symSet :: (Eq a, Hashable a, DvdaDim sh) =>
           FunGraph a b c -> Expr sh a -> HS.HashSet (DynamicExpr a)
 symSet fg e@(ESym sh (SymDependent _ _ dep)) = HS.union (HS.singleton (makeDynamic e)) (symSet fg (ESym sh dep))
 symSet _ e@(ESym _ _)          = HS.singleton (makeDynamic e)
@@ -117,7 +116,7 @@ symSet _ (EJacob _ _) = error "don't take symSet of EJacob"
 -- | Try to insert the Expr into the hashmap performing CSE.
 --   If the Expr is not yet in the map, insert it and return new key.
 --   Otherwise don't insert, just return existing key.
-insert :: (Hashable a, Eq a, Element a, DvdaDim sh) => Expr sh a -> State (FunGraph a b c) (Expr sh a)
+insert :: (Hashable a, Eq a, DvdaDim sh) => Expr sh a -> State (FunGraph a b c) (Expr sh a)
 insert (ERef _ _ _) = error "don't insert ERef into graph, ya goon"
 insert (EConst _) = error "don't insert EConst into graph, ya goon"
 insert expr = do
@@ -132,25 +131,25 @@ insert expr = do
                   return (ERef (dim expr) (RefHash (hash expr)) k)
 
 
-funGraphSummary :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String
+funGraphSummary :: (Show a, Show b, Show c) => FunGraph a b c -> String
 funGraphSummary (FunGraph hm _ b c) =
   init $ unlines [ "inputs: " ++ show b
                  , "outputs: " ++ show c
                  , "number of nodes: " ++ show (HM.size hm)
                  ]
 
-showNodes :: (Show a, Element a) => FunGraph a b c -> String
+showNodes :: Show a => FunGraph a b c -> String
 showNodes (FunGraph _ im _ _) = init $ unlines (map show (IM.toList im))
 
 -- more extensive
-funGraphSummary' :: (Show a, Element a, Show b, Show c) => FunGraph a b c -> String
+funGraphSummary' :: (Show a, Show b, Show c) => FunGraph a b c -> String
 funGraphSummary' fg@(FunGraph _ im _ _) =
   init $ unlines $ [ "graph:" 
                  , init $ unlines (map show (IM.toList im))
                  , ""
                  ] ++ [funGraphSummary fg]
 
-collisions :: (Hashable a, Element a) => FunGraph a b c -> (Int, Int, Double)
+collisions :: Hashable a => FunGraph a b c -> (Int, Int, Double)
 collisions (FunGraph gr _ _ _) = (numCollisions, numTotal, fromIntegral numCollisions / fromIntegral numTotal)
   where
     allHashes = sort $ map (hash . fst) $ HM.toList gr
@@ -163,7 +162,7 @@ collisions (FunGraph gr _ _ _) = (numCollisions, numTotal, fromIntegral numColli
         countCollisions n [_] = n
         countCollisions n []  = n
 
-showCollisions :: (Hashable a, Element a) => FunGraph a b c -> String
+showCollisions :: Hashable a => FunGraph a b c -> String
 showCollisions gr = show numCollisions ++ '/' : show numTotal ++ " collisions ("++show (100*frac)++" %)"
   where
     (numCollisions, numTotal, frac) = collisions gr
@@ -175,7 +174,7 @@ emptyFunGraph = FunGraph HM.empty IM.empty inerr outerr
     outerr = error "must specify outputs"
 
 
-previewGraph :: (Show a, Element a) => FunGraph a b c -> IO ()
+previewGraph :: Show a => FunGraph a b c -> IO ()
 previewGraph fungraph = do
   preview $ toFGLGraph fungraph
   threadDelay 10000
@@ -200,12 +199,12 @@ toFGLGraph (FunGraph hm _ _ _) = mkGraph lnodes ledges
         gc (EGrad _ _)  = error "don't call getChildren on EGrad"
 
 
-instance (Show a, Element a) => Labellable (DynamicExpr a) where
+instance Show a => Labellable (DynamicExpr a) where
   toLabelValue (DynamicExpr0 e) = tlv e
   toLabelValue (DynamicExpr1 e) = tlv e
   toLabelValue (DynamicExpr2 e) = tlv e
   
-tlv :: (Show a, Shape sh, Element a) => Expr sh a -> Data.GraphViz.Attributes.Complete.Label
+tlv :: (Show a, Shape sh) => Expr sh a -> Data.GraphViz.Attributes.Complete.Label
 tlv (EBinary op _ _)          = toLabelValue $ show op
 tlv (EUnary op _)             = toLabelValue $ show op
 tlv s@(ESym _ _)              = toLabelValue (show s)

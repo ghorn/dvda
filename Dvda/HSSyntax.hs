@@ -11,7 +11,6 @@ module Dvda.HSSyntax ( writeHSSource
 import Data.List ( intersperse )
 import Data.IntMap ( Key )
 import qualified Data.IntMap as IM
-import Numeric.LinearAlgebra ( Element )
 
 import Dvda.Expr ( Expr(..), Const(..) )
 import Dvda.SymMonad ( (:*)(..) )
@@ -86,7 +85,7 @@ hUnary ASinh  = "asinh"
 hUnary ATanh  = "atanh"
 hUnary ACosh  = "acosh"
 
-pretty :: (Show a, Element a) => Int -> Expr sh a -> String
+pretty :: Show a => Int -> Expr sh a -> String
 pretty _ (EBinary op (ERef _ kx) (ERef _ ky)) = hBinary op ++ " " ++ Config.nameHSVar kx ++ " " ++ Config.nameHSVar ky
 pretty _ (EBinary _ _ _) = error "EBinary got non ERef children"
 pretty _ (EUnary op (ERef _ kx)) = hUnary op ++ " " ++ Config.nameHSVar kx
@@ -104,7 +103,7 @@ pretty _ (EDeriv _ _) = error "EDeriv shouldn't be handled here"
 pretty _ (EGrad _ _)  = error "EGrad shouldn't be handled here"
 pretty _ (ERef _ _) = error "ERef shouldn't be handled here"
 
-writeAssignment :: (Show a, Element a) => (Key, DynamicExpr a) -> (String, String)
+writeAssignment :: Show a => (Key, DynamicExpr a) -> (String, String)
 writeAssignment (k, dexpr) 
   | asIfExpr isSym dexpr = ("-- " ++ Config.nameHSVar k ++ " (input)", show dexpr)
   | otherwise = (sassign k ++ (asIfExpr (pretty k) dexpr), show dexpr)
@@ -112,7 +111,7 @@ writeAssignment (k, dexpr)
     isSym (ESym _ _) = True
     isSym _ = False
 
-writeHSSource :: (Show a, Element a, GenHaskell b, GenHaskell c) => FunGraph a b c -> String -> String
+writeHSSource :: (Show a, GenHaskell b, GenHaskell c) => FunGraph a b c -> String -> String
 writeHSSource (FunGraph _ im inKeys outKeys) hash =
   init $ unlines $
   [ "-- {-# OPTIONS_GHC -Wall #-}"

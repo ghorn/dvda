@@ -10,7 +10,6 @@ module Dvda.OctaveSyntax ( GenOctave
 import Data.List ( intersperse )
 import Data.IntMap ( Key )
 import qualified Data.IntMap as IM
-import Numeric.LinearAlgebra ( Element )
 import Text.Printf
 
 import Dvda ( DIM0 )
@@ -113,7 +112,7 @@ octaveUnary ASinh  = "asinh"
 octaveUnary ATanh  = "atanh"
 octaveUnary ACosh  = "acosh"
 
-writeExpr :: (Show a, Element a) => Expr sh a -> String
+writeExpr :: Show a => Expr sh a -> String
 writeExpr (ERef _ _ k) = Config.nameHSVar k
 writeExpr (EBinary op x y) = writeExpr x ++ " " ++ octaveBinary op ++ " " ++ writeExpr y
 writeExpr (EUnary op x) = octaveUnary op ++ "( " ++ writeExpr x ++ " )"
@@ -128,7 +127,7 @@ writeExpr (EJacob _ _) = error "EJacob shouldn't be handled here"
 writeExpr (EDeriv _ _) = error "EDeriv shouldn't be handled here"
 writeExpr (EGrad _ _)  = error "EGrad shouldn't be handled here"
 
-writeAssignment :: (Show a, Element a) => IM.IntMap String -> (Key, DynamicExpr a) -> (String, String)
+writeAssignment :: Show a => IM.IntMap String -> (Key, DynamicExpr a) -> (String, String)
 writeAssignment inputMap (k, dexpr)
   | asIfExpr isSym dexpr = (imLookupErr, drop 13 (show dexpr))
   | otherwise = (sassign k ++ asIfExpr writeExpr dexpr ++ ";", drop 13 (show dexpr))
@@ -141,7 +140,7 @@ writeAssignment inputMap (k, dexpr)
       Nothing -> error $ printf "OctaveSyntax.writeAssignment has no value for key %d, val: %s" k (show dexpr)
 
 
-toOctaveSource :: (Show a, Element a, GenOctave b, GenOctave c) =>
+toOctaveSource :: (Show a, GenOctave b, GenOctave c) =>
                   FunGraph a b c -> String -> String
 toOctaveSource (FunGraph _ im inputs outputs) funName =
   unlines $

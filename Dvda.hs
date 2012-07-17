@@ -51,15 +51,11 @@ module Dvda ( -- * primitives
               -- * Heterogenous inputs/outputs
             , (:*)(..)
             , Exprs
-              -- * re-export from repa and hmatrix
---            , Index
             , DIM0
             , DIM1
             , DIM2
             , Z(..)
             , (:.)
-            , Matrix
-            , Vector
             ) where
 
 import Dvda.Expr
@@ -67,8 +63,6 @@ import Dvda.Graph
 --import Dvda.HSBuilder
 import Dvda.Shape ( DIM0, DIM1, DIM2, Z(..), Shape, (:.) )
 import Dvda.SymMonad
-
-import Numeric.LinearAlgebra ( Matrix, Vector )
 
 -- | Just a nice way to write (Exprs (DIM0 :* DIM1 :* DIM2) Double)
 -- | instead of (Expr DIM0 Double :* Expr DIM1 Double :* Expr DIM2 Double)

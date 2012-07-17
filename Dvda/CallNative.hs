@@ -17,7 +17,6 @@ import Data.Hashable ( Hashable )
 import qualified Data.IntMap as IM
 import Data.List ( mapAccumL )
 import Data.Maybe ( fromJust, catMaybes )
-import Numeric.LinearAlgebra ( Element, Container )
 
 import Dvda
 import Dvda.BinUn ( BinOp(Mul), applyBinary, applyUnary )
@@ -27,7 +26,7 @@ import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 import Dvda.SymMonad ( rad )
 
-class (Hashable (INumT b), Eq (INumT b), Element (INumT b)) => NativeInputs b where
+class (Hashable (INumT b), Eq (INumT b)) => NativeInputs b where
   type INumT b
   toReplacements :: FunGraph (INumT b) b c -> b -> HashMap (DynamicExpr (INumT b)) (DynamicExpr (INumT b))
 
@@ -35,15 +34,15 @@ insToSyms :: DvdaDim sh => FunGraph a b c -> Expr sh a -> Expr sh a -> Maybe (Dy
 insToSyms fg e@(ERef _ _ k) out = fmap (\x -> (makeDynamic x, makeDynamic out)) $ fgExprFromKey (dim e) k fg
 insToSyms _ _ _ = Nothing
 
-instance (DvdaDim sh, Hashable a, Element a, Eq a) => NativeInputs (Expr sh a) where
+instance (DvdaDim sh, Hashable a, Eq a) => NativeInputs (Expr sh a) where
   type INumT (Expr sh a) = a
   toReplacements fg@(FunGraph _ _ ins _) xs = HM.fromList $ catMaybes [insToSyms fg ins xs]
 
-instance (DvdaDim sh, Hashable a, Element a, Eq a) => NativeInputs [Expr sh a] where
+instance (DvdaDim sh, Hashable a, Eq a) => NativeInputs [Expr sh a] where
   type INumT [Expr sh a] = a
   toReplacements fg@(FunGraph _ _ ins _) xs = HM.fromList $ catMaybes $ zipWith (insToSyms fg) ins xs
 
-instance (DvdaDim sh, Hashable a, Element a, Eq a) => NativeInputs [[Expr sh a]] where
+instance (DvdaDim sh, Hashable a, Eq a) => NativeInputs [[Expr sh a]] where
   type INumT [[Expr sh a]] = a
   toReplacements fg@(FunGraph _ _ ins _) xs =
     HM.fromList $ catMaybes $ zipWith (insToSyms fg) (concat ins) (concat xs)
@@ -64,17 +63,17 @@ class NativeOutput c where
                      -> c
                      -> (FunGraph (ONumT c) b c, c)
 
-instance (DvdaDim sh, Floating a, Num (Vector a), Container Vector a, Hashable a, Eq a)
+instance (DvdaDim sh, Floating a, Hashable a, Eq a)
          => NativeOutput (Expr sh a) where
   type ONumT (Expr sh a) = a
   traverseOutputs = eval
 
-instance (DvdaDim sh, Floating a, Num (Vector a), Container Vector a, Hashable a, Eq a)
+instance (DvdaDim sh, Floating a, Hashable a, Eq a)
          => NativeOutput [Expr sh a] where
   type ONumT [Expr sh a] = a
   traverseOutputs = mapAccumL . eval
 
-instance (DvdaDim sh, Floating a, Num (Vector a), Container Vector a, Hashable a, Eq a)
+instance (DvdaDim sh, Floating a, Hashable a, Eq a)
          => NativeOutput [[Expr sh a]] where
   type ONumT [[Expr sh a]] = a
   traverseOutputs = mapAccumL . mapAccumL . eval
@@ -88,7 +87,7 @@ instance (NativeOutput a, NativeOutput b, ONumT a ~ ONumT b) => NativeOutput (a 
       (FunGraph hm2 im2 _ _, y) = traverseOutputs replacementMap (FunGraph hm1 im1 ins err) y'
 
 
-replace :: (Hashable a, Eq a, Element a, DvdaDim sh) => FunGraph a b c -> Expr sh a -> Expr sh a -> FunGraph a b c
+replace :: (Hashable a, Eq a, DvdaDim sh) => FunGraph a b c -> Expr sh a -> Expr sh a -> FunGraph a b c
 replace fg0@(FunGraph hm0 im0 ins outs) old new = FunGraph hm im ins outs
   where
     (k, _) = fromJust $ fgLookup old fg0
@@ -96,7 +95,7 @@ replace fg0@(FunGraph hm0 im0 ins outs) old new = FunGraph hm im ins outs
     im = IM.insert k (makeDynamic new) im0
   
 
-eval :: (Hashable a, Eq a, Floating a, Num (Vector a), Container Vector a, DvdaDim sh)
+eval :: (Hashable a, Eq a, Floating a, DvdaDim sh)
         => HashMap (DynamicExpr a) (DynamicExpr a) -> FunGraph a b c -> Expr sh a -> (FunGraph a b c, Expr sh a)
 eval _ _ (EDimensionless _) = error "WHO PUT AN EDimensionless IN THIS GRAPH"
 eval _ _ (EDeriv _ _) = error "WHO PUT AN EDeriv IN THIS GRAPH"
@@ -141,7 +140,7 @@ toNative fg@(FunGraph _ _ _ outs) xs = snd $ traverseOutputs replacementMap fg o
 -- | Convenience function for natively computing function This is
 --   expected to be very slow. Using code generation instead is
 --   recommended
-nativeCall :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
+nativeCall :: (Hashable a, Eq a, Show a, Floating a)
               => (Expr Z a -> [Expr Z a]) -> Expr Z a -> [Expr Z a]
 nativeCall f = toNative $ runFunGraph $ do
   let x = sym "x"
@@ -150,8 +149,7 @@ nativeCall f = toNative $ runFunGraph $ do
 
 -- | Lift a unary function over @Floating a => a@ to a function over
 -- @Floating a => Expr Z a@
-liftNative :: (Hashable a, Eq a, Show a, Element a, Floating a, 
-               Num (Vector a), Container Vector a, 
+liftNative :: (Hashable a, Eq a, Show a, Floating a, 
                Floating b, b ~ Expr Z a) => (b -> b) -> Expr Z a -> Expr Z a
 liftNative f x = case nativeCall (return . f) x of
                    [] -> error "Function didn't return."
@@ -160,8 +158,7 @@ liftNative f x = case nativeCall (return . f) x of
 -- | Evaluate a unary function over @Floating a => a@ using Dvda's
 -- internal machinery.  The typeclass constraints should make sure the
 -- error doesn't happen, but it could anyway.
-nativeRun :: (Hashable a, Eq a, Show a, Element a, Floating a, 
-              Num (Vector a), Container Vector a, 
+nativeRun :: (Hashable a, Eq a, Show a, Floating a, 
               Floating b, b ~ Expr Z a) => (b -> b) -> a -> a
 nativeRun f x = case liftNative f (EConst (CSingleton Z x)) of
                   (EConst (CSingleton Z v)) -> v
@@ -171,7 +168,7 @@ nativeRun f x = case liftNative f (EConst (CSingleton Z x)) of
 -- | Convenience function for natively computing jacobian, requires
 -- you to pass the number of inputs.  This is expected to be very
 -- slow. Using code generation instead is recommended
-nativeJacob :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
+nativeJacob :: (Hashable a, Eq a, Show a, Floating a)
                => Int -> ([Expr Z a] -> [Expr Z a]) -> [Expr Z a] -> [[Expr Z a]]
 nativeJacob n f = toNative $ runFunGraph $ do
   let xs = map (\k -> sym ("x_"++show k)) [0..(n-1::Int)]
@@ -182,7 +179,7 @@ nativeJacob n f = toNative $ runFunGraph $ do
 -- | Convenience function for natively computing gradient, requires
 -- you to pass the number of inputs.  This is expected to be very
 -- slow. Using code generation instead is recommended
-nativeGrad :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
+nativeGrad :: (Hashable a, Eq a, Show a, Floating a)
               => Int -> ([Expr Z a] -> Expr Z a) -> [Expr Z a] -> [Expr Z a]
 nativeGrad n f = toNative $ runFunGraph $ do
   let xs = map (\k -> sym ("x_"++show k)) [0..(n-1::Int)]
@@ -193,7 +190,7 @@ nativeGrad n f = toNative $ runFunGraph $ do
 -- | Convenience function for natively computing a derivative.  This
 -- is expected to be very slow. Using code generation instead is
 -- recommended
-nativeDiff :: (Hashable a, Eq a, Show a, Element a, Floating a, Num (Vector a), Container Vector a)
+nativeDiff :: (Hashable a, Eq a, Show a, Floating a)
               => (Expr Z a -> Expr Z a) -> Expr Z a -> Expr Z a
 nativeDiff f = toNative $ runFunGraph $ do
   let x = sym "x"
