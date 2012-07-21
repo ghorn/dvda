@@ -1,25 +1,19 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language GADTs #-}
-{-# Language FlexibleContexts #-}
--- {-# Language StandaloneDeriving #-}
 
 module MutableDvda.Expr ( Expr(..)
+                        , Nums(..)
+                        , Fractionals(..)
+                        , Floatings(..)
+                        , readExpr
                         , isVal
                         , sym
                         , const'
-                        , rad
-                        , backprop
                         ) where
 
-import Control.Concurrent.MVar
-import System.IO.Unsafe ( unsafePerformIO )
 import Data.Hashable ( Hashable, hash, combine )
-
-import Dvda.Dual hiding ( fad, fad' )
---import Dvda.HashMap ( HashMap )
---import qualified Dvda.HashMap as HM
-import Data.HashMap.Lazy ( HashMap )
-import qualified Data.HashMap.Lazy as HM
+import Control.Concurrent.MVar ( MVar, newMVar, readMVar )
+import System.IO.Unsafe ( unsafePerformIO )
 
 commutativeMul :: Bool
 commutativeMul = True
@@ -150,13 +144,6 @@ instance Hashable a => Hashable (Expr a) where
 --deriving instance Enum a => Enum (Floatings a)
 --deriving instance Bounded a => Bounded (Floatings a)
 
---newExpr :: IO (Expr a) -> Expr a
---newExpr x_ = do
---  x <- x_
---  case 
---newExpr x@(ERef _) = x
---newExpr x = 
-
 eref :: Expr a -> Expr a
 eref x@(ERef _) = x
 eref x = ERef (newMVar x)
@@ -164,75 +151,79 @@ eref x = ERef (newMVar x)
 instance (Num a, Eq a) => Num (Expr a) where
   (*) (EConst x) (EConst y) = EConst (x*y)
   (*) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx * ky)
+  (*) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx * ry)
   (*) (EConst x) (ENum (FromInteger ky)) = EConst $ x * fromInteger ky
   (*) (ENum (FromInteger kx)) (EConst y) = EConst $ fromInteger kx * y
-  (*) x y = ERef $ do
-    xIsZero <- isVal 0 x
-    yIsZero <- isVal 0 y
-    xIsOne <- isVal 1 x
-    yIsOne <- isVal 1 y
-    let ret
-          | xIsZero || yIsZero = 0
-          | xIsOne = y
-          | yIsOne = x
-          | otherwise = ENum $ Mul x y
-    newMVar ret
+  (*) (EConst x) (EFractional (FromRational ry)) = EConst $ x * fromRational ry
+  (*) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx * y
+  (*) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx * ry)
+  (*) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx * fromInteger ky)
+  (*) x y
+    | isVal 0 x || isVal 0 y = 0
+    | isVal 1 x = y
+    | isVal 1 y = x
+    | otherwise = eref $ ENum $ Mul x y
 
   (+) (EConst x) (EConst y) = EConst (x+y)
   (+) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx + ky)
+  (+) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx + ry)
   (+) (EConst x) (ENum (FromInteger ky)) = EConst $ x + fromInteger ky
   (+) (ENum (FromInteger kx)) (EConst y) = EConst $ fromInteger kx + y
-  (+) x y = ERef $ do
-    xIsZero <- isVal 0 x
-    yIsZero <- isVal 0 y
-    let ret
-          | xIsZero = y
-          | yIsZero = x
-          | otherwise = ENum $ Add x y
-    newMVar ret
+  (+) (EConst x) (EFractional (FromRational ry)) = EConst $ x + fromRational ry
+  (+) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx + y
+  (+) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx + ry)
+  (+) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx + fromInteger ky)
+  (+) x y
+    | isVal 0 x = y
+    | isVal 0 y = x
+    | otherwise = eref $ ENum $ Add x y
 
   (-) (EConst x) (EConst y) = EConst (x-y)
   (-) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx - ky)
+  (-) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx - ry)
   (-) (EConst x) (ENum (FromInteger ky)) = EConst $ x - fromInteger ky
   (-) (ENum (FromInteger kx)) (EConst y) = EConst $ fromInteger kx - y
-  (-) x y = ERef $ do
-    xIsZero <- isVal 0 x
-    yIsZero <- isVal 0 y
-    let ret
-          | xIsZero = negate y
-          | yIsZero = x
-          | otherwise = ENum $ Sub x y
-    newMVar ret
+  (-) (EConst x) (EFractional (FromRational ry)) = EConst $ x - fromRational ry
+  (-) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx - y
+  (-) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx - ry)
+  (-) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx - fromInteger ky)
+  (-) x y
+    | isVal 0 x = negate y
+    | isVal 0 y = x
+    | otherwise = eref $ ENum $ Sub x y
 
   abs (EConst x) = EConst (abs x)
   abs (ENum (FromInteger k)) = ENum (FromInteger (abs k))
+  abs (EFractional (FromRational r)) = EFractional (FromRational (abs r))
   abs x = eref $ ENum $ Abs x
 
   negate (EConst x) = EConst (negate x)
   negate (ENum (FromInteger k)) = ENum (FromInteger (negate k))
+  negate (EFractional (FromRational r)) = EFractional (FromRational (negate r))
   negate x = eref $ ENum $ Negate x
 
   signum (EConst x) = EConst (signum x)
   signum (ENum (FromInteger k)) = ENum (FromInteger (signum k))
+  signum (EFractional (FromRational r)) = EFractional (FromRational (signum r))
   signum x = eref $ ENum $ Signum x
 
   fromInteger = eref . ENum . FromInteger
 
 instance (Fractional a, Eq a) => Fractional (Expr a) where
   (/) (EConst x) (EConst y) = EConst (x/y)
-  (/) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = EConst $ fromInteger kx / fromInteger ky
+--  (/) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx / ky)
+  (/) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx / ry)
   (/) (EConst x) (ENum (FromInteger ky)) = EConst $ x / fromInteger ky
   (/) (ENum (FromInteger kx)) (EConst y) = EConst $ fromInteger kx / y
-  (/) x y = ERef $ do
-    xIsZero <- isVal 0 x
-    yIsZero <- isVal 0 y
-    yIsOne <- isVal 1 y
-    let ret
-          | yIsZero = error "Fractional (Expr a) divide by zero"
-          | xIsZero = 0
-          | yIsOne = x
-          | otherwise = EFractional $ Div x y
-    newMVar ret
+  (/) (EConst x) (EFractional (FromRational ry)) = EConst $ x / fromRational ry
+  (/) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx / y
+  (/) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx / ry)
+  (/) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx / fromInteger ky)
+  (/) x y
+    | isVal 0 y = error "Fractional (Expr a) divide by zero"
+    | isVal 0 x = 0
+    | isVal 1 y = x
+    | otherwise = eref $ EFractional $ Div x y
 
   fromRational = eref . EFractional . FromRational
 
@@ -240,23 +231,29 @@ instance (Floating a, Eq a) => Floating (Expr a) where
   pi          = eref $ EConst pi
   x ** y      = eref $ EFloating $ Pow x y
   logBase x y = eref $ EFloating $ LogBase x y
-  exp         = eref . EFloating . Exp
-  log         = eref . EFloating . Log
-  sin         = eref . EFloating . Sin
-  cos         = eref . EFloating . Cos
-  asin        = eref . EFloating . ASin
-  atan        = eref . EFloating . ATan
-  acos        = eref . EFloating . ACos
-  sinh        = eref . EFloating . Sinh
-  cosh        = eref . EFloating . Cosh
-  tanh        = eref . EFloating . Tanh
-  asinh       = eref . EFloating . ASinh
-  atanh       = eref . EFloating . ATanh
-  acosh       = eref . EFloating . ACosh
+  exp         = applyFloatingUn (  exp,   Exp)
+  log         = applyFloatingUn (  log,   Log)
+  sin         = applyFloatingUn (  sin,   Sin)
+  cos         = applyFloatingUn (  cos,   Cos)
+  asin        = applyFloatingUn ( asin,  ASin)
+  atan        = applyFloatingUn ( atan,  ATan)
+  acos        = applyFloatingUn ( acos,  ACos)
+  sinh        = applyFloatingUn ( sinh,  Sinh)
+  cosh        = applyFloatingUn ( cosh,  Cosh)
+  tanh        = applyFloatingUn ( tanh,  Tanh)
+  asinh       = applyFloatingUn (asinh, ASinh)
+  atanh       = applyFloatingUn (atanh, ATanh)
+  acosh       = applyFloatingUn (acosh, ACosh)
 
+applyFloatingUn :: Floating a => (t -> a, Expr t -> Floatings (Expr a)) -> Expr t -> Expr a
+applyFloatingUn (f,_) (EConst x) = EConst (f x)
+applyFloatingUn (f,_) (ENum (FromInteger x)) = EConst (f $ fromInteger x)
+applyFloatingUn (f,_) (EFractional (FromRational x)) = EConst (f $ fromRational x)
+applyFloatingUn (_,f) x = eref $ EFloating (f x)
+
+--------------------------- show instances ------------------------
 instance Show a => Show (Expr a) where
-  show (ERef ref) = show $ unsafePerformIO $ readMVar $ unsafePerformIO ref
---  show (ERef ref) = "ERef"
+  show (ERef _) = "ERef"
   show (ESym name) = name
   show (EConst a) = show a
   show (ENum x) = show x
@@ -264,7 +261,7 @@ instance Show a => Show (Expr a) where
   show (EFloating x) = show x
 
 sym :: String -> Expr a
-sym = ESym
+sym name = eref (ESym name)
 
 const' :: a -> Expr a
 const' = EConst
@@ -273,66 +270,10 @@ readExpr :: Expr a -> IO (Expr a)
 readExpr (ERef mx) = mx >>= readMVar >>= readExpr
 readExpr x = return x
 
--- | Checks to see if an Expr is equal to a value. Does not perform any simplification first, beware.
-isVal :: Eq a => a -> Expr a -> IO Bool
-isVal v e@(ERef _) = readExpr e >>= isVal v
-isVal v (EConst c) = return $ v == c
-isVal v (ENum (FromInteger k)) = return $ v == fromInteger k
-isVal _ _ = return False
-
-fad :: Num a => (Dual a -> [Dual a]) -> a -> [a]
-fad f x = map dualPerturbation $ f (Dual x 1)
-
-bpBinary :: (Eq a, Num a)
-            => Expr a -> Expr a -> Expr a
-            -> (Dual (Expr a) -> Dual (Expr a) -> Dual (Expr a))
-            -> IO [(Expr a, Expr a)]
-bpBinary sens g h binop = do
-   let dfdg = dualPerturbation $ binop (Dual g 1) (Dual h 0)
-       dfdh = dualPerturbation $ binop (Dual g 0) (Dual h 1)
-   gsens <- backprop (sens*dfdg) g
-   hsens <- backprop (sens*dfdh) h
-   return $ gsens ++ hsens
-
-bpUnary :: (Eq a, Num a)
-           => Expr a -> Expr a
-           -> (Dual (Expr a) -> Dual (Expr a))
-           -> IO [(Expr a, Expr a)]
-bpUnary sens g unop = do
-   let dfdg = dualPerturbation $ unop (Dual g 1)
-   backprop (sens*dfdg) g
-
-backprop :: Eq a => Expr a -> Expr a -> IO [(Expr a, Expr a)]
-backprop sens e@(ERef _) = readExpr e >>= backprop sens
-backprop sens e@(ESym _) = return [(e,sens)]
-backprop _ (EConst _) = return []
-backprop _ (ENum (FromInteger _)) = return []
-backprop _ (EFractional (FromRational _)) = return []
-backprop sens (ENum (Mul x y)) = bpBinary sens x y (*)
-backprop sens (ENum (Add x y)) = bpBinary sens x y (+)
-backprop sens (ENum (Sub x y)) = bpBinary sens x y (-)
-backprop sens (ENum (Abs x))    = bpUnary sens x abs
-backprop sens (ENum (Negate x)) = bpUnary sens x negate
-backprop sens (ENum (Signum x)) = bpUnary sens x signum
-backprop sens (EFractional (Div x y)) = bpBinary sens x y (/)
-backprop sens (EFloating (Pow x y)) = bpBinary sens x y (**)
-backprop sens (EFloating (LogBase x y)) = bpBinary sens x y logBase
-backprop sens (EFloating (Exp x))   = bpUnary sens x exp
-backprop sens (EFloating (Log x))   = bpUnary sens x log
-backprop sens (EFloating (Sin x))   = bpUnary sens x sin
-backprop sens (EFloating (Cos x))   = bpUnary sens x cos
-backprop sens (EFloating (ASin x))  = bpUnary sens x asin
-backprop sens (EFloating (ATan x))  = bpUnary sens x atan
-backprop sens (EFloating (ACos x))  = bpUnary sens x acos
-backprop sens (EFloating (Sinh x))  = bpUnary sens x sinh
-backprop sens (EFloating (Cosh x))  = bpUnary sens x cosh
-backprop sens (EFloating (Tanh x))  = bpUnary sens x tanh
-backprop sens (EFloating (ASinh x)) = bpUnary sens x asinh
-backprop sens (EFloating (ATanh x)) = bpUnary sens x atanh
-backprop sens (EFloating (ACosh x)) = bpUnary sens x acosh
-
-rad :: (Num a, Eq a, Hashable (Expr a)) => Expr a -> IO (HashMap (Expr a) (Expr a))
-rad x = do
-  sensitivities <- backprop 1 x
-  return $ HM.fromListWith (+) sensitivities
-
+-- | Checks to see if an Expr is equal to a value
+isVal :: Eq a => a -> Expr a -> Bool
+isVal v e@(ERef _) = isVal v (unsafePerformIO $ readExpr e)
+isVal v (EConst c) = v == c
+isVal v (ENum (FromInteger k)) = v == fromInteger k
+isVal v (EFractional (FromRational r)) = v == fromRational r
+isVal _ _ = False
