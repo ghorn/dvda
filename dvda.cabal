@@ -71,6 +71,7 @@ Library
 --                     Dvda.Codegen.Utils
 
   Other-modules:     Dvda.HashMap
+                     MutableDvda.Expr
 
   Build-depends:     base       >= 4     && < 5,
                      hashable  >= 1.1 && < 1.2,
