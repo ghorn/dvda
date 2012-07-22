@@ -64,6 +64,7 @@ Library
                      Dvda.Shape
                      Dvda.SparseLA
                      Dvda.SymMonad
+                     Dvda.Tests.Unary
 --                     Dvda.CFunction
 --                     Dvda.Codegen.CBuilder
 --                     Dvda.Codegen.CCallWrapper
@@ -81,7 +82,10 @@ Library
                      fgl >= 5.4 && < 5.5,
                      mtl >= 2.0 && < 2.1,
                      directory >= 1.1 && < 1.2,
-                     latc >= 0.0.2 && < 0.1
+                     latc >= 0.0.2 && < 0.1,
+                     QuickCheck == 2.4.*,
+                     test-framework-quickcheck2,
+                     test-framework
 --                     process >= 1.1 && < 1.2,
 --                     text >= 0.11 && < 0.12,
 --                     plugins >= 1.5 && < 1.6,
@@ -98,15 +102,25 @@ flag test
   default:     False
 
 Test-suite test
-  type:		   exitcode-stdio-1.0
-  hs-source-dirs:  test, .
-  main-is:         Test.hs
-  build-depends:   base,                      
-                   QuickCheck == 2.4.*,
-                   ad,
-                   test-framework-quickcheck2,
-                   test-framework
-  ghc-options:     -Wall
+  type:		     exitcode-stdio-1.0
+  hs-source-dirs:    .
+  main-is:           TestMain.hs
+  build-depends:     base,
+                     dvda,
+                     hashable  >= 1.1 && < 1.2,
+                     containers >= 0.4 && < 0.5,
+                     unordered-containers  >= 0.2 && < 0.3,
+                     graphviz >= 2999.12 && < 2999.13,
+                     fgl >= 5.4 && < 5.5,
+                     mtl >= 2.0 && < 2.1,
+                     directory >= 1.1 && < 1.2,
+                     latc >= 0.0.2 && < 0.1,
+                     QuickCheck == 2.4.*,
+--                     directory >= 1.1 && < 1.2,
+                     ad,
+                     test-framework-quickcheck2,
+                     test-framework
+  ghc-options:       -Wall
 
 -- Executable stressTest
 --   if flag(stressTest)

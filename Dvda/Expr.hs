@@ -3,6 +3,7 @@
 {-# Language DeriveDataTypeable #-}
 {-# Language GADTs #-}
 {-# Language FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Dvda.Expr ( Expr(..)
                  , Const(..)
@@ -27,12 +28,14 @@ module Dvda.Expr ( Expr(..)
                  , symDependentN
                  ) where
 
-import Numeric.LATC.NestedList ( Matrix, Vector, vbinary, mbinary )
-import qualified Numeric.LATC.NestedList as NL
+import Control.Monad ( liftM, liftM2, liftM3 )
 import Data.IntMap ( Key )
 import Data.Hashable ( Hashable, hash, combine )
 import Data.List ( sort )
 import Data.Typeable ( Typeable2 )
+import Numeric.LATC.NestedList ( Matrix, Vector, vbinary, mbinary )
+import qualified Numeric.LATC.NestedList as NL
+import Test.QuickCheck -- ( Arbitrary(..) )
 
 import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative, lassoc, rassoc )
 import Dvda.Config ( simplifyCommutativeOps )
@@ -356,15 +359,24 @@ msym (r,c) = (ESym (Z :. r :. c)) . Sym
 
 -- | symbolic dense constant vector
 vec :: [a] -> Expr DIM1 a
-vec xs = EConst $ CVec (shapeOfList [length xs]) (NL.fromList xs)
+vec = EConst . cvec
 
 -- | symbolic dense constant matrix
 mat :: (Int,Int) -> [[a]] -> Expr DIM2 a
-mat (r,c) xs 
-  | r*c == sum (map length xs) && r == length xs = EConst $ CMat (shapeOfList [c,r]) (NL.fromLists xs)
+mat rc xs = EConst $ cmat rc xs
+
+-- | dense constant vector (for internal use)
+cvec :: [a] -> Const DIM1 a
+cvec xs = CVec (shapeOfList [length xs]) (NL.fromList xs)
+
+-- | dense constant matrix (for internal use)
+cmat :: (Int, Int) -> [[a]] -> Const DIM2 a
+cmat (r,c) xs 
+  | r*c == sum (map length xs) && r == length xs = CMat (shapeOfList [c,r]) (NL.fromLists xs)
   | otherwise = error $ "bad dims in mat!"++
                 "\ngiven (r,c):  " ++ show (r,c) ++
                 "\nactual (r,c): " ++ show (length xs, map length xs)
+
 
 -- | symbolic sparse vector
 svec :: String -> Int -> SparseVec (Expr DIM0 a)
@@ -394,3 +406,52 @@ jacob = EJacob
 
 hess :: Expr DIM0 a -> Expr DIM1 a -> Expr DIM2 a
 hess expr args = jacob (grad expr args) args
+
+
+
+------------------------------- arbitrary instances --------------------------
+-- Arbitrary constants
+instance Arbitrary a => Arbitrary (Const Z a) where
+    arbitrary = arbCSingleton
+    
+instance Arbitrary a => Arbitrary (Const DIM1 a) where
+    arbitrary = arbCVector
+
+instance Arbitrary a => Arbitrary (Const DIM2 a) where
+    arbitrary = arbCMatrix
+
+arbCVector :: Arbitrary a => Gen (Const DIM1 a)
+arbCVector = liftM cvec $ listOf1 $ arbitrary
+
+
+arbCMatrix :: Arbitrary a => Gen (Const DIM2 a)
+arbCMatrix = do r <- choose (0, 100)
+                c <- choose (0, 100)
+                l <- vectorOf (r*c) arbitrary
+                return $ cmat (r, c) l
+
+class Shape sh => ArbSingleton sh where
+    arbCSingleton :: Arbitrary a => Gen (Const sh a)
+
+instance ArbSingleton Z where
+    arbCSingleton = (liftM (CSingleton Z)) $ arbitrary
+
+
+-- Arbitrary expressions
+instance Arbitrary a => Arbitrary (Expr Z a) where
+   arbitrary = arbExpr
+
+class Shape sh => ArbExpr sh where
+    arbExpr :: Arbitrary a => Gen (Expr sh a)
+
+arbConst :: (Shape sh, Arbitrary (Const sh a), Arbitrary a) => Gen (Expr sh a)
+arbConst = liftM EConst arbitrary
+
+arbUnary :: (Shape sh, Arbitrary (Expr sh a)) => Gen (Expr sh a)
+arbUnary = liftM2 EUnary arbitrary arbitrary
+
+arbBinary :: (Shape sh, Arbitrary (Expr sh a)) => Gen (Expr sh a)
+arbBinary = liftM3 EBinary arbitrary arbitrary arbitrary
+
+instance ArbExpr Z where
+   arbExpr = oneof [arbConst, arbUnary, arbBinary]

@@ -14,6 +14,7 @@ module Dvda.BinUn ( BinOp(..)
                   ) where
 
 import Data.Hashable ( Hashable, hash )
+import Test.QuickCheck ( Arbitrary(..), oneof )
 
 import Dvda.Dual ( Dual(..), dualPerturbation )
 
@@ -42,6 +43,13 @@ data BinOp = Add
            | Div
            | Pow
            | LogBase deriving (Eq, Show, Enum, Bounded)
+
+-- Arbitrary math operations
+instance Arbitrary UnOp where
+    arbitrary = oneof $ map return [minBound..maxBound]
+
+instance Arbitrary BinOp where
+    arbitrary = oneof $ map return [minBound..maxBound]
 
 instance Hashable UnOp where
   hash Abs    = 0
