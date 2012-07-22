@@ -2,10 +2,11 @@
 {-# Language FlexibleContexts #-}
 
 
-module MutableDvda.Utils ( countNodes
+module MutableDvda.Utils ( FullShow(..)
+                         , countNodes
                          , backprop
                          , rad
-                        ) where
+                         ) where
 
 import Data.HashMap.Lazy ( HashMap )
 import qualified Data.HashMap.Lazy as HM

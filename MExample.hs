@@ -3,14 +3,15 @@
 
 module Main where
 
-import Control.Monad ( liftM )
+import qualified Dvda.HashMap as HM
 
 import MutableDvda.Expr
-import MutableDvda.SharedVar
+import MutableDvda.Graph
+--import MutableDvda.SharedVar
 import MutableDvda.Utils
 
 bg :: Floating a => a -> a
-bg x' = f
+bg x' = f -- x' + 2*x'
   where
     y' = 2*x'
     z' = 4*y'
@@ -32,13 +33,24 @@ bg x' = f
 booboo :: Expr Double
 booboo = bg (sym "x")
 
+--main :: IO ()
+--main = do
+----  (fullShow booboo) >>= putStrLn
+--  (toIO $ countNodes booboo) >>= print
+----  putStrLn "--------------------------------------------------"
+--  bam <- toIO (backprop 1 booboo)
+------  mapM (\(_,x) -> fullShow x) bam >>= mapM_ putStrLn
+------  mapM_ putStrLn $ map (\(x,_) -> show x) bam
+--  toIO (fmap sum (mapM (\(_,x) -> countNodes x) bam)) >>= print
+----  print $ length $ bam
+
 main :: IO ()
 main = do
---  (fullShow booboo) >>= putStrLn
-  (toIO $ countNodes booboo) >>= print
---  putStrLn "--------------------------------------------------"
-  bam <- toIO (backprop 1 booboo)
-----  mapM (\(_,x) -> fullShow x) bam >>= mapM_ putStrLn
-----  mapM_ putStrLn $ map (\(x,_) -> show x) bam
-  toIO (fmap sum (mapM (\(_,x) -> countNodes x) bam)) >>= print
---  print $ length $ bam
+--  (_, n, _) <- toGExprs [booboo]
+  putStrLn "running rad"
+  radMap <- rad booboo
+--  nodesBeforeCse <- countNodes 
+--  putStrLn $ "nodes before cse: " ++ show nodesBeforeCse
+  putStrLn "making graph / performing CSE"
+  (_,n,_) <- toGExprs (HM.elems radMap)
+  putStrLn $ show n ++ " nodes"
