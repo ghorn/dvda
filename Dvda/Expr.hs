@@ -276,11 +276,11 @@ makeBinary''' _ f (EConst x') (EConst y') = EConst $ czipWith x' y'
     czipWith (CVec       sh x) (CVec       _ y) = CVec       sh (vbinary f x y)
     czipWith (CMat       sh x) (CMat       _ y) = CMat       sh (mbinary f x y)
     -- broadcast singletons
-    czipWith (CSingleton _ x) (CTensor   sh y) = CTensor    sh (NL.map (f x) y)
-    czipWith (CSingleton _ x) (CVec      sh y) = CVec       sh (NL.map (f x) y)
+    czipWith (CSingleton _ x) (CTensor   sh y) = CTensor    sh (NL.vmap (f x) y)
+    czipWith (CSingleton _ x) (CVec      sh y) = CVec       sh (NL.vmap (f x) y)
     czipWith (CSingleton _ x) (CMat      sh y) = CMat       sh (NL.mmap (f x) y)
-    czipWith (CTensor   sh x) (CSingleton _ y) = CTensor    sh (NL.map (`f` y) x)
-    czipWith (CVec      sh x) (CSingleton _ y) = CVec       sh (NL.map (`f` y) x)
+    czipWith (CTensor   sh x) (CSingleton _ y) = CTensor    sh (NL.vmap (`f` y) x)
+    czipWith (CVec      sh x) (CSingleton _ y) = CVec       sh (NL.vmap (`f` y) x)
     czipWith (CMat      sh x) (CSingleton _ y) = CMat       sh (NL.mmap (`f` y) x)
     czipWith _ _ = error "czipWith called on unlike constants"
 -- | otherwise make symbolic binary
@@ -293,8 +293,8 @@ makeUnary _ f (EDimensionless x) = EDimensionless (f x)
 makeUnary _ f' (EConst x') = EConst $ cmap f' x'
   where
     cmap f (CSingleton sh x) = CSingleton sh (f x)
-    cmap f (CTensor    sh x) = CTensor    sh (NL.map f x)
-    cmap f (CVec       sh x) = CVec       sh (NL.map f x)
+    cmap f (CTensor    sh x) = CTensor    sh (NL.vmap f x)
+    cmap f (CVec       sh x) = CVec       sh (NL.vmap f x)
     cmap f (CMat       sh x) = CMat       sh (NL.mmap f x)
 makeUnary op _ x = EUnary op x
 
