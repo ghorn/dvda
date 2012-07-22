@@ -29,20 +29,6 @@ data Expr a where
   EFractional :: Fractional a => Fractionals (Expr a) -> Expr a
   EFloating :: Floating a => Floatings (Expr a) -> Expr a
 
-instance Eq a => Eq (Expr a) where
-  (==) x@(ERef mx_) y@(ERef my_) = SV.unsafePerformSV $ do
-    mx <- mx_
-    my <- my_
-    return $ mx == my || SV.unsafePerformSV (readExpr x) == SV.unsafePerformSV (readExpr y)
-  (==) x@(ERef _) y = (==) (SV.unsafePerformSV (readExpr x)) y
-  (==) x y@(ERef _) = (==) x (SV.unsafePerformSV (readExpr y))
-  (==) (ESym x) (ESym y) = x == y
-  (==) (EConst x) (EConst y) = x == y
-  (==) (ENum x) (ENum y) = x == y
-  (==) (EFractional x) (EFractional y) = x == y
-  (==) (EFloating x) (EFloating y) = x == y
-  (==) _ _ = False
-
 data Nums a = Mul a a
             | Add a a
             | Sub a a
@@ -51,20 +37,6 @@ data Nums a = Mul a a
             | Signum a
             | FromInteger Integer deriving Show
 
-instance Eq a => Eq (Nums a) where
-  (Mul x0 y0) == (Mul x1 y1) = if commutativeMul
-                               then (x0 == x1 && y0 == y1) || (x0 == y1 && x1 == y0)
-                               else x0 == x1 && y0 == y1
-  (Add x0 y0) == (Add x1 y1) = if commutativeAdd
-                               then (x0 == x1 && y0 == y1) || (x0 == y1 && x1 == y0)
-                               else x0 == x1 && y0 == y1
-  (Sub x0 y0) == (Sub x1 y1) = x0 == x1 && y0 == y1
-  (Negate x) == (Negate y) = x == y
-  (Abs x) == (Abs y) = x == y
-  (Signum x) == (Signum y) = x == y
-  (FromInteger x) == (FromInteger y) = x == y
-  _ == _ = False
-  
 data Fractionals a = Div a a
                    | FromRational Rational deriving (Eq, Show)
 
@@ -83,6 +55,37 @@ data Floatings a = Pow a a
                  | ASinh a
                  | ATanh a
                  | ACosh a deriving (Eq, Show)
+
+
+----------------------- Eq instances -------------------------
+instance Eq a => Eq (Expr a) where
+  (==) x@(ERef mx_) y@(ERef my_) = SV.unsafePerformSV $ do
+    mx <- mx_
+    my <- my_
+    return $ mx == my || SV.unsafePerformSV (readExpr x) == SV.unsafePerformSV (readExpr y)
+  (==) x@(ERef _) y = (==) (SV.unsafePerformSV (readExpr x)) y
+  (==) x y@(ERef _) = (==) x (SV.unsafePerformSV (readExpr y))
+  (==) (ESym x) (ESym y) = x == y
+  (==) (EConst x) (EConst y) = x == y
+  (==) (ENum x) (ENum y) = x == y
+  (==) (EFractional x) (EFractional y) = x == y
+  (==) (EFloating x) (EFloating y) = x == y
+  (==) _ _ = False
+
+instance Eq a => Eq (Nums a) where
+  (Mul x0 y0) == (Mul x1 y1) = if commutativeMul
+                               then (x0 == x1 && y0 == y1) || (x0 == y1 && x1 == y0)
+                               else x0 == x1 && y0 == y1
+  (Add x0 y0) == (Add x1 y1) = if commutativeAdd
+                               then (x0 == x1 && y0 == y1) || (x0 == y1 && x1 == y0)
+                               else x0 == x1 && y0 == y1
+  (Sub x0 y0) == (Sub x1 y1) = x0 == x1 && y0 == y1
+  (Negate x) == (Negate y) = x == y
+  (Abs x) == (Abs y) = x == y
+  (Signum x) == (Signum y) = x == y
+  (FromInteger x) == (FromInteger y) = x == y
+  _ == _ = False
+  
 
 ----------------------------- hashable instances --------------------------
 instance Hashable a => Hashable (Nums a) where
