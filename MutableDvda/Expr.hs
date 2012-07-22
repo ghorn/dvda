@@ -128,7 +128,7 @@ instance Hashable a => Hashable (Floatings a) where
   hash (ACosh x) = hash "ACosh" `combine` hash x
 
 instance Hashable a => Hashable (Expr a) where
-  hash (ERef _) = error "can't hash ERef"
+  hash e@(ERef _)      = hash (unsafePerformIO $ readExpr e)
   hash (ESym name)     = hash "ESym"        `combine` hash name
   hash (EConst x)      = hash "EConst"      `combine` hash x
   hash (ENum x)        = hash "ENum"        `combine` hash x
