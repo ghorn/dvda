@@ -73,9 +73,10 @@ Library
 --                     Dvda.Codegen.Utils
 
   Other-modules:     Dvda.HashMap
+                     MutableDvda.AD
                      MutableDvda.Expr
+                     MutableDvda.FullShow
                      MutableDvda.Graph
-                     MutableDvda.Utils
 
   Build-depends:     base       >= 4     && < 5,
                      hashable  >= 1.1 && < 1.2,

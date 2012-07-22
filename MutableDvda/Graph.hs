@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language GADTs #-}
- {-# Language FlexibleContexts #-}
 {-# Language StandaloneDeriving #-}
 
 
@@ -16,7 +15,6 @@ import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 
 import MutableDvda.Expr
-import MutableDvda.Utils
 
 data GExpr a where
   GRef :: Int -> GExpr a

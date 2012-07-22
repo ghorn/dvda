@@ -5,12 +5,10 @@ module Main where
 
 import qualified Dvda.HashMap as HM
 
+import MutableDvda.AD
 import MutableDvda.Expr
+--import MutableDvda.FullShow
 import MutableDvda.Graph
---import MutableDvda.SharedVar
-import MutableDvda.Utils
-
-import System.IO.Unsafe
 
 bg :: Floating a => a -> a
 bg x' = f -- x' + 2*x'
@@ -32,8 +30,8 @@ bg x' = f -- x' + 2*x'
 --    fy = diff f y'
 --    fz = diff f z'
 
-f :: Expr Double
-f = bg (sym "x")
+g :: Expr Double
+g = bg (sym "x")
 
 --f :: Expr Double
 --f = x + x where x = sym "x"
@@ -68,12 +66,12 @@ f = bg (sym "x")
 
 main :: IO ()
 main = do
-  (_, n, _) <- toGExprs [f]
+--  (_, n, _) <- toGExprs [g]
   putStrLn "\nrunning rad..."
-  radMap <- rad f
+  radMap <- rad g
 --  sx <- fullShow (head $ HM.keys radMap)
 --  sdx <- fullShow (head $ HM.elems radMap)
 --  putStrLn $ "df/d" ++ sx ++ " = " ++ sdx
   putStrLn "\nmaking graph / performing CSE..."
-  (_,n,hm) <- toGExprs (f:(HM.elems radMap))
+  (_,n,_) <- toGExprs (g:(HM.elems radMap))
   putStrLn $ show n ++ " nodes"
