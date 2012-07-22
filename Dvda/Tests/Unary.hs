@@ -18,12 +18,12 @@ import Numeric.LATC.NestedList ( Vector )
 
 import Dvda.CallNative ( nativeRun )
 
--- Arbitrary numerical functions
-binary :: Floating a => [a -> a -> a]
-binary = [(*), (+), (-), (/)]
-
-unary :: Floating a => [a -> a]
-unary = [abs, negate, signum, exp, sqrt, log, sin, cos, tan, asin, acos, atan, tanh, sinh, cosh, atanh, asinh, acosh]
+---- Arbitrary numerical functions
+--binary :: Floating a => [a -> a -> a]
+--binary = [(*), (+), (-), (/)]
+--
+--unary :: Floating a => [a -> a]
+--unary = [abs, negate, signum, exp, sqrt, log, sin, cos, tan, asin, acos, atan, tanh, sinh, cosh, atanh, asinh, acosh]
 
 -- We have to do this by hand because of all kinds of stupid type
 -- shit.  Otherwise we'd map over unary.
