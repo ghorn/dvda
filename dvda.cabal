@@ -64,6 +64,7 @@ Library
                      Dvda.Shape
                      Dvda.SparseLA
                      Dvda.SymMonad
+                     Dvda.Tests.Function
                      Dvda.Tests.Unary
 --                     Dvda.CFunction
 --                     Dvda.Codegen.CBuilder
