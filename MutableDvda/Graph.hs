@@ -10,16 +10,13 @@ module MutableDvda.Graph ( GExpr(..)
                          ) where
 
 import Data.Hashable ( Hashable, hash, combine )
+import Control.Concurrent.MVar
 
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 
 import MutableDvda.Expr
-import MutableDvda.SharedVar
-
-data GraphRef = GraphRef Int deriving Eq
-instance Hashable GraphRef where
-  hash (GraphRef k) = hash "GraphRef" `combine` k
+import MutableDvda.Utils
 
 data GExpr a where
   GRef :: Int -> GExpr a
@@ -29,6 +26,7 @@ data GExpr a where
   GFractional :: Fractionals GraphRef -> GExpr a
   GFloating :: Floatings GraphRef -> GExpr a
 
+deriving instance Show a => Show (GExpr a)
 deriving instance Eq a => Eq (GExpr a)
 
 instance Hashable a => Hashable (GExpr a) where
@@ -40,7 +38,7 @@ instance Hashable a => Hashable (GExpr a) where
   hash (GFloating x)   = hash "GFloating"   `combine` hash x
 
 
-toGExprs :: (Hashable a, Eq a) => [Expr a] -> SVMonad ([GraphRef], Int, HashMap (GExpr a) GraphRef)
+toGExprs :: (Hashable a, Eq a) => [Expr a] -> IO ([GraphRef], Int, HashMap (GExpr a) GraphRef)
 toGExprs exprs = f ([], 0, HM.empty) exprs
   where
     f ret [] = return ret
@@ -49,7 +47,8 @@ toGExprs exprs = f ([], 0, HM.empty) exprs
       f (grefs ++ [gref], n, hm) es
 
 insert :: (Eq a, Hashable a) => HashMap (GExpr a) GraphRef
-          -> Int -> Expr a -> SVMonad (GraphRef, Int, HashMap (GExpr a) GraphRef)
+          -> Int -> Expr a -> IO (GraphRef, Int, HashMap (GExpr a) GraphRef)
+insert hm n (EGraphRef _ gr)               = return (gr, n, hm)
 insert hm n (ESym name)                    = return $ cseInsert hm n (GSym name)
 insert hm n (EConst c)                     = return $ cseInsert hm n (GConst c)
 insert hm n (ENum (Mul x y))               = binaryInsert hm n GNum Mul x y
@@ -76,9 +75,15 @@ insert hm n (EFloating (Tanh x))           = unaryInsert hm n GFloating Tanh x
 insert hm n (EFloating (ASinh x))          = unaryInsert hm n GFloating ASinh x
 insert hm n (EFloating (ATanh x))          = unaryInsert hm n GFloating ATanh x
 insert hm n (EFloating (ACosh x))          = unaryInsert hm n GFloating ACosh x
-insert hm n e@(ERef _) = do -- if the 
-  e' <- readExpr e
-  insert hm n e'
+insert hm0 n0 (ERef mv) = do
+  e <- takeMVar mv
+  case e of (EGraphRef _ gr) -> do -- reuse node
+              putMVar mv e
+              return (gr, n0, hm0)
+            _ -> do -- insert and memoize new node
+              (gr, n, hm) <- insert hm0 n0 e
+              putMVar mv (EGraphRef e gr)
+              return (gr, n, hm)
 
 binaryInsert
   :: (Eq a, Hashable a) =>
@@ -88,7 +93,7 @@ binaryInsert
      -> (GraphRef -> GraphRef -> t)
      -> Expr a
      -> Expr a
-     -> SVMonad (GraphRef, Int, HashMap (GExpr a) GraphRef)
+     -> IO (GraphRef, Int, HashMap (GExpr a) GraphRef)
 binaryInsert hm0 n0 gnum mul x y = do
   (kx,n1,hm1) <- insert hm0 n0 x
   (ky,n2,hm2) <- insert hm1 n1 y
@@ -100,7 +105,7 @@ unaryInsert
      -> (nf GraphRef -> GExpr a)
      -> (GraphRef -> nf GraphRef)
      -> Expr a
-     -> SVMonad (GraphRef, Int, HashMap (GExpr a) GraphRef)
+     -> IO (GraphRef, Int, HashMap (GExpr a) GraphRef)
 unaryInsert hm0 n0 gnum mul x = do
   (k,n1,hm1) <- insert hm0 n0 x
   return $ cseInsert hm1 n1 (gnum (mul k))

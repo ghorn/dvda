@@ -10,6 +10,8 @@ import MutableDvda.Graph
 --import MutableDvda.SharedVar
 import MutableDvda.Utils
 
+import System.IO.Unsafe
+
 bg :: Floating a => a -> a
 bg x' = f -- x' + 2*x'
   where
@@ -30,8 +32,11 @@ bg x' = f -- x' + 2*x'
 --    fy = diff f y'
 --    fz = diff f z'
 
-booboo :: Expr Double
-booboo = bg (sym "x")
+f :: Expr Double
+f = bg (sym "x")
+
+--f :: Expr Double
+--f = x + x where x = sym "x"
 
 --main :: IO ()
 --main = do
@@ -44,13 +49,31 @@ booboo = bg (sym "x")
 --  toIO (fmap sum (mapM (\(_,x) -> countNodes x) bam)) >>= print
 ----  print $ length $ bam
 
+--main :: IO ()
+--main = do
+----  (_, n, _) <- toGExprs [booboo]
+--  sf <- fullShow f
+--  putStrLn $ "f = " ++ sf ++ " ( " ++ show (unsafePerformIO $ readExpr f) ++ " )"
+----  putStrLn "\nrunning rad..."
+----  radMap <- rad f
+----  sx <- fullShow (head $ HM.keys radMap)
+----  sdx <- fullShow (head $ HM.elems radMap)
+----  putStrLn $ "df/d" ++ sx ++ " = " ++ sdx
+--  putStrLn "\nmaking graph / performing CSE..."
+--  (_,n,hm) <- toGExprs [f] -- :(HM.elems radMap))
+--  putStrLn $ show n ++ " nodes"
+--
+--  putStrLn "\nhashmap:"
+--  mapM_ print (HM.toList hm)
+
 main :: IO ()
 main = do
---  (_, n, _) <- toGExprs [booboo]
-  putStrLn "running rad"
-  radMap <- rad booboo
---  nodesBeforeCse <- countNodes 
---  putStrLn $ "nodes before cse: " ++ show nodesBeforeCse
-  putStrLn "making graph / performing CSE"
-  (_,n,_) <- toGExprs (HM.elems radMap)
+  (_, n, _) <- toGExprs [f]
+  putStrLn "\nrunning rad..."
+  radMap <- rad f
+--  sx <- fullShow (head $ HM.keys radMap)
+--  sdx <- fullShow (head $ HM.elems radMap)
+--  putStrLn $ "df/d" ++ sx ++ " = " ++ sdx
+  putStrLn "\nmaking graph / performing CSE..."
+  (_,n,hm) <- toGExprs (f:(HM.elems radMap))
   putStrLn $ show n ++ " nodes"
