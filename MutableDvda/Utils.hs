@@ -1,25 +1,31 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# Language FlexibleContexts #-}
+
 
 module MutableDvda.Utils ( countNodes
                          , backprop
-                         , main
-                         ) where
---module Main where
+                         , rad
+                        ) where
+
+import Data.HashMap.Lazy ( HashMap )
+import qualified Data.HashMap.Lazy as HM
+import Data.Hashable ( Hashable )
 
 import Dvda.Dual hiding ( fad, fad' )
 
 import MutableDvda.Expr
+import qualified MutableDvda.SharedVar as SV
 
 class FullShow a where
-  fullShow :: a -> IO String
+  fullShow :: a -> SV.SVMonad String
 
-fs :: FullShow a => a -> a -> String -> IO String
+fs :: FullShow a => a -> a -> String -> SV.SVMonad String
 fs x' y' name = do
   x <- fullShow x'
   y <- fullShow y'
   return $ "(" ++ name ++ " " ++ x ++ " " ++ y ++ ")"
 
-fs' :: FullShow a => a -> String -> IO String
+fs' :: FullShow a => a -> String -> SV.SVMonad String
 fs' x' name = do
   x <- fullShow x'
   return $ "(" ++ name ++ " " ++ x ++ ")"
@@ -64,11 +70,11 @@ instance Show a => FullShow (Expr a) where
 
 -- fad :: Num a => (Dual a -> [Dual a]) -> a -> [a]
 -- fad f x = map dualPerturbation $ f (Dual x 1)
--- 
+
 bpBinary :: (Eq a, Num a)
             => Expr a -> Expr a -> Expr a
             -> (Dual (Expr a) -> Dual (Expr a) -> Dual (Expr a))
-            -> IO [(Expr a, Expr a)]
+            -> SV.SVMonad [(Expr a, Expr a)]
 bpBinary sens g h binop = do
    let dfdg = dualPerturbation $ binop (Dual g 1) (Dual h 0)
        dfdh = dualPerturbation $ binop (Dual g 0) (Dual h 1)
@@ -79,12 +85,12 @@ bpBinary sens g h binop = do
 bpUnary :: (Eq a, Num a)
            => Expr a -> Expr a
            -> (Dual (Expr a) -> Dual (Expr a))
-           -> IO [(Expr a, Expr a)]
+           -> SV.SVMonad [(Expr a, Expr a)]
 bpUnary sens g unop = do
    let dfdg = dualPerturbation $ unop (Dual g 1)
    backprop (sens*dfdg) g
 
-backprop :: Eq a => Expr a -> Expr a -> IO [(Expr a, Expr a)]
+backprop :: Eq a => Expr a -> Expr a -> SV.SVMonad [(Expr a, Expr a)]
 backprop sens e@(ERef _) = readExpr e >>= backprop sens
 backprop sens e@(ESym _) = return [(e,sens)]
 backprop _ (EConst _) = return []
@@ -113,14 +119,13 @@ backprop sens (EFloating (ASinh x)) = bpUnary sens x asinh
 backprop sens (EFloating (ATanh x)) = bpUnary sens x atanh
 backprop sens (EFloating (ACosh x)) = bpUnary sens x acosh
 
--- rad :: (Num a, Eq a, Hashable (Expr a)) => Expr a -> IO (HashMap (Expr a) (Expr a))
--- rad x = do
---   sensitivities <- backprop 1 x
---   return $ HM.fromListWith (+) sensitivities
+rad :: (Num a, Eq a, Hashable (Expr a)) => Expr a -> SV.SVMonad (HashMap (Expr a) (Expr a))
+rad x = do
+  sensitivities <- backprop 1 x
+  return $ HM.fromListWith (+) sensitivities
 
 
-
-countNodes :: Expr a -> IO Int
+countNodes :: Expr a -> SV.SVMonad Int
 countNodes e@(ERef _) = readExpr e >>= countNodes
 countNodes (ESym _) = return 1
 countNodes (EConst _) = return 1
@@ -172,36 +177,3 @@ countNodes (EFloating (Tanh x))  = fmap (1 +) (countNodes x)
 countNodes (EFloating (ASinh x)) = fmap (1 +) (countNodes x)
 countNodes (EFloating (ATanh x)) = fmap (1 +) (countNodes x)
 countNodes (EFloating (ACosh x)) = fmap (1 +) (countNodes x)
-
-
-bg :: Floating a => a -> a
-bg x' = f
-  where
-    y' = 2*x'
-    z' = 4*y'
---    x' = sym "x"
---    y' = sym "y"
---    z' = sym "z"
-    
-    f0 x y z = (z + x*y) -- *log(cos x / tanh y)**(z/exp y)
-    fx0 = f0 (f0 x' y' z') (f0 z' y' x') (f0 y' x' z')
-    fy0 = f0 (f0 z' x' y') (f0 x' z' y') (f0 z' z' y')
-    fz0 = f0 (f0 x' y' z') (f0 x' y' x') (f0 y' x' y')
-    f = f0 fx0 fy0 fz0
---    f = z' + x'*y'
-
---    fx = diff f x'
---    fy = diff f y'
---    fz = diff f z'
-
-booboo :: Expr Double
-booboo = bg (sym "x")
-
-main :: IO ()
-main = do
-  (fullShow booboo) >>= putStrLn
-  (countNodes booboo) >>= print
---  putStrLn "--------------------------------------------------"
-  bam <- backprop 1 booboo
-  mapM (\(_,x) -> fullShow x) bam >>= mapM_ putStrLn
-  fmap sum (mapM (\(_,x) -> countNodes x) bam) >>= print

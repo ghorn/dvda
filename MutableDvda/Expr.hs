@@ -12,8 +12,8 @@ module MutableDvda.Expr ( Expr(..)
                         ) where
 
 import Data.Hashable ( Hashable, hash, combine )
-import Control.Concurrent.MVar ( MVar, newMVar, readMVar )
-import System.IO.Unsafe ( unsafePerformIO )
+
+import qualified MutableDvda.SharedVar as SV
 
 commutativeMul :: Bool
 commutativeMul = True
@@ -22,7 +22,7 @@ commutativeAdd :: Bool
 commutativeAdd = True
 
 data Expr a where
-  ERef :: IO (MVar (Expr a)) -> Expr a
+  ERef :: SV.SVMonad (SV.SharedVar (Expr a)) -> Expr a
   ESym :: String -> Expr a
   EConst :: a -> Expr a
   ENum :: Num a => Nums (Expr a) -> Expr a
@@ -30,12 +30,12 @@ data Expr a where
   EFloating :: Floating a => Floatings (Expr a) -> Expr a
 
 instance Eq a => Eq (Expr a) where
-  (==) x@(ERef mx_) y@(ERef my_) = unsafePerformIO $ do
+  (==) x@(ERef mx_) y@(ERef my_) = SV.unsafePerformSV $ do
     mx <- mx_
     my <- my_
-    return $ mx == my || unsafePerformIO (readExpr x) == unsafePerformIO (readExpr y)
-  (==) x@(ERef _) y = (==) (unsafePerformIO (readExpr x)) y
-  (==) x y@(ERef _) = (==) x (unsafePerformIO (readExpr y))
+    return $ mx == my || SV.unsafePerformSV (readExpr x) == SV.unsafePerformSV (readExpr y)
+  (==) x@(ERef _) y = (==) (SV.unsafePerformSV (readExpr x)) y
+  (==) x y@(ERef _) = (==) x (SV.unsafePerformSV (readExpr y))
   (==) (ESym x) (ESym y) = x == y
   (==) (EConst x) (EConst y) = x == y
   (==) (ENum x) (ENum y) = x == y
@@ -128,7 +128,7 @@ instance Hashable a => Hashable (Floatings a) where
   hash (ACosh x) = hash "ACosh" `combine` hash x
 
 instance Hashable a => Hashable (Expr a) where
-  hash e@(ERef _)      = hash (unsafePerformIO $ readExpr e)
+  hash e@(ERef _)      = hash (SV.unsafePerformSV $ readExpr e)
   hash (ESym name)     = hash "ESym"        `combine` hash name
   hash (EConst x)      = hash "EConst"      `combine` hash x
   hash (ENum x)        = hash "ENum"        `combine` hash x
@@ -146,7 +146,7 @@ instance Hashable a => Hashable (Expr a) where
 
 eref :: Expr a -> Expr a
 eref x@(ERef _) = x
-eref x = ERef (newMVar x)
+eref x = ERef (SV.newSharedVar x)
 
 instance (Num a, Eq a) => Num (Expr a) where
   (*) (EConst x) (EConst y) = EConst (x*y)
@@ -266,13 +266,13 @@ sym name = eref (ESym name)
 const' :: a -> Expr a
 const' = EConst
 
-readExpr :: Expr a -> IO (Expr a)
-readExpr (ERef mx) = mx >>= readMVar >>= readExpr
+readExpr :: Expr a -> SV.SVMonad (Expr a)
+readExpr (ERef mx) = mx >>= SV.readSharedVar >>= readExpr
 readExpr x = return x
 
 -- | Checks to see if an Expr is equal to a value
 isVal :: Eq a => a -> Expr a -> Bool
-isVal v e@(ERef _) = isVal v (unsafePerformIO $ readExpr e)
+isVal v e@(ERef _) = isVal v (SV.unsafePerformSV $ readExpr e)
 isVal v (EConst c) = v == c
 isVal v (ENum (FromInteger k)) = v == fromInteger k
 isVal v (EFractional (FromRational r)) = v == fromRational r
