@@ -6,6 +6,7 @@
 module MutableDvda.Graph ( GExpr(..)
                          , GraphRef(..)
                          , toGExprs
+                         , unsafeToGExprs
                          ) where
 
 import Data.Hashable ( Hashable, hash, combine )
@@ -35,14 +36,63 @@ instance Hashable a => Hashable (GExpr a) where
   hash (GFractional x) = hash "GFractional" `combine` hash x
   hash (GFloating x)   = hash "GFloating"   `combine` hash x
 
+rgrBinary :: (t -> Expr a) -> (Expr a -> Expr a -> t) -> Expr a -> Expr a -> IO (Expr a)
+rgrBinary enum mul x' y' = do
+  x <- resetGraphRefs x'
+  y <- resetGraphRefs y'
+  return $ enum (mul x y)
+                             
+rgrUnary :: (t -> Expr a) -> (Expr a -> t) -> Expr a -> IO (Expr a)
+rgrUnary enum mul x' = do
+  x <- resetGraphRefs x'
+  return $ enum (mul x)
+                             
+resetGraphRefs :: Expr a -> IO (Expr a)
+resetGraphRefs e@(ESym _)                       = return e
+resetGraphRefs e@(EConst _)                     = return e
+resetGraphRefs (ENum (Mul x y))                 = rgrBinary ENum Mul x y
+resetGraphRefs (ENum (Add x y))                 = rgrBinary ENum Add x y
+resetGraphRefs (ENum (Sub x y))                 = rgrBinary ENum Sub x y
+resetGraphRefs (ENum (Negate x))                = rgrUnary ENum Negate x
+resetGraphRefs (ENum (Abs x))                   = rgrUnary ENum Abs x
+resetGraphRefs (ENum (Signum x))                = rgrUnary ENum Signum x
+resetGraphRefs e@(ENum (FromInteger _))         = return e
+resetGraphRefs (EFractional (Div x y))          = rgrBinary EFractional Div x y
+resetGraphRefs e@(EFractional (FromRational _)) = return e
+resetGraphRefs (EFloating (Pow x y))            = rgrBinary EFloating Pow x y
+resetGraphRefs (EFloating (LogBase x y))        = rgrBinary EFloating LogBase x y
+resetGraphRefs (EFloating (Exp x))              = rgrUnary EFloating Exp x
+resetGraphRefs (EFloating (Log x))              = rgrUnary EFloating Log x
+resetGraphRefs (EFloating (Sin x))              = rgrUnary EFloating Sin x
+resetGraphRefs (EFloating (Cos x))              = rgrUnary EFloating Cos x
+resetGraphRefs (EFloating (ASin x))             = rgrUnary EFloating ASin x
+resetGraphRefs (EFloating (ATan x))             = rgrUnary EFloating ATan x
+resetGraphRefs (EFloating (ACos x))             = rgrUnary EFloating ACos x
+resetGraphRefs (EFloating (Sinh x))             = rgrUnary EFloating Sinh x
+resetGraphRefs (EFloating (Cosh x))             = rgrUnary EFloating Cosh x
+resetGraphRefs (EFloating (Tanh x))             = rgrUnary EFloating Tanh x
+resetGraphRefs (EFloating (ASinh x))            = rgrUnary EFloating ASinh x
+resetGraphRefs (EFloating (ATanh x))            = rgrUnary EFloating ATanh x
+resetGraphRefs (EFloating (ACosh x))            = rgrUnary EFloating ACosh x
+resetGraphRefs (EGraphRef e _)                  = resetGraphRefs e
+resetGraphRefs (ERef mv) = do
+  expr0 <- takeMVar mv
+  exprReset <- resetGraphRefs expr0
+  putMVar mv exprReset
+  return (ERef mv)
 
-toGExprs :: (Hashable a, Eq a) => [Expr a] -> IO ([GraphRef], Int, HashMap (GExpr a) GraphRef)
-toGExprs exprs = f ([], 0, HM.empty) exprs
+-- | This version consumes the Exprs as a side effect, so only use it internally if you generate the Exprs youself and can discard them after calling unsafeToGExprs
+unsafeToGExprs :: (Eq a, Hashable a) => [Expr a] -> IO ([GraphRef], Int, HashMap (GExpr a) GraphRef)
+unsafeToGExprs exprs = f ([], 0, HM.empty) exprs
   where
     f ret [] = return ret
     f (grefs, n0, hm0) (e:es) = do
       (gref, n, hm) <- insert hm0 n0 e
       f (grefs ++ [gref], n, hm) es
+
+-- | This version is way slower but it is safe to use multiple times.
+toGExprs :: (Hashable a, Eq a) => [Expr a] -> IO ([GraphRef], Int, HashMap (GExpr a) GraphRef)
+toGExprs exprs0 = mapM resetGraphRefs exprs0 >>= unsafeToGExprs
 
 insert :: (Eq a, Hashable a) => HashMap (GExpr a) GraphRef
           -> Int -> Expr a -> IO (GraphRef, Int, HashMap (GExpr a) GraphRef)
