@@ -90,7 +90,10 @@ unsafeToGExprs exprs = f ([], 0, HM.empty) exprs
 
 -- | This version is way slower but it is safe to use multiple times.
 toGExprs :: (Hashable a, Eq a) => [Expr a] -> IO ([GraphRef], Int, HashMap (GExpr a) GraphRef)
-toGExprs exprs0 = mapM resetGraphRefs exprs0 >>= unsafeToGExprs
+toGExprs exprs = do
+  ret <- unsafeToGExprs exprs
+  mapM_ resetGraphRefs exprs
+  return ret
 
 insert :: (Eq a, Hashable a) => HashMap (GExpr a) GraphRef
           -> Int -> Expr a -> IO (GraphRef, Int, HashMap (GExpr a) GraphRef)
