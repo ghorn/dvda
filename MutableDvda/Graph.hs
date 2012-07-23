@@ -18,7 +18,6 @@ import qualified Dvda.HashMap as HM
 import MutableDvda.Expr
 
 data GExpr a where
-  GRef :: Int -> GExpr a
   GSym :: String -> GExpr a
   GConst :: a -> GExpr a
   GNum :: Nums GraphRef -> GExpr a
@@ -29,7 +28,6 @@ deriving instance Show a => Show (GExpr a)
 deriving instance Eq a => Eq (GExpr a)
 
 instance Hashable a => Hashable (GExpr a) where
-  hash (GRef _)      = error "don't hash a GRef"
   hash (GSym name)     = hash "GSym"        `combine` hash name
   hash (GConst x)      = hash "GConst"      `combine` hash x
   hash (GNum x)        = hash "GNum"        `combine` hash x
