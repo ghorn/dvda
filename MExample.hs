@@ -7,11 +7,11 @@ import qualified Dvda.HashMap as HM
 
 import MutableDvda.AD
 import MutableDvda.Expr
---import MutableDvda.FullShow
+import MutableDvda.FullShow
 import MutableDvda.Graph
 
 bg :: Floating a => a -> a
-bg x' = f -- x' + 2*x'
+bg x' = f
   where
     y' = 2*x'
     z' = 4*y'
@@ -24,6 +24,11 @@ bg x' = f -- x' + 2*x'
     fy0 = f0 (f0 z' x' y') (f0 x' z' y') (f0 z' z' y')
     fz0 = f0 (f0 x' y' z') (f0 x' y' x') (f0 y' x' y')
     f = f0 fx0 fy0 fz0
+    f' = f0 fy0 fz0 fx0
+    f'' = f0 f' f f'
+    f''' = f0 f'' f' f''
+    f'''' = f0 f''' f''' f'''
+    f''''' = f0 f'''' f'''' f''''
 --    f = z' + x'*y'
 
 --    fx = diff f x'
@@ -69,9 +74,11 @@ main = do
 --  (_, n, _) <- toGExprs [g]
   putStrLn "\nrunning rad..."
   radMap <- rad g
---  sx <- fullShow (head $ HM.keys radMap)
---  sdx <- fullShow (head $ HM.elems radMap)
---  putStrLn $ "df/d" ++ sx ++ " = " ++ sdx
+--  sg <- fullShow g
+--  putStrLn sg
   putStrLn "\nmaking graph / performing CSE..."
-  (_,n,_) <- toGExprs (g:(HM.elems radMap))
+--  (_,n,hm,_) <- unsafeToGExprs (g:(HM.elems radMap))
+  (_,n,hm) <- toGExprs (g:(HM.elems radMap))
   putStrLn $ show n ++ " nodes"
+--  print (graphCount hm)
+--  putStrLn (graphShow hm)
