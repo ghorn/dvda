@@ -26,11 +26,12 @@ run = do
       w = sym "w"
       w1 = sym "w1"
       w2 = sym "w2"
-      f0 = x*y + z + w1 + w2
+      w3 = sym "w3"
+      f0 = x*y + z + w1 + w2 + w3
       
       f1 = [f0/2, f0*y, w]
 --  showC "foo" (x :* [y]:*[[z]]) (f0:*f1:*[[f0*f0]]) >>= putStrLn
-  showMex "foo" (x :* [y]:*[[z,w], [w1,w2]]) (f0:*f1:*[[f0*f0]]:*[f1]) >>= putStrLn
+  showMex "foo" (x :* [y,w3]:*[[z,w], [w1,w2]]) (f0:*f1:*[[f0*f0]]:*[f1]) >>= putStrLn
 
 -------------------------------------------------------------------------
 class GenC a where
@@ -39,7 +40,6 @@ class GenC a where
   writeInputs :: a -> Int -> ([String], [String]) -- (input declarations, prototype)
   -- mex function stuff
   createMxOutputs :: a -> Int -> [String]
-  checkMxInputShape :: a -> String -> Int -> [String]
   checkMxInputDims :: a -> String -> Int -> [String]
 
 instance GenC GraphRef where
@@ -53,17 +53,17 @@ instance GenC GraphRef where
       decls = [printf "/* input %d */" inputK, printf "const double %s = *input%d;" (nameNode gref) inputK]
       prototype = ["const double * input" ++ show inputK]
   createMxOutputs _ outputK = ["    plhs[" ++ show outputK ++ "] = mxCreateDoubleScalar( 0 );"]
-  checkMxInputShape _ functionName inputK =
-    [ "    if ( 0 != mxGetNumberOfDimensions( prhs[" ++ show inputK ++ "] ) ) {"
+  checkMxInputDims _ functionName inputK =
+    [ "    if ( 1 != mxGetM( prhs[" ++ show inputK ++ "] ) || 1 != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
     , "        char errMsg[200];"
     , "        sprintf(errMsg,"
-    , "                \"mex function '" ++ functionName ++ "' got incorrect shape for input " ++ show inputK ++ "\\n\""
-    , "                \"expected 0 dimensions but got %d\\n\","
-    , "                mxGetNumberOfDimensions( prhs[" ++ show inputK ++ "] ) );"
+    , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
+    , "                \"expected dimensions: (1, 1) but got (%d, %d)\","
+    , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
+    , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
     , "        mexErrMsgTxt(errMsg);"
     , "    }"
     ]
-  checkMxInputDims _ _ _ = []
 
 instance GenC [GraphRef] where
   numObjects _ = 1
@@ -82,22 +82,12 @@ instance GenC [GraphRef] where
           f inIdx gref = printf "const double %s = input%d[%d];" (nameNode gref) inputK inIdx
   createMxOutputs grefs outputK =
     ["    plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show (length grefs) ++ ", 1, mxREAL );"]
-  checkMxInputShape _ functionName inputK =
-    [ "    if ( 1 != mxGetNumberOfDimensions( prhs[" ++ show inputK ++ "] ) ) {"
-    , "        char errMsg[200];"
-    , "        sprintf(errMsg,"
-    , "                \"mex function '" ++ functionName ++ "' got incorrect shape for input " ++ show inputK ++ "\\n\""
-    , "                \"expected 1 dimensions but got %d\\n\","
-    , "                mxGetNumberOfDimensions( prhs[" ++ show inputK ++ "] ) );"
-    , "        mexErrMsgTxt(errMsg);"
-    , "    }"
-    ]
   checkMxInputDims grefs functionName inputK =
     [ "    if ( " ++ show (length grefs) ++ " != mxGetNumberOfElements( prhs[" ++ show inputK ++ "] ) ) {"
     , "        char errMsg[200];"
     , "        sprintf(errMsg,"
-    , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show inputK ++ "\\n\""
-    , "                \"expected dimension: " ++ show (length grefs) ++ " but got dimension: %d\\n\","
+    , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
+    , "                \"expected dimensions: " ++ show (length grefs) ++ " but got %d\","
     , "                mxGetNumberOfElements( prhs[" ++ show inputK ++ "] ) );"
     , "        mexErrMsgTxt(errMsg);"
     , "    }"
@@ -128,22 +118,12 @@ instance GenC [[GraphRef]] where
     where
       nrows = length grefs
       ncols = length (head grefs)
-  checkMxInputShape _ functionName inputK =
-    [ "    if ( 2 != mxGetNumberOfDimensions( prhs[" ++ show inputK ++ "] ) ) {"
-    , "        char errMsg[200];"
-    , "        sprintf(errMsg,"
-    , "                \"mex function '" ++ functionName ++ "' got incorrect shape for input " ++ show inputK ++ "\\n\""
-    , "                \"expected 2 dimensions but got %d\\n\","
-    , "                mxGetNumberOfDimensions( prhs[" ++ show inputK ++ "] ) );"
-    , "        mexErrMsgTxt(errMsg);"
-    , "    }"
-    ]
   checkMxInputDims grefs functionName inputK =
     [ "    if ( " ++ show nrows ++ " != mxGetM( prhs[" ++ show inputK ++ "] ) || " ++ show ncols ++ " != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
     , "        char errMsg[200];"
     , "        sprintf(errMsg,"
-    , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show inputK ++ "\\n\""
-    , "                \"expected dimensions: (" ++ show nrows ++ ", " ++ show ncols ++ ") but got (%d, %d)\\n\","
+    , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
+    , "                \"expected dimensions: (" ++ show nrows ++ ", " ++ show ncols ++ ") but got (%d, %d)\","
     , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
     , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
     , "        mexErrMsgTxt(errMsg);"
@@ -167,10 +147,6 @@ instance (GenC a, GenC b) => GenC (a :* b) where
     where
       mx = createMxOutputs x outputK
       my = createMxOutputs y (outputK + numObjects x)
-  checkMxInputShape (x :* y) functionName inputK = mx ++ my
-    where
-      mx = checkMxInputShape x functionName inputK
-      my = checkMxInputShape y functionName (inputK + numObjects x)
   checkMxInputDims (x :* y) functionName inputK = mx ++ my
     where
       mx = checkMxInputDims x functionName inputK
@@ -267,7 +243,7 @@ mexFun functionName ins outs =
   , "        char errMsg[200];"
   , "        sprintf(errMsg,"
   , "                \"mex function '" ++ functionName ++ "' given incorrect number of inputs\\n\""
-  , "                \"expected: " ++ show nrhs ++ " but got %d\\n\","
+  , "                \"expected: " ++ show nrhs ++ " but got %d\","
   , "                nrhs);"
   , "        mexErrMsgTxt(errMsg);"
   , "    }"
@@ -277,14 +253,11 @@ mexFun functionName ins outs =
   , "        char errMsg[200];"
   , "        sprintf(errMsg,"
   , "                \"mex function '" ++ functionName ++ "' given incorrect number of outputs\\n\""
-  , "                \"expected: " ++ show nlhs ++ " but got %d\\n\","
-  , "                nrhs);"
+  , "                \"expected: " ++ show nlhs ++ " but got %d\","
+  , "                nlhs);"
   , "        mexErrMsgTxt(errMsg);"
   , "    }"
   , []
-  , "    /* check the shapes of the input arrays */"
-  ] ++ checkMxInputShape ins functionName 0 ++
-  [ []
   , "    /* check the dimensions of the input arrays */"
   ] ++ checkMxInputDims ins functionName 0 ++
   [ []
