@@ -242,6 +242,8 @@ makeBinary'' Mul f x y
   | isVal 1 x = y
   | isVal 1 y = x
   | otherwise = makeBinary''' Mul f x y
+makeBinary'' Add _ (EUnary Neg x) y = y - x
+makeBinary'' Add _ x (EUnary Neg y) = x - y
 makeBinary'' Add f x y
   | isVal 0 x = y
   | isVal 0 y = x
@@ -254,6 +256,7 @@ makeBinary'' Div f x y
 makeBinary'' Sub f x y
   | isVal 0 x = negate y
   | isVal 0 y = x
+  | x == y    = 0*x -- 0*x instead of 0 to get rid of EDimensionless :/
   | otherwise = makeBinary''' Sub f x y
 makeBinary'' op f x y = makeBinary''' op f x y
 
