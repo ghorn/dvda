@@ -7,6 +7,7 @@ module MutableDvda.Graph ( GExpr(..)
                          , toGExprs
                          , unsafeToGExprs
                          , toFunGraph
+                         , unsafeToFunGraph
                          ) where
 
 import Control.Monad.State ( runStateT, StateT(..) )
