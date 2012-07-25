@@ -1,20 +1,20 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language GADTs #-}
 {-# Language StandaloneDeriving #-}
+{-# Language TypeFamilies #-}
+{-# Language FlexibleContexts #-}
 
 module MutableDvda.Graph ( GExpr(..)
                          , GraphRef(..)
-                         , toGExprs
-                         , unsafeToGExprs
+                         , ToGExprs(..)
                          , toFunGraph
                          , unsafeToFunGraph
+                         , topSort
                          ) where
 
-import Control.Monad.State ( runStateT, StateT(..) )
-import Data.Traversable ( Traversable, traverse )
-import qualified Data.Traversable as Traversable
-import Data.Hashable ( Hashable, hash, combine )
 import Control.Concurrent.MVar
+import qualified Data.Graph as Graph
+import Data.Hashable ( Hashable, hash, combine )
 
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
@@ -124,42 +124,89 @@ resetGraphRefs mv = do
   case expr of (EGraphRef e _) -> putMVar mv e
                _               -> error "shouldn't ever try to resetGraphRefs on non EGraphRef"
 
--- | This version consumes the Exprs as a side effect, so only use it internally if you generate the Exprs youself and can discard them after calling unsafeToGExprs
-unsafeToGExprs :: (Traversable t, Eq a, Hashable a)
-                  => t (Expr a) -> IO (t GraphRef, (Int, HashMap (GExpr a) GraphRef, HashMap (Expr a) GraphRef, [MVar (Expr a)]))
-unsafeToGExprs exprs = mapAccumM f (0, HM.empty, HM.empty, []) exprs
-  where
-    f (n0, hm0, im0, mv0) e = do
+class ToGExprs a where
+  type NumT a
+  type ContainerT a b
+  readExprs :: a -> IO a
+  mapExprs :: (Expr (NumT a) -> GraphRef) -> a -> ContainerT a GraphRef
+  unsafeToGExprs ::
+    (Eq (NumT a), Hashable (NumT a))
+    => Int -> HashMap (GExpr (NumT a)) GraphRef -> HashMap (Expr (NumT a)) GraphRef -> a
+    -> IO (ContainerT a GraphRef, [MVar (Expr (NumT a))], Int, HashMap (GExpr (NumT a)) GraphRef, HashMap (Expr (NumT a)) GraphRef)
+
+instance ToGExprs (Expr a) where
+  type NumT (Expr a) = a
+  type ContainerT (Expr a) b = b
+  readExprs = readExpr
+  mapExprs f x = f x
+  unsafeToGExprs n0 hm0 im0 e = do
       (gref, n, hm, im, mv) <- insert hm0 im0 n0 e
-      return (gref, (n,hm,im,mv0++mv))
+      return (gref, mv, n, hm, im)
 
-    mapAccumM :: (Monad m, Functor m, Traversable t) => (a -> b -> m (c, a)) -> a -> t b -> m (t c, a)
-    mapAccumM g = flip (runStateT . (Data.Traversable.traverse (StateT . (flip g))))
+instance ToGExprs a => ToGExprs [a] where
+  type NumT [a] = NumT a
+  type ContainerT [a] b = [ContainerT a b]
+  readExprs = mapM readExprs
+  mapExprs f xs = map (mapExprs f) xs
+  unsafeToGExprs n0' hm0' im0' = f ([], [], n0', hm0', im0')
+    where
+      f ret [] = return ret
+      f (gref0, mv0, n0, hm0, im0) (e:es) = do
+        (gref, mv, n, hm, im) <- unsafeToGExprs n0 hm0 im0 e
+        f (gref0 ++ [gref], mv0 ++ mv, n, hm, im) es
 
--- | This version is a bit slower (maybe 10-20% ?) but it is safe to use multiple times.
-toGExprs :: (Traversable t, Eq a, Hashable a)
-            => t (Expr a) -> IO (t GraphRef, Int, HashMap (GExpr a) GraphRef, HashMap (Expr a) GraphRef)
-toGExprs exprs = do
-  (grefs, (n,hm,im,mvs)) <- unsafeToGExprs exprs
-  mapM_ resetGraphRefs mvs
-  return (grefs, n, hm, im)
-
-unsafeToFunGraph :: (Eq a, Hashable a, Show a, Traversable t0, Traversable t1) => t0 (Expr a) -> t1 (Expr a)
-                    -> IO (t0 GraphRef, t1 GraphRef, HashMap (GExpr a) GraphRef, [MVar (Expr a)])
+---- | This version consumes the Exprs as a side effect, so only use it internally if you generate the Exprs youself and can discard them after calling unsafeToGExprs
+unsafeToFunGraph :: (Eq a, Hashable a, Show a, NumT b ~ a, NumT c ~ a, ToGExprs b, ToGExprs c)
+                    => b -> c -> IO (ContainerT b GraphRef, ContainerT c GraphRef, HashMap (GExpr a) GraphRef, Int, [MVar (Expr a)])
 unsafeToFunGraph inputExprs_ outputExprs = do
-  inputExprs <- Traversable.mapM readExpr inputExprs_
-  (outputIndices, (_, hm, inputMap, mvs)) <- unsafeToGExprs outputExprs
+  inputExprs <- readExprs inputExprs_
+  (outputIndices, mvs, n, hm, inputMap) <- unsafeToGExprs 0 HM.empty HM.empty outputExprs
 
   let lookupExpr e@(ESym _) = case HM.lookup e inputMap of
         Just x -> x
         Nothing ->   error $ "ERROR: in toFunGraph, input " ++ show e ++ " was not found as parent of outputs"
       lookupExpr e = error $ "ERROR: in toFunGraph, input " ++ show e ++ " is not symbolic type"
-      inputIndices = fmap lookupExpr inputExprs
-  return (inputIndices, outputIndices, hm, mvs)
+      inputIndices = mapExprs lookupExpr inputExprs
+  return (inputIndices, outputIndices, hm, n, mvs)
 
-toFunGraph :: (Eq a, Hashable a, Show a, Traversable t0, Traversable t1) => t0 (Expr a) -> t1 (Expr a)
-              -> IO (t0 GraphRef, t1 GraphRef, HashMap (GExpr a) GraphRef)
+toFunGraph :: (Eq a, Hashable a, Show a, NumT b ~ a, NumT c ~ a, ToGExprs b, ToGExprs c)
+              => b -> c -> IO (ContainerT b GraphRef, ContainerT c GraphRef, HashMap (GExpr a) GraphRef, Int)
 toFunGraph inputExprs outputExprs = do
-  (inputIndices, outputIndices, hm, mvs) <- unsafeToFunGraph inputExprs outputExprs
+  (inputIndices, outputIndices, hm, n, mvs) <- unsafeToFunGraph inputExprs outputExprs
   mapM_ resetGraphRefs mvs
-  return (inputIndices, outputIndices, hm)
+  return (inputIndices, outputIndices, hm, n)
+
+topSort :: HashMap (GExpr a) GraphRef -> [GExpr a]
+topSort hm = map ((\(x,_,_) -> x) . vertexToNode) (Graph.topSort graph)
+  where
+    (graph, vertexToNode) = Graph.graphFromEdges' $ map f (HM.toList hm)
+      where
+        f (gexpr, GraphRef k) = (gexpr, k, map (\(GraphRef n) -> n) $ getChildren gexpr)
+
+getChildren :: GExpr a -> [GraphRef]
+getChildren (GSym _)                       = []
+getChildren (GConst _)                     = []
+getChildren (GNum (Mul x y))               = [x,y]
+getChildren (GNum (Add x y))               = [x,y]
+getChildren (GNum (Sub x y))               = [x,y]
+getChildren (GNum (Negate x))              = [x]
+getChildren (GNum (Abs x))                 = [x]
+getChildren (GNum (Signum x))              = [x]
+getChildren (GNum (FromInteger _))         = []
+getChildren (GFractional (Div x y))        = [x,y]
+getChildren (GFractional (FromRational _)) = []
+getChildren (GFloating (Pow x y))          = [x,y]
+getChildren (GFloating (LogBase x y))      = [x,y]
+getChildren (GFloating (Exp x))            = [x]
+getChildren (GFloating (Log x))            = [x]
+getChildren (GFloating (Sin x))            = [x]
+getChildren (GFloating (Cos x))            = [x]
+getChildren (GFloating (ASin x))           = [x]
+getChildren (GFloating (ATan x))           = [x]
+getChildren (GFloating (ACos x))           = [x]
+getChildren (GFloating (Sinh x))           = [x]
+getChildren (GFloating (Cosh x))           = [x]
+getChildren (GFloating (Tanh x))           = [x]
+getChildren (GFloating (ASinh x))          = [x]
+getChildren (GFloating (ATanh x))          = [x]
+getChildren (GFloating (ACosh x))          = [x]
