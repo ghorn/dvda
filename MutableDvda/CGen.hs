@@ -58,7 +58,7 @@ instance GenC GraphRef where
     , "        char errMsg[200];"
     , "        sprintf(errMsg,"
     , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
-    , "                \"expected dimensions: (1, 1) but got (%d, %d)\","
+    , "                \"expected dimensions: (1, 1) but got (%zu, %zu)\","
     , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
     , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
     , "        mexErrMsgTxt(errMsg);"
@@ -83,15 +83,18 @@ instance GenC [GraphRef] where
   createMxOutputs grefs outputK =
     ["    plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show (length grefs) ++ ", 1, mxREAL );"]
   checkMxInputDims grefs functionName inputK =
-    [ "    if ( " ++ show (length grefs) ++ " != mxGetNumberOfElements( prhs[" ++ show inputK ++ "] ) ) {"
+    [ "    if ( !( " ++ show nrows ++ " == mxGetM( prhs[" ++ show inputK ++ "] ) && 1 == mxGetN( prhs[" ++ show inputK ++ "] ) ) && !( " ++ show nrows ++ " == mxGetN( prhs[" ++ show inputK ++ "] ) && 1 == mxGetM( prhs[" ++ show inputK ++ "] ) ) ) {"
     , "        char errMsg[200];"
     , "        sprintf(errMsg,"
     , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
-    , "                \"expected dimensions: " ++ show (length grefs) ++ " but got %d\","
-    , "                mxGetNumberOfElements( prhs[" ++ show inputK ++ "] ) );"
+    , "                \"expected dimensions: (" ++ show nrows ++ ", 1) or (1, " ++ show nrows ++ ") but got (%zu, %zu)\","
+    , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
+    , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
     , "        mexErrMsgTxt(errMsg);"
     , "    }"
     ]
+    where
+      nrows = length grefs
     
 instance GenC [[GraphRef]] where
   numObjects _ = 1
@@ -123,7 +126,7 @@ instance GenC [[GraphRef]] where
     , "        char errMsg[200];"
     , "        sprintf(errMsg,"
     , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
-    , "                \"expected dimensions: (" ++ show nrows ++ ", " ++ show ncols ++ ") but got (%d, %d)\","
+    , "                \"expected dimensions: (" ++ show nrows ++ ", " ++ show ncols ++ ") but got (%zu, %zu)\","
     , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
     , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
     , "        mexErrMsgTxt(errMsg);"
