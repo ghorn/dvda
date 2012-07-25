@@ -74,6 +74,7 @@ Library
 
   Other-modules:     Dvda.HashMap
                      MutableDvda.AD
+                     MutableDvda.CGen
                      MutableDvda.Expr
                      MutableDvda.FullShow
                      MutableDvda.Graph

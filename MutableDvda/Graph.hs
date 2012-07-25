@@ -196,8 +196,8 @@ toFunGraph inputExprs outputExprs = do
   mapM_ resetGraphRefs mvs
   return (inputIndices, outputIndices, hm, n)
 
-topSort :: HashMap (GExpr a) GraphRef -> [GExpr a]
-topSort hm = map ((\(x,_,_) -> x) . vertexToNode) (Graph.topSort graph)
+topSort :: HashMap (GExpr a) GraphRef -> [(GraphRef, GExpr a)]
+topSort hm = map ((\(x,k,_) -> (GraphRef k,x)) . vertexToNode) (Graph.topSort graph)
   where
     (graph, vertexToNode) = Graph.graphFromEdges' $ map f (HM.toList hm)
       where
