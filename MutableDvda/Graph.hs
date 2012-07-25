@@ -1,12 +1,14 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language GADTs #-}
+{-# Language TypeOperators #-}
 {-# Language StandaloneDeriving #-}
+{-# Language GADTs #-}
 {-# Language TypeFamilies #-}
 {-# Language FlexibleContexts #-}
 
 module MutableDvda.Graph ( GExpr(..)
                          , GraphRef(..)
                          , ToGExprs(..)
+                         , (:*)(..)
                          , toFunGraph
                          , unsafeToFunGraph
                          , topSort
@@ -154,6 +156,24 @@ instance ToGExprs a => ToGExprs [a] where
       f (gref0, mv0, n0, hm0, im0) (e:es) = do
         (gref, mv, n, hm, im) <- unsafeToGExprs n0 hm0 im0 e
         f (gref0 ++ [gref], mv0 ++ mv, n, hm, im) es
+
+
+data a :* b = a :* b deriving Show
+infixr 6 :*
+
+instance (ToGExprs a, ToGExprs b, NumT a ~ NumT b) => ToGExprs (a :* b) where
+  type NumT (a :* b) = NumT a
+  type ContainerT (a :* b) c = (ContainerT a c) :* (ContainerT b c)
+  readExprs (x' :* y') = do
+    x <- readExprs x'
+    y <- readExprs y'
+    return (x :* y)
+  mapExprs f (x :* y) = (mapExprs f x) :* (mapExprs f y)
+  unsafeToGExprs n0 hm0 im0 (x :* y) = do
+    (grefs1, mvs1, n1, hm1, im1) <- unsafeToGExprs n0 hm0 im0 x
+    (grefs2, mvs2, n2, hm2, im2) <- unsafeToGExprs n1 hm1 im1 y
+    return (grefs1 :* grefs2, mvs1 ++ mvs2, n2, hm2, im2)
+  
 
 ---- | This version consumes the Exprs as a side effect, so only use it internally if you generate the Exprs youself and can discard them after calling unsafeToGExprs
 unsafeToFunGraph :: (Eq a, Hashable a, Show a, NumT b ~ a, NumT c ~ a, ToGExprs b, ToGExprs c)
