@@ -133,7 +133,7 @@ class ToGExprs a where
   type NumT a
   type ContainerT a b
   readExprs :: a -> IO a
-  mapExprs :: (Expr (NumT a) -> GraphRef) -> a -> ContainerT a GraphRef
+  mapExprs :: (Expr (NumT a) -> b) -> a -> ContainerT a b
   unsafeToGExprs ::
     (Eq (NumT a), Hashable (NumT a))
     => Int -> HashMap (GExpr (NumT a)) GraphRef -> HashMap (Expr (NumT a)) GraphRef -> a
