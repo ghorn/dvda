@@ -30,7 +30,7 @@ run = do
       w3 = sym "w3"
       f0 = x*y + z + w1 + w2 + w3
       
-      f1 = [f0/2, f0*y, w]
+      f1 = [f0/2, f0*y, w, 0.0, 0]
 --  showC "foo" (x :* [y]:*[[z]]) (f0:*f1:*[[f0*f0]]) >>= putStrLn
   showMex "foo" (x :* [y,w3]:*[[z,w], [w1,w2]]) (f0:*f1:*[[f0*f0]]:*[f1]) >>= putStrLn
 
@@ -145,7 +145,7 @@ instance GenC [[GraphRef]] where
 
 instance (GenC a, GenC b) => GenC (a :* b) where
   numObjects (x :* y) = numObjects x + numObjects y
-  writeOutputs  (x :* y) outputK = (dx ++ "" : dy, px ++ py)
+  writeOutputs (x :* y) outputK = (dx ++ "" : dy, px ++ py)
     where
       (dx, px) = writeOutputs x outputK
       (dy, py) = writeOutputs y (outputK + numObjects x)
@@ -162,6 +162,11 @@ instance (GenC a, GenC b) => GenC (a :* b) where
       mx = checkMxInputDims x functionName inputK
       my = checkMxInputDims y functionName (inputK + numObjects x)
 
+-- | Turns inputs and outputs into a string containing C code.
+-- .
+--   Also pass a name to give to the C function
+-- .
+--   This function simply calls showCWithGraphRefs and discards the first two outputs
 showC :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a,
           ToGExprs b, GenC (ContainerT c GraphRef),
           ToGExprs c, GenC (ContainerT b GraphRef))
@@ -170,6 +175,9 @@ showC functionName inputs outputs = do
   (_,_,txt) <- showCWithGraphRefs functionName inputs outputs
   return txt
 
+-- | Turns inputs and outputs into a string containing C code. Also return indices of the inputs and outputs
+-- .
+--   Also pass a name to give to the C function
 showCWithGraphRefs :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a,
                        ToGExprs b, GenC (ContainerT b GraphRef),
                        ToGExprs c, GenC (ContainerT c GraphRef))
@@ -206,8 +214,10 @@ cAssignment gref gexpr = fmap (\cop -> "const double " ++ nameNode gref ++ " = "
     
     un :: GraphRef -> String -> String
     un x op = op ++ "( " ++ nameNode x ++ " )"
+
+    asTypeOfG :: a -> GExpr a -> a
+    asTypeOfG x _ = x
     
-    toCOp :: Show a => GExpr a -> Maybe String
     toCOp (GSym _)                       = Nothing
     toCOp (GConst c)                     = Just $ show c
     toCOp (GNum (Mul x y))               = Just $ bin x y "*"
@@ -218,7 +228,7 @@ cAssignment gref gexpr = fmap (\cop -> "const double " ++ nameNode gref ++ " = "
     toCOp (GNum (Signum x))              = Just $ un x "sign"
     toCOp (GNum (FromInteger x))         = Just $ show x
     toCOp (GFractional (Div x y))        = Just $ bin x y "/"
-    toCOp (GFractional (FromRational x)) = Just $ show x
+    toCOp (GFractional (FromRational x)) = Just $ show (fromRational x `asTypeOfG` gexpr)
     toCOp (GFloating (Pow x y))          = Just $ "pow( " ++ nameNode x ++ ", " ++ nameNode y ++ " )"
     toCOp (GFloating (LogBase x y))      = Just $ "log( " ++ nameNode y ++ ") / log( " ++ nameNode x ++ " )"
     toCOp (GFloating (Exp x))            = Just $ un x "exp"

@@ -29,9 +29,9 @@ import MutableDvda.Expr
 data GExpr a where
   GSym :: String -> GExpr a
   GConst :: a -> GExpr a
-  GNum :: Nums GraphRef -> GExpr a
-  GFractional :: Fractionals GraphRef -> GExpr a
-  GFloating :: Floatings GraphRef -> GExpr a
+  GNum :: Num a => Nums GraphRef -> GExpr a
+  GFractional :: Fractional a => Fractionals GraphRef -> GExpr a
+  GFloating :: Floating a => Floatings GraphRef -> GExpr a
 
 deriving instance Show a => Show (GExpr a)
 deriving instance Eq a => Eq (GExpr a)
