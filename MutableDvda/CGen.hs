@@ -14,6 +14,7 @@ import Data.Hashable ( Hashable )
 import Data.Maybe ( catMaybes )
 import Data.List ( intercalate )
 import Text.Printf ( printf )
+import qualified Data.HashSet as HS
 
 import MutableDvda.Expr
 import MutableDvda.Graph
@@ -98,7 +99,10 @@ instance GenC [GraphRef] where
     
 instance GenC [[GraphRef]] where
   numObjects _ = 1
-  writeOutputs grefs outputK = (decls, prototype)
+  writeOutputs grefs outputK
+    | any ((ncols /=) . length) grefs =
+        error $ "writeOutputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length grefs)
+    | otherwise = (decls, prototype)
     where
       nrows = length grefs
       ncols = length (head grefs)
@@ -107,7 +111,10 @@ instance GenC [[GraphRef]] where
               zipWith f [(r,c) | r <- [0..(length grefs-1)], c <- [0..(length (head grefs)-1)]] (concat grefs)
         where
           f (rowIdx,colIdx) gref = printf "output%d[%d][%d] = %s;" outputK rowIdx colIdx (nameNode gref)
-  writeInputs grefs inputK = (decls, prototype)
+  writeInputs grefs inputK
+    | any ((ncols /=) . length) grefs =
+        error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length grefs)
+    | otherwise = (decls, prototype)
     where
       nrows = length grefs
       ncols = length (head grefs)
@@ -168,23 +175,26 @@ showCWithGraphRefs :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a,
                        ToGExprs c, GenC (ContainerT c GraphRef))
                       => String -> b -> c -> IO (ContainerT b GraphRef, ContainerT c GraphRef, String)
 showCWithGraphRefs functionName inputs outputs = do
-  (inputIndices, outputIndices, hm, _) <- toFunGraph inputs outputs
-  let (inDecls, inPrototypes) = writeInputs inputIndices 0
-      (outDecls, outPrototypes) = writeOutputs outputIndices 0
-      mainDecls = catMaybes $ map (\(gref,gexpr) -> cAssignment gref gexpr) $ reverse $ topSort hm
+  redundantExprs <- getRedundantExprs inputs
+  case redundantExprs of
+    Just res -> error $ "showCWithGraphRefs saw redundant inputs: " ++ show (HS.toList res)
+    Nothing -> do
+      (inputIndices, outputIndices, hm, _) <- toFunGraph inputs outputs
+      let (inDecls, inPrototypes) = writeInputs inputIndices 0
+          (outDecls, outPrototypes) = writeOutputs outputIndices 0
+          mainDecls = catMaybes $ map (\(gref,gexpr) -> cAssignment gref gexpr) $ reverse $ topSort hm
+      
+          body = unlines $ map ("    "++) $
+                 inDecls ++
+                 ["","/* body */"] ++
+                 mainDecls ++ [""] ++
+                 outDecls
+      
+          txt = "#include <math.h>\n\n" ++
+                "void " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes++outPrototypes)) ++ " )\n{\n" ++
+                body ++ "}\n"
+      return (inputIndices, outputIndices, txt)
 
-      body = unlines $ map ("    "++) $
-             inDecls ++
-             ["","/* body */"] ++
-             mainDecls ++ [""] ++
-             outDecls
-
-      txt = "#include <math.h>\n\n" ++
-            "void " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes++outPrototypes)) ++ " )\n{\n" ++
-            body ++ "}\n"
-
-  return (inputIndices, outputIndices, txt)
-    
 nameNode :: GraphRef -> String
 nameNode (GraphRef k) = "v_" ++ show k
 

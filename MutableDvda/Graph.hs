@@ -12,11 +12,14 @@ module MutableDvda.Graph ( GExpr(..)
                          , toFunGraph
                          , unsafeToFunGraph
                          , topSort
+                         , getRedundantExprs
                          ) where
 
 import Control.Concurrent.MVar
 import qualified Data.Graph as Graph
 import Data.Hashable ( Hashable, hash, combine )
+import Data.HashSet ( HashSet )
+import qualified Data.HashSet as HS
 
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
@@ -135,6 +138,7 @@ class ToGExprs a where
     (Eq (NumT a), Hashable (NumT a))
     => Int -> HashMap (GExpr (NumT a)) GraphRef -> HashMap (Expr (NumT a)) GraphRef -> a
     -> IO (ContainerT a GraphRef, [MVar (Expr (NumT a))], Int, HashMap (GExpr (NumT a)) GraphRef, HashMap (Expr (NumT a)) GraphRef)
+  toList :: a -> [Expr (NumT a)]
 
 instance ToGExprs (Expr a) where
   type NumT (Expr a) = a
@@ -144,6 +148,7 @@ instance ToGExprs (Expr a) where
   unsafeToGExprs n0 hm0 im0 e = do
       (gref, n, hm, im, mv) <- insert hm0 im0 n0 e
       return (gref, mv, n, hm, im)
+  toList e = [e]
 
 instance ToGExprs a => ToGExprs [a] where
   type NumT [a] = NumT a
@@ -156,7 +161,7 @@ instance ToGExprs a => ToGExprs [a] where
       f (gref0, mv0, n0, hm0, im0) (e:es) = do
         (gref, mv, n, hm, im) <- unsafeToGExprs n0 hm0 im0 e
         f (gref0 ++ [gref], mv0 ++ mv, n, hm, im) es
-
+  toList = concatMap toList
 
 data a :* b = a :* b deriving Show
 infixr 6 :*
@@ -173,6 +178,7 @@ instance (ToGExprs a, ToGExprs b, NumT a ~ NumT b) => ToGExprs (a :* b) where
     (grefs1, mvs1, n1, hm1, im1) <- unsafeToGExprs n0 hm0 im0 x
     (grefs2, mvs2, n2, hm2, im2) <- unsafeToGExprs n1 hm1 im1 y
     return (grefs1 :* grefs2, mvs1 ++ mvs2, n2, hm2, im2)
+  toList (x :* y) = toList x ++ toList y
   
 
 ---- | This version consumes the Exprs as a side effect, so only use it internally if you generate the Exprs youself and can discard them after calling unsafeToGExprs
@@ -195,6 +201,21 @@ toFunGraph inputExprs outputExprs = do
   (inputIndices, outputIndices, hm, n, mvs) <- unsafeToFunGraph inputExprs outputExprs
   mapM_ resetGraphRefs mvs
   return (inputIndices, outputIndices, hm, n)
+
+-- | throw an error if there are repeated inputs
+getRedundantExprs :: (ToGExprs a, Eq b, Hashable b, NumT a ~ b) =>
+                     a -> IO (Maybe (HashSet (Expr b)))
+getRedundantExprs exprs_ = do
+  exprs <- readExprs exprs_
+  let redundant = snd $ foldl f (HS.empty, HS.empty) (toList exprs)
+        where
+          f (knownExprs, redundantExprs) expr
+            | HS.member expr knownExprs = (knownExprs, HS.insert expr redundantExprs)
+            | otherwise = (HS.insert expr knownExprs, redundantExprs)
+  return $ if HS.null redundant
+           then Nothing
+           else Just redundant
+
 
 topSort :: HashMap (GExpr a) GraphRef -> [(GraphRef, GExpr a)]
 topSort hm = map ((\(x,k,_) -> (GraphRef k,x)) . vertexToNode) (Graph.topSort graph)
