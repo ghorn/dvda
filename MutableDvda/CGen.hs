@@ -51,7 +51,10 @@ instance GenC GraphRef where
       prototype = ["double * const output" ++ show outputK]
   writeInputs gref inputK = (decls, prototype)
     where
-      decls = [printf "/* input %d */" inputK, printf "const double %s = *input%d;" (nameNode gref) inputK]
+      (bc,ec) = case gref of GraphRef (-1) -> ("/* ", " */")
+                             _ -> ("","")
+      decls =
+        [printf "/* input %d */" inputK, printf "%sconst double %s = *input%d;%s" bc (nameNode gref) inputK ec]
       prototype = ["const double * input" ++ show inputK]
   createMxOutputs _ outputK = ["    plhs[" ++ show outputK ++ "] = mxCreateDoubleScalar( 0 );"]
   checkMxInputDims _ functionName inputK =
@@ -80,7 +83,11 @@ instance GenC [GraphRef] where
       prototype = ["const double input" ++ show inputK ++ "[" ++ show (length grefs) ++ "]"]
       decls = (printf "/* input %d */" inputK):(zipWith f [(0::Int)..] grefs)
         where
-          f inIdx gref = printf "const double %s = input%d[%d];" (nameNode gref) inputK inIdx
+          f inIdx gref = printf "%sconst double %s = input%d[%d];%s" bc (nameNode gref) inputK inIdx ec
+            where
+              (bc,ec) = case gref of GraphRef (-1) -> ("/* ", " */")
+                                     _ -> ("","")
+
   createMxOutputs grefs outputK =
     ["    plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show (length grefs) ++ ", 1, mxREAL );"]
   checkMxInputDims grefs functionName inputK =
@@ -108,7 +115,7 @@ instance GenC [[GraphRef]] where
       ncols = length (head grefs)
       prototype = ["double output" ++ show outputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
       decls = (printf "/* output %d */" outputK):
-              zipWith f [(r,c) | r <- [0..(length grefs-1)], c <- [0..(length (head grefs)-1)]] (concat grefs)
+              zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat grefs)
         where
           f (rowIdx,colIdx) gref = printf "output%d[%d][%d] = %s;" outputK rowIdx colIdx (nameNode gref)
   writeInputs grefs inputK
@@ -122,7 +129,11 @@ instance GenC [[GraphRef]] where
       decls = (printf "/* input %d */" inputK):
               zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat grefs)
         where
-          f (rowIdx,colIdx) gref = printf "const double %s = input%d[%d][%d];" (nameNode gref) inputK rowIdx colIdx
+          f (rowIdx,colIdx) gref = printf "%sconst double %s = input%d[%d][%d];%s" bc (nameNode gref) inputK rowIdx colIdx ec
+            where
+              (bc,ec) = case gref of GraphRef (-1) -> ("/* ", " */")
+                                     _ -> ("","")
+
   createMxOutputs grefs outputK =
     ["    plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show nrows++ ", " ++ show ncols ++ ", mxREAL );"]
     where

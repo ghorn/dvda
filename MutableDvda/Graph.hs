@@ -190,7 +190,7 @@ unsafeToFunGraph inputExprs_ outputExprs = do
 
   let lookupExpr e@(ESym _) = case HM.lookup e inputMap of
         Just x -> x
-        Nothing ->   error $ "ERROR: in toFunGraph, input " ++ show e ++ " was not found as parent of outputs"
+        Nothing -> GraphRef (-1) -- return -1 if this symbol isn't a parent of any outputs
       lookupExpr e = error $ "ERROR: in toFunGraph, input " ++ show e ++ " is not symbolic type"
       inputIndices = mapExprs lookupExpr inputExprs
   return (inputIndices, outputIndices, hm, n, mvs)
