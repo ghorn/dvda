@@ -56,7 +56,14 @@ instance GenC GraphRef where
       decls =
         [printf "/* input %d */" inputK, printf "%sconst double %s = *input%d;%s" bc (nameNode gref) inputK ec]
       prototype = ["const double * input" ++ show inputK]
-  createMxOutputs _ outputK = ["    plhs[" ++ show outputK ++ "] = mxCreateDoubleScalar( 0 );"]
+  createMxOutputs _ outputK =
+    [ "    if ( " ++ show outputK ++ " < nlhs ) {"
+    , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleScalar( 0 );"
+    , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
+    , "    } else"
+    , "        outputs[" ++ show outputK ++ "] = (double*)malloc( sizeof(double) );"
+    ]
+
   checkMxInputDims _ functionName inputK =
     [ "    if ( 1 != mxGetM( prhs[" ++ show inputK ++ "] ) || 1 != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
     , "        char errMsg[200];"
@@ -89,7 +96,13 @@ instance GenC [GraphRef] where
                                      _ -> ("","")
 
   createMxOutputs grefs outputK =
-    ["    plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show (length grefs) ++ ", 1, mxREAL );"]
+    [ "    if ( " ++ show outputK ++ " < nlhs ) {"
+    , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show (length grefs) ++ ", 1, mxREAL );"
+    , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
+    , "    } else"
+    , "        outputs[" ++ show outputK ++ "] = (double*)malloc( " ++ show (length grefs) ++ "*sizeof(double) );"
+    ]
+  
   checkMxInputDims grefs functionName inputK =
     [ "    if ( !( " ++ show nrows ++ " == mxGetM( prhs[" ++ show inputK ++ "] ) && 1 == mxGetN( prhs[" ++ show inputK ++ "] ) ) && !( " ++ show nrows ++ " == mxGetN( prhs[" ++ show inputK ++ "] ) && 1 == mxGetM( prhs[" ++ show inputK ++ "] ) ) ) {"
     , "        char errMsg[200];"
@@ -112,7 +125,7 @@ instance GenC [[GraphRef]] where
     | otherwise = (decls, prototype)
     where
       nrows = length grefs
-      ncols = length (head grefs)
+      ncols = if nrows == 0 then 0 else length (head grefs)
       prototype = ["double output" ++ show outputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
       decls = (printf "/* output %d */" outputK):
               zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat grefs)
@@ -124,7 +137,7 @@ instance GenC [[GraphRef]] where
     | otherwise = (decls, prototype)
     where
       nrows = length grefs
-      ncols = length (head grefs)
+      ncols = if nrows == 0 then 0 else length (head grefs)
       prototype = ["const double input" ++ show inputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
       decls = (printf "/* input %d */" inputK):
               zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat grefs)
@@ -135,10 +148,15 @@ instance GenC [[GraphRef]] where
                                      _ -> ("","")
 
   createMxOutputs grefs outputK =
-    ["    plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show nrows++ ", " ++ show ncols ++ ", mxREAL );"]
+    [ "    if ( " ++ show outputK ++ " < nlhs ) {"
+    , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show nrows++ ", " ++ show ncols ++ ", mxREAL );"
+    , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
+    , "    } else"
+    , "        outputs[" ++ show outputK ++ "] = (double*)malloc( " ++ show (nrows*ncols) ++ "*sizeof(double) );"
+    ]
     where
       nrows = length grefs
-      ncols = length (head grefs)
+      ncols = if nrows == 0 then 0 else length (head grefs)
   checkMxInputDims grefs functionName inputK =
     [ "    if ( " ++ show nrows ++ " != mxGetM( prhs[" ++ show inputK ++ "] ) || " ++ show ncols ++ " != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
     , "        char errMsg[200];"
@@ -152,7 +170,7 @@ instance GenC [[GraphRef]] where
     ]
     where
       nrows = length grefs
-      ncols = length (head grefs)
+      ncols = if nrows == 0 then 0 else length (head grefs)
 
 instance (GenC a, GenC b) => GenC (a :* b) where
   numObjects (x :* y) = numObjects x + numObjects y
@@ -282,28 +300,34 @@ mexFun functionName ins outs =
   , "        mexErrMsgTxt(errMsg);"
   , "    }"
   , []
+  , "    /* check the dimensions of the input arrays */"
+  ] ++ checkMxInputDims ins functionName 0 ++
+  [ []
   , "    /* check number of outputs  */"
-  , "    if ( " ++ show nlhs ++ " != nlhs ) {"
+  , "    if ( " ++ show nlhs ++ " < nlhs ) {"
   , "        char errMsg[200];"
   , "        sprintf(errMsg,"
-  , "                \"mex function '" ++ functionName ++ "' given incorrect number of outputs\\n\""
-  , "                \"expected: " ++ show nlhs ++ " but got %d\","
+  , "                \"mex function '" ++ functionName ++ "' saw too many outputs\\n\""
+  , "                \"expected <= " ++ show nlhs ++ " but got %d\","
   , "                nlhs);"
   , "        mexErrMsgTxt(errMsg);"
   , "    }"
   , []
-  , "    /* check the dimensions of the input arrays */"
-  ] ++ checkMxInputDims ins functionName 0 ++
-  [ []
-  , "    /* create the output arrays */"
+  , "    /* create the output arrays, if no output is provided by user create a dummy output */"
+  , "    double * outputs[" ++ show nlhs ++ "];"
   ] ++ createMxOutputs outs 0 ++ -- e.g.: plhs[0] = mxCreateDoubleMatrix(1,ncols,mxREAL);
   [ []
   , "    /* call the c function */"
   , "    " ++ functionName ++ "( " ++ intercalate ", " (inputPtrs ++ outputPtrs) ++ " );"
+  , []
+  , "    /* free the unused dummy outputs */"
+  , "    int k;"
+  , "    for ( k = " ++ show (nlhs - 1) ++ "; nlhs <= k; k-- )"
+  , "        free( outputs[k] );"
   , "}"
   ]
   where
     nlhs = numObjects outs
     nrhs = numObjects ins
     inputPtrs = map (\k -> "mxGetPr(prhs[" ++ show k ++ "])") [0..(nrhs-1)]
-    outputPtrs = map (\k -> "mxGetPr(plhs[" ++ show k ++ "])") [0..(nlhs-1)]
+    outputPtrs = map (\k -> "outputs[" ++ show k ++ "]") [0..(nlhs-1)]

@@ -26,7 +26,6 @@ data GraphRef = GraphRef Int deriving (Eq, Show)
 instance Hashable GraphRef where
   hash (GraphRef k) = hash "GraphRef" `combine` k
 
-
 data Expr a where
   ERef :: MVar (Expr a) -> Expr a
   ESym :: String -> Expr a
