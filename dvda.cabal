@@ -80,6 +80,7 @@ Library
                      MutableDvda.Graph
 
   Build-depends:     base       >= 4     && < 5,
+                     file-location >= 0.4.4 && < 0.5,
                      hashable  >= 1.1 && < 1.2,
                      containers >= 0.4 && < 0.5,
                      unordered-containers  >= 0.2 && < 0.3,
@@ -112,6 +113,7 @@ Test-suite test
   main-is:           TestMain.hs
   build-depends:     base,
                      dvda,
+                     file-location >= 0.4.4 && < 0.5,
                      hashable  >= 1.1 && < 1.2,
                      containers >= 0.4 && < 0.5,
                      unordered-containers  >= 0.2 && < 0.3,

@@ -37,7 +37,7 @@ import Numeric.LATC.NestedList ( Matrix, Vector, vbinary, mbinary )
 import qualified Numeric.LATC.NestedList as NL
 import Test.QuickCheck -- ( Arbitrary(..) )
 
-import Dvda.BinUn ( BinOp(..), UnOp(..), showBinary, showUnary, isCommutative, lassoc, rassoc )
+import Dvda.BinUn ( BinOp(..), UnOp(..), showBinaryOperator, showUnaryOperator, isCommutative, binPrec )
 import Dvda.Config ( simplifyCommutativeOps )
 import Dvda.Shape (DIM0,DIM1,DIM2,Z(..),(:.)(..), listOfShape, Shape(shapeOfList), rank )
 import Dvda.SparseLA ( SparseVec, SparseMat, svFromList, smFromLists )
@@ -99,41 +99,36 @@ instance (Shape sh, Show a) => Show (Const sh a) where
   show (CMat sh m) = "CMat " ++ showShapeR sh ++ " " ++ show m
   show (CTensor sh v) = "CTensor " ++ showShapeR sh ++ " " ++ show v
 
-paren :: String -> String
-paren x = "("++ x ++")"
+showInfixBinary :: (Show a, Show b) => Int -> BinOp -> a -> b -> ShowS
+showInfixBinary d op u v = showParen (d > prec) $
+                           showsPrec prec u .
+                           showString (" " ++ showBinaryOperator op ++ " ") .
+                           showsPrec prec v
+  where
+    prec = binPrec op
+
+showUnary :: Show a => Int -> Int -> UnOp -> a -> ShowS
+showUnary d prec op u = showParen (d > prec) $
+                        showString (showUnaryOperator op) .
+                        showsPrec prec u
 
 instance (Shape sh, Show a) => Show (Expr sh a) where
-  show (ERef sh _ k)
-    | rank sh == 0 = "{ref:" ++ show k ++ "}"
-    | otherwise    = "{ref:" ++ show k ++ ",(" ++ showShapeR sh ++ ")}"
-  show (EDimensionless x) = show x
-  show (ESym sh s)
-    | rank sh == 0 = show s
-    | otherwise    = show s++"{"++showShapeR sh++"}"
-  show (EConst x) = show x
-  show (EUnary op x) = showUnary (show x) op
-  show (EBinary op x y) = parenx x (show x) ++ " " ++ showBinary op ++ " " ++ pareny y (show y)
-    where
-      parenx (EBinary xop _ _) = if lassoc xop op then id else paren
-      parenx (EScale _ _)      = if lassoc Mul op then id else paren
-      parenx _ = id
-
-      pareny (EBinary yop _ _) = if rassoc op yop then id else paren
-      pareny (EScale _ _)      = if rassoc op Mul then id else paren
-      pareny _ = id
-  show (EScale x y) = parenx x (show x) ++ " " ++ showBinary Mul ++ " " ++ pareny y (show y)
-    where
-      parenx (EBinary xop _ _) = if lassoc xop Mul then id else paren
-      parenx (EScale _ _)      = if lassoc Mul Mul then id else paren
-      parenx _ = id
-
-      pareny (EBinary yop _ _) = if rassoc Mul yop then id else paren
-      pareny (EScale _ _)      = if rassoc Mul Mul then id else paren
-      pareny _ = id
+  showsPrec _ (ERef sh _ k)
+    | rank sh == 0 = showString $ "{ref:" ++ show k ++ "}"
+    | otherwise    = showString $ "{ref:" ++ show k ++ ",(" ++ showShapeR sh ++ ")}"
+  showsPrec _ (EDimensionless x) = showString $ show x
+  showsPrec _ (ESym sh s)
+    | rank sh == 0 = showString $ show s
+    | otherwise    = showString $ show s++"{"++showShapeR sh++"}"
+  showsPrec _ (EConst x) = showString (show x)
+  showsPrec d (EUnary Neg x) = showUnary d  7 Neg x
+  showsPrec d (EUnary  op x) = showUnary d 10  op x
+  showsPrec d (EBinary op x y) = showInfixBinary d op x y
+  showsPrec d (EScale x y) = showInfixBinary d Mul x y
         
-  show (EDeriv x y) = "deriv(" ++ show x ++ ", " ++ show y ++ ")"
-  show (EGrad  x y) = "grad("  ++ show x ++ ", " ++ show y ++ ")"
-  show (EJacob x y) = "jacob(" ++ show x ++ ", " ++ show y ++ ")"
+  showsPrec _ (EDeriv x y) = showString $ "deriv(" ++ show x ++ ", " ++ show y ++ ")"
+  showsPrec _ (EGrad  x y) = showString $ "grad("  ++ show x ++ ", " ++ show y ++ ")"
+  showsPrec _ (EJacob x y) = showString $ "jacob(" ++ show x ++ ", " ++ show y ++ ")"
 
 
 --------------------------------- eq instances -------------------------

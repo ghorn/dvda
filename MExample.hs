@@ -11,7 +11,7 @@ import MutableDvda.FullShow
 import MutableDvda.Graph
 
 bg :: Floating a => a -> a
-bg x' = f
+bg x' = f''
   where
     y' = 2*x'
     z' = 4*y'
@@ -69,16 +69,16 @@ g = bg (sym "x")
 --  putStrLn "\nhashmap:"
 --  mapM_ print (HM.toList hm)
 
-main :: IO ()
-main = do
---  (_, n, _) <- toGExprs [g]
-  putStrLn "\nrunning rad..."
-  radMap <- rad g
---  sg <- fullShow g
---  putStrLn sg
-  putStrLn "\nmaking graph / performing CSE..."
---  (_,n,hm,_) <- unsafeToGExprs (g:(HM.elems radMap))
-  (_,n,hm) <- toGExprs (g:(HM.elems radMap))
-  putStrLn $ show n ++ " nodes"
---  print (graphCount hm)
---  putStrLn (graphShow hm)
+--main :: IO ()
+--main = do
+----  (_, n, _) <- toGExprs [g]
+--  putStrLn "\nrunning rad..."
+--  radMap <- rad g
+----  sg <- fullShow g
+----  putStrLn sg
+--  putStrLn "\nmaking graph / performing CSE..."
+----  (_,n,hm,_) <- unsafeToGExprs (g:(HM.elems radMap))
+--  (_,n,hm) <- toFunGraph (g:(HM.elems radMap))
+--  putStrLn $ show n ++ " nodes"
+----  print (graphCount hm)
+----  putStrLn (graphShow hm)

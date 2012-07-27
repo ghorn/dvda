@@ -42,10 +42,10 @@ data Nums a = Mul a a
             | Negate a
             | Abs a
             | Signum a
-            | FromInteger Integer deriving Show
+            | FromInteger Integer
 
 data Fractionals a = Div a a
-                   | FromRational Rational deriving (Eq, Show)
+                   | FromRational Rational deriving Eq
 
 data Floatings a = Pow a a
                  | LogBase a a
@@ -61,7 +61,60 @@ data Floatings a = Pow a a
                  | Tanh a
                  | ASinh a
                  | ATanh a
-                 | ACosh a deriving (Eq, Show)
+                 | ACosh a deriving Eq
+
+----------------------- Show instances -------------------------
+showsInfixBinary :: (Show a, Show b) => Int -> Int -> String -> a -> b -> ShowS
+showsInfixBinary d prec op u v = showParen (d > prec) $
+                                 showsPrec prec u .
+                                 showString op .
+                                 showsPrec prec v
+
+showsUnary :: Show a => Int -> Int -> String -> a -> ShowS
+showsUnary d prec op u = showParen (d > prec) $
+                         showString op .
+                         showsPrec prec u
+
+instance Show a => Show (Nums a) where
+  showsPrec d (Mul x y) = showsInfixBinary d 7 " * " x y
+  showsPrec d (Add x y) = showsInfixBinary d 7 " + " x y
+  showsPrec d (Sub x y) = showsInfixBinary d 7 " + " x y
+  showsPrec d (Negate x) = showsUnary d 7 "-" x
+  showsPrec d (Abs x) = showsUnary d 10 "abs" x
+  showsPrec d (Signum x) = showsUnary d 10 "signum" x
+  showsPrec _ (FromInteger k) = showString (show k)
+
+instance Show a => Show (Fractionals a) where
+  showsPrec d (Div x y) = showsInfixBinary d 7 " / " x y
+  showsPrec _ (FromRational r) = showString $ show (fromRational r :: Double)
+
+instance Show a => Show (Floatings a) where
+  showsPrec d (Pow x y) = showsInfixBinary d 8 " ** " x y
+  showsPrec d (LogBase x y) = showParen (d > 10) $ showString $ "logBase(" ++ show x ++ ", " ++ show y ++ ")"
+  showsPrec d (Exp x)   = showsUnary d 10 "exp" x
+  showsPrec d (Log x)   = showsUnary d 10 "log" x
+  showsPrec d (Sin x)   = showsUnary d 10 "sin" x
+  showsPrec d (Cos x)   = showsUnary d 10 "cos" x
+  showsPrec d (ASin x)  = showsUnary d 10 "asin" x
+  showsPrec d (ATan x)  = showsUnary d 10 "atan" x
+  showsPrec d (ACos x)  = showsUnary d 10 "acos" x
+  showsPrec d (Sinh x)  = showsUnary d 10 "sinh" x
+  showsPrec d (Cosh x)  = showsUnary d 10 "cosh" x
+  showsPrec d (Tanh x)  = showsUnary d 10 "tanh" x
+  showsPrec d (ASinh x) = showsUnary d 10 "asinh" x
+  showsPrec d (ATanh x) = showsUnary d 10 "atanh" x
+  showsPrec d (ACosh x) = showsUnary d 10 "acosh" x
+
+instance Show a => Show (Expr a) where
+--  showsPrec _ (ERef _) = showString "ERef"
+  showsPrec d (ERef mv) = showsPrec d $ unsafePerformIO (readMVar mv)
+  showsPrec _ (ESym name) = showString name
+  showsPrec _ (EConst x) = showString (show x)
+  showsPrec d (ENum x) = showsPrec d x
+  showsPrec d (EFractional x) = showsPrec d x
+  showsPrec d (EFloating x) = showsPrec d x
+  showsPrec d (EGraphRef x k) = showString ("EGraphRef(" ++ show k ++ "): ") .
+                                showsPrec d x
 
 
 ----------------------- Eq instances -------------------------
@@ -262,15 +315,6 @@ applyFloatingUn (f,_) (ENum (FromInteger x)) = EConst (f $ fromInteger x)
 applyFloatingUn (f,_) (EFractional (FromRational x)) = EConst (f $ fromRational x)
 applyFloatingUn (_,f) x = eref $ EFloating (f x)
 
---------------------------- show instances ------------------------
-instance Show a => Show (Expr a) where
-  show (ERef _) = "ERef"
-  show (ESym name) = name
-  show (EConst a) = show a
-  show (ENum x) = show x
-  show (EFractional x) = show x
-  show (EFloating x) = show x
-  show (EGraphRef x k) = "EGraphRef(" ++ show k ++ "): " ++ show x
 
 sym :: String -> Expr a
 sym name = eref (ESym name)
