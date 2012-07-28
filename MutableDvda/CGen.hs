@@ -1,13 +1,10 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language TypeOperators #-}
-{-# Language FlexibleInstances #-}
 {-# Language TypeFamilies #-}
 {-# Language FlexibleContexts #-}
 
-module MutableDvda.CGen ( GenC(..)
+module MutableDvda.CGen ( run
                         , showC
                         , showMex
-                        , run
                         ) where
 
 import Data.Hashable ( Hashable )
@@ -17,8 +14,7 @@ import Text.Printf ( printf )
 import qualified Data.HashSet as HS
 
 import MutableDvda.Expr
-import MutableDvda.FunGraph ( FunGraph(..), (:*)(..) )
-import MutableDvda.Graph
+import MutableDvda.FunGraph
 
 run :: IO ()
 run = do
@@ -35,162 +31,149 @@ run = do
 --  showC "foo" (x :* [y]:*[[z]]) (f0:*f1:*[[f0*f0]]) >>= putStrLn
   showMex "foo" (x :* [y,w3]:*[[z,w], [w1,w2]]) (f0:*f1:*[[f0*f0]]:*[f1]) >>= putStrLn
 
--------------------------------------------------------------------------
-class GenC a where
-  numObjects :: a -> Int
-  writeOutputs :: a -> Int -> ([String], [String]) -- (output declarations, prototype)
-  writeInputs :: a -> Int -> ([String], [String]) -- (input declarations, prototype)
-  -- mex function stuff
-  createMxOutputs :: a -> Int -> [String]
-  checkMxInputDims :: a -> String -> Int -> [String]
 
-instance GenC GraphRef where
-  numObjects _ = 1
-  writeOutputs gref outputK = (decls, prototype)
-    where
-      decls = [printf "/* output %d */" outputK, printf "(*output%d) = %s;" outputK (nameNode gref)]
-      prototype = ["double * const output" ++ show outputK]
-  writeInputs gref inputK = (decls, prototype)
-    where
-      (bc,ec) = case gref of GraphRef (-1) -> ("/* ", " */")
-                             _ -> ("","")
-      decls =
-        [printf "/* input %d */" inputK, printf "%sconst double %s = *input%d;%s" bc (nameNode gref) inputK ec]
-      prototype = ["const double * input" ++ show inputK]
-  createMxOutputs _ outputK =
-    [ "    if ( " ++ show outputK ++ " < nlhs ) {"
-    , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleScalar( 0 );"
-    , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
-    , "    } else"
-    , "        outputs[" ++ show outputK ++ "] = (double*)malloc( sizeof(double) );"
-    ]
-
-  checkMxInputDims _ functionName inputK =
-    [ "    if ( 1 != mxGetM( prhs[" ++ show inputK ++ "] ) || 1 != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
-    , "        char errMsg[200];"
-    , "        sprintf(errMsg,"
-    , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
-    , "                \"expected dimensions: (1, 1) but got (%zu, %zu)\","
-    , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
-    , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
-    , "        mexErrMsgTxt(errMsg);"
-    , "    }"
-    ]
-
-instance GenC [GraphRef] where
-  numObjects _ = 1
-  writeOutputs grefs outputK = (decls, prototype)
-    where
-      prototype = ["double output" ++ show outputK ++ "[" ++ show (length grefs) ++ "]"]
-      decls = (printf "/* output %d */" outputK):
-              zipWith f [(0::Int)..] grefs
-        where
-          f outIdx gref = printf "output%d[%d] = %s;" outputK outIdx (nameNode gref)
-  writeInputs grefs inputK = (decls, prototype)
-    where
-      prototype = ["const double input" ++ show inputK ++ "[" ++ show (length grefs) ++ "]"]
-      decls = (printf "/* input %d */" inputK):(zipWith f [(0::Int)..] grefs)
-        where
-          f inIdx gref = printf "%sconst double %s = input%d[%d];%s" bc (nameNode gref) inputK inIdx ec
-            where
-              (bc,ec) = case gref of GraphRef (-1) -> ("/* ", " */")
-                                     _ -> ("","")
-
-  createMxOutputs grefs outputK =
-    [ "    if ( " ++ show outputK ++ " < nlhs ) {"
-    , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show (length grefs) ++ ", 1, mxREAL );"
-    , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
-    , "    } else"
-    , "        outputs[" ++ show outputK ++ "] = (double*)malloc( " ++ show (length grefs) ++ "*sizeof(double) );"
-    ]
-  
-  checkMxInputDims grefs functionName inputK =
-    [ "    if ( !( " ++ show nrows ++ " == mxGetM( prhs[" ++ show inputK ++ "] ) && 1 == mxGetN( prhs[" ++ show inputK ++ "] ) ) && !( " ++ show nrows ++ " == mxGetN( prhs[" ++ show inputK ++ "] ) && 1 == mxGetM( prhs[" ++ show inputK ++ "] ) ) ) {"
-    , "        char errMsg[200];"
-    , "        sprintf(errMsg,"
-    , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
-    , "                \"expected dimensions: (" ++ show nrows ++ ", 1) or (1, " ++ show nrows ++ ") but got (%zu, %zu)\","
-    , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
-    , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
-    , "        mexErrMsgTxt(errMsg);"
-    , "    }"
-    ]
-    where
-      nrows = length grefs
+writeInputs :: [MVS Int] -> ([String], [String])
+writeInputs ins = (concatMap fst dcs, concatMap snd dcs)
+  where
+    dcs :: [([String],[String])]
+    dcs = zipWith writeInput ins [0..]
     
-instance GenC [[GraphRef]] where
-  numObjects _ = 1
-  writeOutputs grefs outputK
-    | any ((ncols /=) . length) grefs =
-        error $ "writeOutputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length grefs)
-    | otherwise = (decls, prototype)
-    where
-      nrows = length grefs
-      ncols = if nrows == 0 then 0 else length (head grefs)
-      prototype = ["double output" ++ show outputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
-      decls = (printf "/* output %d */" outputK):
-              zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat grefs)
-        where
-          f (rowIdx,colIdx) gref = printf "output%d[%d][%d] = %s;" outputK rowIdx colIdx (nameNode gref)
-  writeInputs grefs inputK
-    | any ((ncols /=) . length) grefs =
-        error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length grefs)
-    | otherwise = (decls, prototype)
-    where
-      nrows = length grefs
-      ncols = if nrows == 0 then 0 else length (head grefs)
-      prototype = ["const double input" ++ show inputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
-      decls = (printf "/* input %d */" inputK):
-              zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat grefs)
-        where
-          f (rowIdx,colIdx) gref = printf "%sconst double %s = input%d[%d][%d];%s" bc (nameNode gref) inputK rowIdx colIdx ec
-            where
-              (bc,ec) = case gref of GraphRef (-1) -> ("/* ", " */")
-                                     _ -> ("","")
+    writeInput :: MVS Int -> Int -> ([String], [String])
+    writeInput (Sca k) inputK = (decls, prototype)
+      where
+        (bc,ec) = case k of (-1) -> ("/* ", " */")
+                            _ -> ("","")
+        decls =
+          [printf "/* input %d */" inputK, printf "%sconst double %s = *input%d;%s" bc (nameNode k) inputK ec]
+        prototype = ["const double * input" ++ show inputK]
+    writeInput (Vec ks) inputK = (decls, prototype)
+      where
+        prototype = ["const double input" ++ show inputK ++ "[" ++ show (length ks) ++ "]"]
+        decls = (printf "/* input %d */" inputK):(zipWith f [(0::Int)..] ks)
+          where
+            f inIdx k = printf "%sconst double %s = input%d[%d];%s" bc (nameNode k) inputK inIdx ec
+              where
+                (bc,ec) = case k of (-1) -> ("/* ", " */")
+                                    _ -> ("","")
+    writeInput (Mat ks) inputK
+      | any ((ncols /=) . length) ks =
+          error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length ks)
+      | otherwise = (decls, prototype)
+      where
+        nrows = length ks
+        ncols = if nrows == 0 then 0 else length (head ks)
+        prototype = ["const double input" ++ show inputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
+        decls = (printf "/* input %d */" inputK):
+                zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat ks)
+          where
+            f (rowIdx,colIdx) gref = printf "%sconst double %s = input%d[%d][%d];%s"
+                                     bc (nameNode gref) inputK rowIdx colIdx ec
+              where
+                (bc,ec) = case gref of (-1) -> ("/* ", " */")
+                                       _ -> ("","")
 
-  createMxOutputs grefs outputK =
-    [ "    if ( " ++ show outputK ++ " < nlhs ) {"
-    , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show nrows++ ", " ++ show ncols ++ ", mxREAL );"
-    , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
-    , "    } else"
-    , "        outputs[" ++ show outputK ++ "] = (double*)malloc( " ++ show (nrows*ncols) ++ "*sizeof(double) );"
-    ]
-    where
-      nrows = length grefs
-      ncols = if nrows == 0 then 0 else length (head grefs)
-  checkMxInputDims grefs functionName inputK =
-    [ "    if ( " ++ show nrows ++ " != mxGetM( prhs[" ++ show inputK ++ "] ) || " ++ show ncols ++ " != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
-    , "        char errMsg[200];"
-    , "        sprintf(errMsg,"
-    , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
-    , "                \"expected dimensions: (" ++ show nrows ++ ", " ++ show ncols ++ ") but got (%zu, %zu)\","
-    , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
-    , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
-    , "        mexErrMsgTxt(errMsg);"
-    , "    }"
-    ]
-    where
-      nrows = length grefs
-      ncols = if nrows == 0 then 0 else length (head grefs)
 
-instance (GenC a, GenC b) => GenC (a :* b) where
-  numObjects (x :* y) = numObjects x + numObjects y
-  writeOutputs (x :* y) outputK = (dx ++ "" : dy, px ++ py)
-    where
-      (dx, px) = writeOutputs x outputK
-      (dy, py) = writeOutputs y (outputK + numObjects x)
-  writeInputs  (x :* y) inputK = (dx ++ "":dy, px ++ py)
-    where
-      (dx, px) = writeInputs x inputK
-      (dy, py) = writeInputs y (inputK + numObjects x)
-  createMxOutputs (x :* y) outputK = mx ++ my
-    where
-      mx = createMxOutputs x outputK
-      my = createMxOutputs y (outputK + numObjects x)
-  checkMxInputDims (x :* y) functionName inputK = mx ++ my
-    where
-      mx = checkMxInputDims x functionName inputK
-      my = checkMxInputDims y functionName (inputK + numObjects x)
+writeOutputs :: [MVS Int] -> ([String], [String])
+writeOutputs ins = (concatMap fst dcs, concatMap snd dcs)
+  where
+    dcs :: [([String],[String])]
+    dcs = zipWith writeOutput ins [0..]
+
+    writeOutput :: MVS Int -> Int -> ([String], [String])
+    writeOutput (Sca gref) outputK = (decls, prototype)
+      where
+        decls = [printf "/* output %d */" outputK, printf "(*output%d) = %s;" outputK (nameNode gref)]
+        prototype = ["double * const output" ++ show outputK]
+    writeOutput (Vec grefs) outputK = (decls, prototype)
+      where
+        prototype = ["double output" ++ show outputK ++ "[" ++ show (length grefs) ++ "]"]
+        decls = (printf "/* output %d */" outputK):
+                zipWith f [(0::Int)..] grefs
+          where
+            f outIdx gref = printf "output%d[%d] = %s;" outputK outIdx (nameNode gref)
+    writeOutput (Mat grefs) outputK
+      | any ((ncols /=) . length) grefs =
+          error $ "writeOutputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length grefs)
+      | otherwise = (decls, prototype)
+      where
+        nrows = length grefs
+        ncols = if nrows == 0 then 0 else length (head grefs)
+        prototype = ["double output" ++ show outputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
+        decls = (printf "/* output %d */" outputK):
+                zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat grefs)
+          where
+            f (rowIdx,colIdx) gref = printf "output%d[%d][%d] = %s;" outputK rowIdx colIdx (nameNode gref)
+
+createMxOutputs :: [MVS Int] -> [String]
+createMxOutputs xs = concat $ zipWith createMxOutput xs [0..]
+  where
+    createMxOutput :: MVS Int -> Int -> [String]
+    createMxOutput (Sca _) outputK =
+      [ "    if ( " ++ show outputK ++ " < nlhs ) {"
+      , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleScalar( 0 );"
+      , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
+      , "    } else"
+      , "        outputs[" ++ show outputK ++ "] = (double*)malloc( sizeof(double) );"
+      ]
+    createMxOutput (Vec grefs) outputK =
+      [ "    if ( " ++ show outputK ++ " < nlhs ) {"
+      , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show (length grefs) ++ ", 1, mxREAL );"
+      , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
+      , "    } else"
+      , "        outputs[" ++ show outputK ++ "] = (double*)malloc( " ++ show (length grefs) ++ "*sizeof(double) );"
+      ]
+    createMxOutput (Mat grefs) outputK =
+      [ "    if ( " ++ show outputK ++ " < nlhs ) {"
+      , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show nrows++ ", " ++ show ncols ++ ", mxREAL );"
+      , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
+      , "    } else"
+      , "        outputs[" ++ show outputK ++ "] = (double*)malloc( " ++ show (nrows*ncols) ++ "*sizeof(double) );"
+      ]
+      where
+        nrows = length grefs
+        ncols = if nrows == 0 then 0 else length (head grefs)
+
+
+checkMxInputDims :: MVS a -> String -> Int -> [String]
+checkMxInputDims (Sca _) functionName inputK =
+  [ "    if ( 1 != mxGetM( prhs[" ++ show inputK ++ "] ) || 1 != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
+  , "        char errMsg[200];"
+  , "        sprintf(errMsg,"
+  , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
+  , "                \"expected dimensions: (1, 1) but got (%zu, %zu)\","
+  , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
+  , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
+  , "        mexErrMsgTxt(errMsg);"
+  , "    }"
+  ]
+checkMxInputDims (Vec grefs) functionName inputK =
+  [ "    if ( !( " ++ show nrows ++ " == mxGetM( prhs[" ++ show inputK ++ "] ) && 1 == mxGetN( prhs[" ++ show inputK ++ "] ) ) && !( " ++ show nrows ++ " == mxGetN( prhs[" ++ show inputK ++ "] ) && 1 == mxGetM( prhs[" ++ show inputK ++ "] ) ) ) {"
+  , "        char errMsg[200];"
+  , "        sprintf(errMsg,"
+  , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
+  , "                \"expected dimensions: (" ++ show nrows ++ ", 1) or (1, " ++ show nrows ++ ") but got (%zu, %zu)\","
+  , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
+  , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
+  , "        mexErrMsgTxt(errMsg);"
+  , "    }"
+  ]
+  where
+    nrows = length grefs
+checkMxInputDims (Mat grefs) functionName inputK =
+  [ "    if ( " ++ show nrows ++ " != mxGetM( prhs[" ++ show inputK ++ "] ) || " ++ show ncols ++ " != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
+  , "        char errMsg[200];"
+  , "        sprintf(errMsg,"
+  , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
+  , "                \"expected dimensions: (" ++ show nrows ++ ", " ++ show ncols ++ ") but got (%zu, %zu)\","
+  , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
+  , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
+  , "        mexErrMsgTxt(errMsg);"
+  , "    }"
+  ]
+  where
+    nrows = length grefs
+    ncols = if nrows == 0 then 0 else length (head grefs)
+
 
 -- | Turns inputs and outputs into a string containing C code.
 -- .
@@ -198,8 +181,7 @@ instance (GenC a, GenC b) => GenC (a :* b) where
 -- .
 --   This function simply calls showCWithGraphRefs and discards the first two outputs
 showC :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a,
-          ToGExprs b, GenC (ContainerT c GraphRef),
-          ToGExprs c, GenC (ContainerT b GraphRef))
+          ToFunGraph b, ToFunGraph c)
          => String -> b -> c -> IO String
 showC functionName inputs outputs = do
   (_,_,txt) <- showCWithGraphRefs functionName inputs outputs
@@ -208,44 +190,40 @@ showC functionName inputs outputs = do
 -- | Turns inputs and outputs into a string containing C code. Also return indices of the inputs and outputs
 -- .
 --   Also pass a name to give to the C function
-showCWithGraphRefs :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a,
-                       ToGExprs b, GenC (ContainerT b GraphRef),
-                       ToGExprs c, GenC (ContainerT c GraphRef))
-                      => String -> b -> c -> IO (ContainerT b GraphRef, ContainerT c GraphRef, String)
-showCWithGraphRefs functionName inputs outputs = do
-  redundantExprs <- getRedundantExprs inputs
-  case redundantExprs of
-    Just res -> error $ "showCWithGraphRefs saw redundant inputs: " ++ show (HS.toList res)
-    Nothing -> do
-      (inputIndices, outputIndices, hm, _) <- toFunGraph inputs outputs
-      let (inDecls, inPrototypes) = writeInputs inputIndices 0
-          (outDecls, outPrototypes) = writeOutputs outputIndices 0
-          mainDecls = catMaybes $ map (\(gref,gexpr) -> cAssignment gref gexpr) $ reverse $ topSort hm
-      
-          body = unlines $ map ("    "++) $
-                 inDecls ++
-                 ["","/* body */"] ++
-                 mainDecls ++ [""] ++
-                 outDecls
-      
-          txt = "#include <math.h>\n\n" ++
-                "void " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes++outPrototypes)) ++ " )\n{\n" ++
-                body ++ "}\n"
-      return (inputIndices, outputIndices, txt)
+showCWithGraphRefs :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a, ToFunGraph b, ToFunGraph c)
+                      => String -> b -> c -> IO ([MVS Int], [MVS Int], String)
+showCWithGraphRefs functionName inputs outputs = case getRedundantExprs inputs of
+  Just res -> error $ "showCWithGraphRefs saw redundant inputs: " ++ show (HS.toList res)
+  Nothing -> do
+    fg <- toFunGraph inputs outputs
+    let (inDecls, inPrototypes) = writeInputs (fgInputs fg)
+        (outDecls, outPrototypes) = writeOutputs (fgOutputs fg)
+        mainDecls = catMaybes $ map (\gref -> lookupGExpr gref fg >>= cAssignment gref) $ reverse $ topSort fg
+    
+        body = unlines $ map ("    "++) $
+               inDecls ++
+               ["","/* body */"] ++
+               mainDecls ++ [""] ++
+               outDecls
+    
+        txt = "#include <math.h>\n\n" ++
+              "void " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes++outPrototypes)) ++ " )\n{\n" ++
+              body ++ "}\n"
+    return (fgInputs fg, fgOutputs fg, txt)
 
-nameNode :: GraphRef -> String
-nameNode (GraphRef k) = "v_" ++ show k
+nameNode :: Int -> String
+nameNode k = "v_" ++ show k
 
-cAssignment :: Show a => GraphRef -> GExpr a -> Maybe String
-cAssignment gref gexpr = fmap (\cop -> "const double " ++ nameNode gref ++ " = " ++ cop ++ ";") (toCOp gexpr)
+cAssignment :: Show a => Int -> GExpr a Int -> Maybe String
+cAssignment k gexpr = fmap (\cop -> "const double " ++ nameNode k ++ " = " ++ cop ++ ";") (toCOp gexpr)
   where
-    bin :: GraphRef -> GraphRef -> String -> String
+    bin :: Int -> Int -> String -> String
     bin x y op = nameNode x ++ " " ++ op ++ " " ++ nameNode y
     
-    un :: GraphRef -> String -> String
+    un :: Int -> String -> String
     un x op = op ++ "( " ++ nameNode x ++ " )"
 
-    asTypeOfG :: a -> GExpr a -> a
+    asTypeOfG :: a -> GExpr a b -> a
     asTypeOfG x _ = x
     
     toCOp (GSym _)                       = Nothing
@@ -276,15 +254,13 @@ cAssignment gref gexpr = fmap (\cop -> "const double " ++ nameNode gref ++ " = "
     toCOp (GFloating (ACosh _))          = error "C generation doesn't support ACosh"
 
 
-showMex :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a,
-          ToGExprs b, GenC (ContainerT c GraphRef),
-          ToGExprs c, GenC (ContainerT b GraphRef))
-         => String -> b -> c -> IO String
+showMex :: (Eq (NumT c), Show (NumT c), Hashable (NumT c), ToFunGraph b, ToFunGraph c, NumT b ~ NumT c)
+           => String -> b -> c -> IO String
 showMex functionName inputs outputs = do
   (inputIndices, outputIndices, cText) <- showCWithGraphRefs functionName inputs outputs
   return $ cText ++ "\n\n\n" ++ mexFun functionName inputIndices outputIndices
 
-mexFun :: (GenC a, GenC b) => String -> a -> b -> String
+mexFun :: String -> [MVS a] -> [MVS Int] -> String
 mexFun functionName ins outs =
   unlines $
   [ "#include \"mex.h\""
@@ -302,7 +278,7 @@ mexFun functionName ins outs =
   , "    }"
   , []
   , "    /* check the dimensions of the input arrays */"
-  ] ++ checkMxInputDims ins functionName 0 ++
+  ] ++ concat (zipWith (\x -> checkMxInputDims x functionName) ins [0..]) ++
   [ []
   , "    /* check number of outputs  */"
   , "    if ( " ++ show nlhs ++ " < nlhs ) {"
@@ -316,7 +292,7 @@ mexFun functionName ins outs =
   , []
   , "    /* create the output arrays, if no output is provided by user create a dummy output */"
   , "    double * outputs[" ++ show nlhs ++ "];"
-  ] ++ createMxOutputs outs 0 ++ -- e.g.: plhs[0] = mxCreateDoubleMatrix(1,ncols,mxREAL);
+  ] ++ createMxOutputs outs ++ -- e.g.: plhs[0] = mxCreateDoubleMatrix(1,ncols,mxREAL);
   [ []
   , "    /* call the c function */"
   , "    " ++ functionName ++ "( " ++ intercalate ", " (inputPtrs ++ outputPtrs) ++ " );"
@@ -328,7 +304,7 @@ mexFun functionName ins outs =
   , "}"
   ]
   where
-    nlhs = numObjects outs
-    nrhs = numObjects ins
+    nlhs = length outs
+    nrhs = length ins
     inputPtrs = map (\k -> "mxGetPr(prhs[" ++ show k ++ "])") [0..(nrhs-1)]
     outputPtrs = map (\k -> "outputs[" ++ show k ++ "]") [0..(nlhs-1)]

@@ -6,10 +6,9 @@ module Main where
 import MutableDvda.AD
 import MutableDvda.Expr
 import MutableDvda.FunGraph
-import MutableDvda.Graph
 
 bg :: Floating a => a -> a
-bg x' = f'''
+bg x' = f''
   where
     y' = 2*x'
     z' = 4*y'
@@ -42,19 +41,13 @@ main = do
   let x = sym "x" :: Expr Double
       g = bg x
       g' = rad g [x]
---  print (bg x)
---  putStrLn "\nrunning rad..."
---  radMap <- rad f
---  sx <- fullShow (head $ HM.keys radMap)
---  sdx <- fullShow (head $ HM.elems radMap)
---  putStrLn $ "df/d" ++ sx ++ " = " ++ sdx
-  putStrLn "\nmaking graph..."
-  FunGraph gr ins outs <- toFunGraph x (g :* g') -- :(HM.elems radMap))
-
-  putStrLn $ "\nlength graph:" ++ show (length gr)
+  putStrLn "making graph..."
+  fg <- toFunGraph x (g :* g') -- :(HM.elems radMap))
 
   putStrLn "\ninputs:"
-  print ins
+  print (fgInputs fg)
 
   putStrLn "\noutputs:"
-  print outs
+  print (fgOutputs fg)
+
+  putStrLn $ "\nnumber of nodes: " ++ show (countNodes fg)

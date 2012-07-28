@@ -1,17 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language TypeOperators #-}
-{-# Language TypeFamilies #-}
-{-# Language FlexibleContexts #-}
-{-# Language FlexibleInstances #-}
-{-# Language MultiParamTypeClasses #-}
-{-# Language TemplateHaskell #-}
 
-module MutableDvda.Graph ( topSort
-                         , insert
---                         , getRedundantExprs
+module MutableDvda.Graph ( insert
                          ) where
 
-import qualified Data.Graph as DataGraph
 import Data.Hashable ( Hashable )
 
 import Dvda.HashMap ( HashMap )
@@ -86,54 +77,3 @@ cseInsert :: (Eq k, Hashable k) => HashMap k GraphRef -> Int -> k -> (GraphRef, 
 cseInsert hm n gexpr = case HM.lookup gexpr hm of
   Nothing -> (GraphRef n, n+1, HM.insert gexpr (GraphRef n) hm)
   Just k -> (k, n, hm)
-
-
-topSort :: HashMap (GExpr a GraphRef) GraphRef -> [(GraphRef, GExpr a GraphRef)]
-topSort hm = map ((\(x,k,_) -> (GraphRef k,x)) . vertexToNode) (DataGraph.topSort graph)
-  where
-    (graph, vertexToNode) = DataGraph.graphFromEdges' $ map f (HM.toList hm)
-      where
-        f (gexpr, GraphRef k) = (gexpr, k, map (\(GraphRef n) -> n) $ getChildren gexpr)
-
-getChildren :: GExpr a b -> [b]
-getChildren (GSym _)                       = []
-getChildren (GConst _)                     = []
-getChildren (GNum (Mul x y))               = [x,y]
-getChildren (GNum (Add x y))               = [x,y]
-getChildren (GNum (Sub x y))               = [x,y]
-getChildren (GNum (Negate x))              = [x]
-getChildren (GNum (Abs x))                 = [x]
-getChildren (GNum (Signum x))              = [x]
-getChildren (GNum (FromInteger _))         = []
-getChildren (GFractional (Div x y))        = [x,y]
-getChildren (GFractional (FromRational _)) = []
-getChildren (GFloating (Pow x y))          = [x,y]
-getChildren (GFloating (LogBase x y))      = [x,y]
-getChildren (GFloating (Exp x))            = [x]
-getChildren (GFloating (Log x))            = [x]
-getChildren (GFloating (Sin x))            = [x]
-getChildren (GFloating (Cos x))            = [x]
-getChildren (GFloating (ASin x))           = [x]
-getChildren (GFloating (ATan x))           = [x]
-getChildren (GFloating (ACos x))           = [x]
-getChildren (GFloating (Sinh x))           = [x]
-getChildren (GFloating (Cosh x))           = [x]
-getChildren (GFloating (Tanh x))           = [x]
-getChildren (GFloating (ASinh x))          = [x]
-getChildren (GFloating (ATanh x))          = [x]
-getChildren (GFloating (ACosh x))          = [x]
-
-
--- | throw an error if there are repeated inputs
---getRedundantExprs :: (ToGExprs a, Eq b, Hashable b, NumT a ~ b) =>
---                     a -> IO (Maybe (HashSet (Expr b)))
---getRedundantExprs exprs_ = do
---  exprs <- readExprs exprs_
---  let redundant = snd $ foldl f (HS.empty, HS.empty) (toList exprs)
---        where
---          f (knownExprs, redundantExprs) expr
---            | HS.member expr knownExprs = (knownExprs, HS.insert expr redundantExprs)
---            | otherwise = (HS.insert expr knownExprs, redundantExprs)
---  return $ if HS.null redundant
---           then Nothing
---           else Just redundant

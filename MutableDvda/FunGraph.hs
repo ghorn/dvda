@@ -3,19 +3,32 @@
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
 {-# Language FlexibleInstances #-}
--- {-# Language FlexibleContexts #-}
+{-# Language FlexibleContexts #-}
 
-module MutableDvda.FunGraph ( FunGraph(..)
+module MutableDvda.FunGraph ( FunGraph
                             , ToFunGraph
+                            , NumT
                             , (:*)(..)
+                            , MVS(..)
                             , toFunGraph
+                            , countNodes
+                            , fgInputs
+                            , fgOutputs
+                            , lookupGExpr
+                            , topSort
+                            , getRedundantExprs
                             ) where
 
+import Control.Applicative
+import qualified Data.Graph as Graph
+import Data.Hashable ( Hashable )
+import Data.HashSet ( HashSet )
+import qualified Data.HashSet as HS
 import FileLocation ( err )
 import MutableDvda.Expr
 import MutableDvda.Reify
 
-data FunGraph a = FunGraph [(Int, GExpr a Int)] [MVS Int] [MVS Int]
+data FunGraph a = FunGraph Graph.Graph [MVS Int] [MVS Int] (Int -> Maybe (GExpr a Int))
 
 ---- | matrix or vector or scalar
 data MVS a = Mat [[a]] | Vec [a] | Sca a deriving Show
@@ -35,6 +48,20 @@ listsToMVS (Vec _) _ = $(err "reifyGraphs returned different number of output in
 listsToMVS (Mat m) x
   | length m == length x && and (zipWith (\u v -> length u == length v) m x) = Mat x
   | otherwise = $(err "reifyGraphs returned different number of output indices than inputs for Mat")
+
+-- | throw an error if there are repeated inputs
+getRedundantExprs :: (Eq (NumT a), Hashable (NumT a), ToFunGraph a)
+                     => a -> Maybe (HashSet (Expr (NumT a)))
+getRedundantExprs exprs
+  | HS.null redundant = Nothing
+  | otherwise = Just redundant
+  where
+    redundant = snd $ foldl f (HS.empty, HS.empty) (concat $ concatMap mvsToLists (toMVSList exprs))
+      where
+        f (knownExprs, redundantExprs) expr
+          | HS.member expr knownExprs = (knownExprs, HS.insert expr redundantExprs)
+          | otherwise = (HS.insert expr knownExprs, redundantExprs)
+
 
 class ToFunGraph a where
   type NumT a
@@ -60,7 +87,26 @@ toFunGraph inputs outputs = mvsToFunGraph (toMVSList inputs) (toMVSList outputs)
 
 mvsToFunGraph :: [MVS (Expr a)] -> [MVS (Expr a)] -> IO (FunGraph a)
 mvsToFunGraph inputExprs outputExprs = do
-  (ReifyGraph gr, [inputIndices, outputIndices]) <- reifyGraphs (map (map mvsToLists) [inputExprs, outputExprs])
-  return $ FunGraph gr
-    (zipWith listsToMVS inputExprs inputIndices)
-    (zipWith listsToMVS outputExprs outputIndices)
+  (ReifyGraph rgr, [inputIndices, outputIndices]) <- reifyGraphs (map (map mvsToLists) [inputExprs, outputExprs])
+  let inputMVSIndices  = zipWith listsToMVS  inputExprs  inputIndices
+      outputMVSIndices = zipWith listsToMVS outputExprs outputIndices
+      (gr, lookupVertex, lookupKey) = Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, getParents gexpr)) rgr
+      lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
+  return $ FunGraph gr inputMVSIndices outputMVSIndices lookupG
+
+
+---------------------------------- utilities -----------------------------
+countNodes :: FunGraph a -> Int
+countNodes (FunGraph gr _ _ _) = length (Graph.vertices gr)
+
+topSort :: FunGraph a -> [Int]
+topSort (FunGraph gr _ _ _) = Graph.topSort gr
+
+lookupGExpr :: Int -> FunGraph a -> Maybe (GExpr a Int)
+lookupGExpr k (FunGraph _ _ _ lookupFun) = lookupFun k
+
+fgInputs :: FunGraph a -> [MVS Int]
+fgInputs (FunGraph _ ins _ _) = ins
+
+fgOutputs :: FunGraph a -> [MVS Int]
+fgOutputs (FunGraph _ _ outs _) = outs

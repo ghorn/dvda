@@ -13,6 +13,7 @@ module MutableDvda.Expr ( Expr(..)
                         , isVal
                         , sym
                         , const'
+                        , getParents
                         ) where
 
 import Data.Hashable ( Hashable, hash, combine )
@@ -343,6 +344,34 @@ gexprToExpr f (GFloating (Tanh x))           = EFloating (Tanh  (f x))
 gexprToExpr f (GFloating (ASinh x))          = EFloating (ASinh (f x))
 gexprToExpr f (GFloating (ATanh x))          = EFloating (ATanh (f x))
 gexprToExpr f (GFloating (ACosh x))          = EFloating (ACosh (f x))
+
+getParents :: GExpr a b -> [b]
+getParents (GSym _)                       = []
+getParents (GConst _)                     = []
+getParents (GNum (Mul x y))               = [x,y]
+getParents (GNum (Add x y))               = [x,y]
+getParents (GNum (Sub x y))               = [x,y]
+getParents (GNum (Negate x))              = [x]
+getParents (GNum (Abs x))                 = [x]
+getParents (GNum (Signum x))              = [x]
+getParents (GNum (FromInteger _))         = []
+getParents (GFractional (Div x y))        = [x,y]
+getParents (GFractional (FromRational _)) = []
+getParents (GFloating (Pow x y))          = [x,y]
+getParents (GFloating (LogBase x y))      = [x,y]
+getParents (GFloating (Exp x))            = [x]
+getParents (GFloating (Log x))            = [x]
+getParents (GFloating (Sin x))            = [x]
+getParents (GFloating (Cos x))            = [x]
+getParents (GFloating (ASin x))           = [x]
+getParents (GFloating (ATan x))           = [x]
+getParents (GFloating (ACos x))           = [x]
+getParents (GFloating (Sinh x))           = [x]
+getParents (GFloating (Cosh x))           = [x]
+getParents (GFloating (Tanh x))           = [x]
+getParents (GFloating (ASinh x))          = [x]
+getParents (GFloating (ATanh x))          = [x]
+getParents (GFloating (ACosh x))          = [x]
 
 instance (Show a, Show b) => Show (GExpr a b) where
   show = show . (gexprToExpr (\x -> ESym ("{" ++ show x ++ "}")))

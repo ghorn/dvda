@@ -68,7 +68,7 @@ Library
 
   Other-modules:     Dvda.HashMap
                      MutableDvda.AD
---                     MutableDvda.CGen
+                     MutableDvda.CGen
                      MutableDvda.Expr
                      MutableDvda.FunGraph
                      MutableDvda.Graph
