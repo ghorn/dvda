@@ -1,65 +1,40 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language TypeOperators #-}
-{-# Language StandaloneDeriving #-}
-{-# Language GADTs #-}
 {-# Language TypeFamilies #-}
 {-# Language FlexibleContexts #-}
+{-# Language FlexibleInstances #-}
+{-# Language MultiParamTypeClasses #-}
+{-# Language TemplateHaskell #-}
 
-module MutableDvda.Graph ( GExpr(..)
-                         , GraphRef(..)
-                         , ToGExprs(..)
-                         , (:*)(..)
-                         , toFunGraph
-                         , unsafeToFunGraph
-                         , topSort
-                         , getRedundantExprs
+module MutableDvda.Graph ( topSort
+                         , insert
+--                         , getRedundantExprs
                          ) where
 
-import Control.Concurrent.MVar
-import qualified Data.Graph as Graph
-import Data.Hashable ( Hashable, hash, combine )
-import Data.HashSet ( HashSet )
-import qualified Data.HashSet as HS
+import qualified Data.Graph as DataGraph
+import Data.Hashable ( Hashable )
 
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
+import MutableDvda.Expr ( Expr(..), GExpr(..), Floatings(..), Fractionals(..), Nums(..), GraphRef(..) )
 
-import MutableDvda.Expr
-
-data GExpr a where
-  GSym :: String -> GExpr a
-  GConst :: a -> GExpr a
-  GNum :: Num a => Nums GraphRef -> GExpr a
-  GFractional :: Fractional a => Fractionals GraphRef -> GExpr a
-  GFloating :: Floating a => Floatings GraphRef -> GExpr a
-
-deriving instance Show a => Show (GExpr a)
-deriving instance Eq a => Eq (GExpr a)
-
-instance Hashable a => Hashable (GExpr a) where
-  hash (GSym name)     = hash "GSym"        `combine` hash name
-  hash (GConst x)      = hash "GConst"      `combine` hash x
-  hash (GNum x)        = hash "GNum"        `combine` hash x
-  hash (GFractional x) = hash "GFractional" `combine` hash x
-  hash (GFloating x)   = hash "GFloating"   `combine` hash x
-
-insert :: (Eq a, Hashable a) => HashMap (GExpr a) GraphRef -> HashMap (Expr a) GraphRef
-          -> Int -> Expr a -> IO (GraphRef, Int, HashMap (GExpr a) GraphRef, HashMap (Expr a) GraphRef, [MVar (Expr a)])
-insert hm im n (EGraphRef _ gr)               = return (gr, n, hm, im, [])
-insert hm im0 n expr@(ESym name)              = return $ tupleAppend im [] ret
+insert :: (Eq a, Hashable a) => HashMap (GExpr a GraphRef) GraphRef -> HashMap (Expr a) GraphRef
+          -> Int -> Expr a -> (GraphRef, Int, HashMap (GExpr a GraphRef) GraphRef, HashMap (Expr a) GraphRef)
+insert hm im n (EGraphRef _ gr)               = (gr, n, hm, im)
+insert hm im0 n expr@(ESym name)              = tupleAppend im ret
   where
     ret@(graphRef, _, _) = cseInsert hm n (GSym name)
     im = HM.insert expr graphRef im0
-insert hm im n (EConst c)                     = return $ tupleAppend im [] $ cseInsert hm n (GConst c)
+insert hm im n (EConst c)                     = tupleAppend im $ cseInsert hm n (GConst c)
 insert hm im n (ENum (Mul x y))               = binaryInsert hm im n GNum Mul x y
 insert hm im n (ENum (Add x y))               = binaryInsert hm im n GNum Add x y
 insert hm im n (ENum (Sub x y))               = binaryInsert hm im n GNum Sub x y
 insert hm im n (ENum (Negate x))              = unaryInsert hm im n GNum Negate x
 insert hm im n (ENum (Abs x))                 = unaryInsert hm im n GNum Abs x
 insert hm im n (ENum (Signum x))              = unaryInsert hm im n GNum Signum x
-insert hm im n (ENum (FromInteger x))         = return $ tupleAppend im [] $ cseInsert hm n (GNum (FromInteger x))
+insert hm im n (ENum (FromInteger x))         = tupleAppend im $ cseInsert hm n (GNum (FromInteger x))
 insert hm im n (EFractional (Div x y))        = binaryInsert hm im n GFractional Div x y
-insert hm im n (EFractional (FromRational x)) = return $ tupleAppend im [] $ cseInsert hm n (GFractional (FromRational x))
+insert hm im n (EFractional (FromRational x)) = tupleAppend im $ cseInsert hm n (GFractional (FromRational x))
 insert hm im n (EFloating (Pow x y))          = binaryInsert hm im n GFloating Pow x y
 insert hm im n (EFloating (LogBase x y))      = binaryInsert hm im n GFloating LogBase x y
 insert hm im n (EFloating (Exp x))            = unaryInsert hm im n GFloating Exp x
@@ -75,156 +50,52 @@ insert hm im n (EFloating (Tanh x))           = unaryInsert hm im n GFloating Ta
 insert hm im n (EFloating (ASinh x))          = unaryInsert hm im n GFloating ASinh x
 insert hm im n (EFloating (ATanh x))          = unaryInsert hm im n GFloating ATanh x
 insert hm im n (EFloating (ACosh x))          = unaryInsert hm im n GFloating ACosh x
-insert hm0 im0 n0 (ERef mv) = do
-  e <- takeMVar mv
-  case e of (EGraphRef _ gr) -> do -- reuse node
-              putMVar mv e
-              return (gr, n0, hm0, im0, [])
-            _ -> do -- insert and memoize new node
-              (gr, n, hm, im, mvs) <- insert hm0 im0 n0 e
-              putMVar mv (EGraphRef e gr)
-              return (gr, n, hm, im, mv:mvs)
 
-tupleAppend :: d -> e -> (a,b,c) -> (a,b,c,d,e)
-tupleAppend d e (a,b,c) = (a,b,c,d,e)
+tupleAppend :: d -> (a,b,c) -> (a,b,c,d)
+tupleAppend d (a,b,c) = (a,b,c,d)
 
 binaryInsert
   :: (Eq a, Hashable a)
-     => HashMap (GExpr a) GraphRef
+     => HashMap (GExpr a GraphRef) GraphRef
      -> HashMap (Expr a) GraphRef
      -> Int
-     -> (t -> GExpr a)
+     -> (t -> GExpr a GraphRef)
      -> (GraphRef -> GraphRef -> t)
      -> Expr a
      -> Expr a
-     -> IO (GraphRef, Int, HashMap (GExpr a) GraphRef, HashMap (Expr a) GraphRef, [MVar (Expr a)])
-binaryInsert hm0 im0 n0 gnum mul x y = do
-  (kx,n1,hm1,im1,mv1) <- insert hm0 im0 n0 x
-  (ky,n2,hm2,im2,mv2) <- insert hm1 im1 n1 y
-  return $ tupleAppend im2 (mv1++mv2) $ cseInsert hm2 n2 (gnum (mul kx ky))
+     -> (GraphRef, Int, HashMap (GExpr a GraphRef) GraphRef, HashMap (Expr a) GraphRef)
+binaryInsert hm0 im0 n0 gnum mul x y = tupleAppend im2 $ cseInsert hm2 n2 (gnum (mul kx ky))
+  where
+    (kx,n1,hm1,im1) = insert hm0 im0 n0 x
+    (ky,n2,hm2,im2) = insert hm1 im1 n1 y
 
 unaryInsert
   :: (Eq a, Hashable a)
-     => HashMap (GExpr a) GraphRef
+     => HashMap (GExpr a GraphRef) GraphRef
      -> HashMap (Expr a) GraphRef
      -> Int
-     -> (nf GraphRef -> GExpr a)
+     -> (nf GraphRef -> GExpr a GraphRef)
      -> (GraphRef -> nf GraphRef)
      -> Expr a
-     -> IO (GraphRef, Int, HashMap (GExpr a) GraphRef, HashMap (Expr a) GraphRef, [MVar (Expr a)])
-unaryInsert hm0 im0 n0 gnum mul x = do
-  (k,n1,hm1,im1,mv1) <- insert hm0 im0 n0 x
-  return $ tupleAppend im1 mv1 $ cseInsert hm1 n1 (gnum (mul k))
-  
+     -> (GraphRef, Int, HashMap (GExpr a GraphRef) GraphRef, HashMap (Expr a) GraphRef)
+unaryInsert hm0 im0 n0 gnum mul x = tupleAppend im1 $ cseInsert hm1 n1 (gnum (mul k))
+  where
+    (k,n1,hm1,im1) = insert hm0 im0 n0 x
+
 cseInsert :: (Eq k, Hashable k) => HashMap k GraphRef -> Int -> k -> (GraphRef, Int, HashMap k GraphRef)
 cseInsert hm n gexpr = case HM.lookup gexpr hm of
   Nothing -> (GraphRef n, n+1, HM.insert gexpr (GraphRef n) hm)
   Just k -> (k, n, hm)
 
 
--------------------------------- turn things into function graphs --------------------------------------
-resetGraphRefs :: MVar (Expr a) -> IO ()
-resetGraphRefs mv = do
-  expr <- takeMVar mv
-  case expr of (EGraphRef e _) -> putMVar mv e
-               _               -> error "shouldn't ever try to resetGraphRefs on non EGraphRef"
-
-class ToGExprs a where
-  type NumT a
-  type ContainerT a b
-  readExprs :: a -> IO a
-  mapExprs :: (Expr (NumT a) -> b) -> a -> ContainerT a b
-  unsafeToGExprs ::
-    (Eq (NumT a), Hashable (NumT a))
-    => Int -> HashMap (GExpr (NumT a)) GraphRef -> HashMap (Expr (NumT a)) GraphRef -> a
-    -> IO (ContainerT a GraphRef, [MVar (Expr (NumT a))], Int, HashMap (GExpr (NumT a)) GraphRef, HashMap (Expr (NumT a)) GraphRef)
-  toList :: a -> [Expr (NumT a)]
-
-instance ToGExprs (Expr a) where
-  type NumT (Expr a) = a
-  type ContainerT (Expr a) b = b
-  readExprs = readExpr
-  mapExprs f x = f x
-  unsafeToGExprs n0 hm0 im0 e = do
-      (gref, n, hm, im, mv) <- insert hm0 im0 n0 e
-      return (gref, mv, n, hm, im)
-  toList e = [e]
-
-instance ToGExprs a => ToGExprs [a] where
-  type NumT [a] = NumT a
-  type ContainerT [a] b = [ContainerT a b]
-  readExprs = mapM readExprs
-  mapExprs f xs = map (mapExprs f) xs
-  unsafeToGExprs n0' hm0' im0' = f ([], [], n0', hm0', im0')
-    where
-      f ret [] = return ret
-      f (gref0, mv0, n0, hm0, im0) (e:es) = do
-        (gref, mv, n, hm, im) <- unsafeToGExprs n0 hm0 im0 e
-        f (gref0 ++ [gref], mv0 ++ mv, n, hm, im) es
-  toList = concatMap toList
-
-data a :* b = a :* b deriving Show
-infixr 6 :*
-
-instance (ToGExprs a, ToGExprs b, NumT a ~ NumT b) => ToGExprs (a :* b) where
-  type NumT (a :* b) = NumT a
-  type ContainerT (a :* b) c = (ContainerT a c) :* (ContainerT b c)
-  readExprs (x' :* y') = do
-    x <- readExprs x'
-    y <- readExprs y'
-    return (x :* y)
-  mapExprs f (x :* y) = (mapExprs f x) :* (mapExprs f y)
-  unsafeToGExprs n0 hm0 im0 (x :* y) = do
-    (grefs1, mvs1, n1, hm1, im1) <- unsafeToGExprs n0 hm0 im0 x
-    (grefs2, mvs2, n2, hm2, im2) <- unsafeToGExprs n1 hm1 im1 y
-    return (grefs1 :* grefs2, mvs1 ++ mvs2, n2, hm2, im2)
-  toList (x :* y) = toList x ++ toList y
-  
-
----- | This version consumes the Exprs as a side effect, so only use it internally if you generate the Exprs youself and can discard them after calling unsafeToGExprs
-unsafeToFunGraph :: (Eq a, Hashable a, Show a, NumT b ~ a, NumT c ~ a, ToGExprs b, ToGExprs c)
-                    => b -> c -> IO (ContainerT b GraphRef, ContainerT c GraphRef, HashMap (GExpr a) GraphRef, Int, [MVar (Expr a)])
-unsafeToFunGraph inputExprs_ outputExprs = do
-  inputExprs <- readExprs inputExprs_
-  (outputIndices, mvs, n, hm, inputMap) <- unsafeToGExprs 0 HM.empty HM.empty outputExprs
-
-  let lookupExpr e@(ESym _) = case HM.lookup e inputMap of
-        Just x -> x
-        Nothing -> GraphRef (-1) -- return -1 if this symbol isn't a parent of any outputs
-      lookupExpr e = error $ "ERROR: in toFunGraph, input " ++ show e ++ " is not symbolic type"
-      inputIndices = mapExprs lookupExpr inputExprs
-  return (inputIndices, outputIndices, hm, n, mvs)
-
-toFunGraph :: (Eq a, Hashable a, Show a, NumT b ~ a, NumT c ~ a, ToGExprs b, ToGExprs c)
-              => b -> c -> IO (ContainerT b GraphRef, ContainerT c GraphRef, HashMap (GExpr a) GraphRef, Int)
-toFunGraph inputExprs outputExprs = do
-  (inputIndices, outputIndices, hm, n, mvs) <- unsafeToFunGraph inputExprs outputExprs
-  mapM_ resetGraphRefs mvs
-  return (inputIndices, outputIndices, hm, n)
-
--- | throw an error if there are repeated inputs
-getRedundantExprs :: (ToGExprs a, Eq b, Hashable b, NumT a ~ b) =>
-                     a -> IO (Maybe (HashSet (Expr b)))
-getRedundantExprs exprs_ = do
-  exprs <- readExprs exprs_
-  let redundant = snd $ foldl f (HS.empty, HS.empty) (toList exprs)
-        where
-          f (knownExprs, redundantExprs) expr
-            | HS.member expr knownExprs = (knownExprs, HS.insert expr redundantExprs)
-            | otherwise = (HS.insert expr knownExprs, redundantExprs)
-  return $ if HS.null redundant
-           then Nothing
-           else Just redundant
-
-
-topSort :: HashMap (GExpr a) GraphRef -> [(GraphRef, GExpr a)]
-topSort hm = map ((\(x,k,_) -> (GraphRef k,x)) . vertexToNode) (Graph.topSort graph)
+topSort :: HashMap (GExpr a GraphRef) GraphRef -> [(GraphRef, GExpr a GraphRef)]
+topSort hm = map ((\(x,k,_) -> (GraphRef k,x)) . vertexToNode) (DataGraph.topSort graph)
   where
-    (graph, vertexToNode) = Graph.graphFromEdges' $ map f (HM.toList hm)
+    (graph, vertexToNode) = DataGraph.graphFromEdges' $ map f (HM.toList hm)
       where
         f (gexpr, GraphRef k) = (gexpr, k, map (\(GraphRef n) -> n) $ getChildren gexpr)
 
-getChildren :: GExpr a -> [GraphRef]
+getChildren :: GExpr a b -> [b]
 getChildren (GSym _)                       = []
 getChildren (GConst _)                     = []
 getChildren (GNum (Mul x y))               = [x,y]
@@ -251,3 +122,18 @@ getChildren (GFloating (Tanh x))           = [x]
 getChildren (GFloating (ASinh x))          = [x]
 getChildren (GFloating (ATanh x))          = [x]
 getChildren (GFloating (ACosh x))          = [x]
+
+
+-- | throw an error if there are repeated inputs
+--getRedundantExprs :: (ToGExprs a, Eq b, Hashable b, NumT a ~ b) =>
+--                     a -> IO (Maybe (HashSet (Expr b)))
+--getRedundantExprs exprs_ = do
+--  exprs <- readExprs exprs_
+--  let redundant = snd $ foldl f (HS.empty, HS.empty) (toList exprs)
+--        where
+--          f (knownExprs, redundantExprs) expr
+--            | HS.member expr knownExprs = (knownExprs, HS.insert expr redundantExprs)
+--            | otherwise = (HS.insert expr knownExprs, redundantExprs)
+--  return $ if HS.null redundant
+--           then Nothing
+--           else Just redundant

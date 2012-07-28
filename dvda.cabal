@@ -4,35 +4,37 @@ License:             BSD3
 License-file:        LICENSE
 Author:              Greg Horn
 Maintainer:          gregmainland@gmail.edu
+Copyright:           (c) 2011 - 2012 Greg Horn
+                     (c) 2009 Andy Gill
 Stability:           Experimental
 Category:            Numerical, Math
 Build-type:          Custom
-Synopsis:            Efficient automatic differentiation
+Synopsis:            Efficient automatic differentiation and code generation
 Cabal-version:       >= 1.8
-Description: {
-dvda == DVDA Verifiably Differentiates Algorithmically
-.
-This library provides a symbolic type `Dvda.Expr` which is
-manipulated mathematically through its Num\/Fractional\/Floating instances.
-Expr can be a scalar, vector, or matrix. Binary operations (adding\/multiplying\/etc)
-are all elementwise.
-.
-Matrix/vector/scalar safety is enforced at compile time
-.
-
-Efficient derivatives can be computed. Internally reverse automatic differentiation
-is performed including efficient common subexpression elimination.
-.
-Function graphs can be JIT compiled into efficient functions using "buildHSFunction".
-This is the intended way to use this library.
-.
-Pretty graphviz plots!
-.
-If the runtime JIT stuff works in terminal ghci but not emacs haskell-mode, you may need to add
-`(setenv "PATH" (concatenate 'string (getenv "PATH") ":/usr/local/bin"))` to your .emacs file
-.
-To get started look in `Dvda.Examples` or CompileTest.hs in the github repo
-}
+--Description: {
+--dvda == DVDA Verifiably Differentiates Algorithmically
+--.
+--This library provides a symbolic type `Dvda.Expr` which is
+--manipulated mathematically through its Num\/Fractional\/Floating instances.
+--Expr can be a scalar, vector, or matrix. Binary operations (adding\/multiplying\/etc)
+--are all elementwise.
+--.
+--Matrix/vector/scalar safety is enforced at compile time
+--.
+--
+--Efficient derivatives can be computed. Internally reverse automatic differentiation
+--is performed including efficient common subexpression elimination.
+--.
+--Function graphs can be JIT compiled into efficient functions using "buildHSFunction".
+--This is the intended way to use this library.
+--.
+--Pretty graphviz plots!
+--.
+--If the runtime JIT stuff works in terminal ghci but not emacs haskell-mode, you may need to add
+--`(setenv "PATH" (concatenate 'string (getenv "PATH") ":/usr/local/bin"))` to your .emacs file
+--.
+--To get started look in `Dvda.Examples` or CompileTest.hs in the github repo
+--}
 
 source-repository head
   type: git
@@ -49,13 +51,10 @@ Library
                      Dvda.CallNative
                      Dvda.Codegen
                      Dvda.Config
---                     Dvda.Dot
                      Dvda.Dual
                      Dvda.Examples
                      Dvda.Expr
                      Dvda.Graph
---                     Dvda.HSBuilder
---                     Dvda.HSSyntax
                      Dvda.MultipleShooting.MSCoctave
                      Dvda.MultipleShooting.MSMonad
                      Dvda.MultipleShooting.MultipleShooting
@@ -66,18 +65,17 @@ Library
                      Dvda.SymMonad
                      Dvda.Tests.Function
                      Dvda.Tests.Unary
---                     Dvda.CFunction
---                     Dvda.Codegen.CBuilder
---                     Dvda.Codegen.CCallWrapper
---                     Dvda.Codegen.CSyntax
---                     Dvda.Codegen.Utils
 
   Other-modules:     Dvda.HashMap
                      MutableDvda.AD
-                     MutableDvda.CGen
+--                     MutableDvda.CGen
                      MutableDvda.Expr
-                     MutableDvda.FullShow
+                     MutableDvda.FunGraph
                      MutableDvda.Graph
+                     MutableDvda.MultipleShooting.MSMonad
+                     MutableDvda.MultipleShooting.Types
+                     MutableDvda.Reify
+                     MutableDvda.ReifyGraph
 
   Build-depends:     base       >= 4     && < 5,
                      file-location >= 0.4.4 && < 0.5,
@@ -99,7 +97,7 @@ Library
 --                     text,
 
   Ghc-options:       -Wall
-  GHC-Prof-Options: -prof -fprof-auto -fprof-cafs -rtsopts
+  GHC-Prof-Options:  -prof -fprof-auto -fprof-cafs -rtsopts
   GHC-Shared-Options: -fPIC
 
 
@@ -128,15 +126,3 @@ Test-suite test
                      test-framework-quickcheck2,
                      test-framework
   ghc-options:       -Wall
-
--- Executable stressTest
---   if flag(stressTest)
---      Buildable: True
---   else
---      Buildable: False
--- 
---   Main-Is:           StressTest.hs
--- 
---   Ghc-Options: -O2
--- 
---   GHC-Prof-Options: -prof -fprof-auto

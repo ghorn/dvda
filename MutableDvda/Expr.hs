@@ -1,20 +1,25 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language GADTs #-}
+{-# Language TemplateHaskell #-}
+{-# Language TypeFamilies #-}
+{-# Language StandaloneDeriving #-}
 
 module MutableDvda.Expr ( Expr(..)
+                        , GExpr(..)
                         , Nums(..)
                         , Fractionals(..)
                         , Floatings(..)
                         , GraphRef(..)
-                        , readExpr
                         , isVal
                         , sym
                         , const'
                         ) where
 
-import Control.Concurrent.MVar ( MVar, newMVar, readMVar )
 import Data.Hashable ( Hashable, hash, combine )
-import System.IO.Unsafe ( unsafePerformIO )
+import FileLocation ( err )
+import Control.Applicative
+
+import MutableDvda.Reify ( MuRef(..) )
 
 commutativeMul :: Bool
 commutativeMul = True
@@ -27,7 +32,6 @@ instance Hashable GraphRef where
   hash (GraphRef k) = hash "GraphRef" `combine` k
 
 data Expr a where
-  ERef :: MVar (Expr a) -> Expr a
   ESym :: String -> Expr a
   EConst :: a -> Expr a
   ENum :: Num a => Nums (Expr a) -> Expr a
@@ -76,8 +80,8 @@ showsUnary d prec op u = showParen (d > prec) $
 
 instance Show a => Show (Nums a) where
   showsPrec d (Mul x y) = showsInfixBinary d 7 " * " x y
-  showsPrec d (Add x y) = showsInfixBinary d 7 " + " x y
-  showsPrec d (Sub x y) = showsInfixBinary d 7 " - " x y
+  showsPrec d (Add x y) = showsInfixBinary d 6 " + " x y
+  showsPrec d (Sub x y) = showsInfixBinary d 6 " - " x y
   showsPrec d (Negate x) = showsUnary d 7 "-" x
   showsPrec d (Abs x) = showsUnary d 10 "abs" x
   showsPrec d (Signum x) = showsUnary d 10 "signum" x
@@ -105,8 +109,6 @@ instance Show a => Show (Floatings a) where
   showsPrec d (ACosh x) = showsUnary d 10 "acosh" x
 
 instance Show a => Show (Expr a) where
---  showsPrec _ (ERef _) = showString "ERef"
-  showsPrec d (ERef mv) = showsPrec d $ unsafePerformIO (readMVar mv)
   showsPrec _ (ESym name) = showString name
   showsPrec _ (EConst x) = showString (show x)
   showsPrec d (ENum x) = showsPrec d x
@@ -118,10 +120,6 @@ instance Show a => Show (Expr a) where
 
 ----------------------- Eq instances -------------------------
 instance Eq a => Eq (Expr a) where
-  (==) x@(ERef mx) y@(ERef my) = unsafePerformIO $ do
-    return $ mx == my || unsafePerformIO (readExpr x) == unsafePerformIO (readExpr y)
-  (==) x@(ERef _) y = (==) (unsafePerformIO (readExpr x)) y
-  (==) x y@(ERef _) = (==) x (unsafePerformIO (readExpr y))
   (==) (ESym x) (ESym y) = x == y
   (==) (EConst x) (EConst y) = x == y
   (==) (ENum x) (ENum y) = x == y
@@ -190,7 +188,6 @@ instance Hashable a => Hashable (Floatings a) where
   hash (ACosh x) = hash "ACosh" `combine` hash x
 
 instance Hashable a => Hashable (Expr a) where
-  hash e@(ERef _)      = hash (unsafePerformIO $ readExpr e)
   hash (ESym name)     = hash "ESym"        `combine` hash name
   hash (EConst x)      = hash "EConst"      `combine` hash x
   hash (ENum x)        = hash "ENum"        `combine` hash x
@@ -207,10 +204,6 @@ instance Hashable a => Hashable (Expr a) where
 --deriving instance Enum a => Enum (Floatings a)
 --deriving instance Bounded a => Bounded (Floatings a)
 
-eref :: Expr a -> Expr a
-eref x@(ERef _) = x
-eref x = ERef (unsafePerformIO $ newMVar x)
-
 instance (Num a, Eq a) => Num (Expr a) where
   (*) (EConst x) (EConst y) = EConst (x*y)
   (*) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx * ky)
@@ -225,7 +218,7 @@ instance (Num a, Eq a) => Num (Expr a) where
     | isVal 0 x || isVal 0 y = 0
     | isVal 1 x = y
     | isVal 1 y = x
-    | otherwise = eref $ ENum $ Mul x y
+    | otherwise = ENum $ Mul x y
 
   (+) (EConst x) (EConst y) = EConst (x+y)
   (+) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx + ky)
@@ -239,7 +232,7 @@ instance (Num a, Eq a) => Num (Expr a) where
   (+) x y
     | isVal 0 x = y
     | isVal 0 y = x
-    | otherwise = eref $ ENum $ Add x y
+    | otherwise = ENum $ Add x y
 
   (-) (EConst x) (EConst y) = EConst (x-y)
   (-) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx - ky)
@@ -253,24 +246,24 @@ instance (Num a, Eq a) => Num (Expr a) where
   (-) x y
     | isVal 0 x = negate y
     | isVal 0 y = x
-    | otherwise = eref $ ENum $ Sub x y
+    | otherwise = ENum $ Sub x y
 
   abs (EConst x) = EConst (abs x)
   abs (ENum (FromInteger k)) = ENum (FromInteger (abs k))
   abs (EFractional (FromRational r)) = EFractional (FromRational (abs r))
-  abs x = eref $ ENum $ Abs x
+  abs x = ENum $ Abs x
 
   negate (EConst x) = EConst (negate x)
   negate (ENum (FromInteger k)) = ENum (FromInteger (negate k))
   negate (EFractional (FromRational r)) = EFractional (FromRational (negate r))
-  negate x = eref $ ENum $ Negate x
+  negate x = ENum $ Negate x
 
   signum (EConst x) = EConst (signum x)
   signum (ENum (FromInteger k)) = ENum (FromInteger (signum k))
   signum (EFractional (FromRational r)) = EFractional (FromRational (signum r))
-  signum x = eref $ ENum $ Signum x
+  signum x = ENum $ Signum x
 
-  fromInteger = eref . ENum . FromInteger
+  fromInteger = ENum . FromInteger
 
 instance (Fractional a, Eq a) => Fractional (Expr a) where
   (/) (EConst x) (EConst y) = EConst (x/y)
@@ -286,14 +279,14 @@ instance (Fractional a, Eq a) => Fractional (Expr a) where
     | isVal 0 y = error "Fractional (Expr a) divide by zero"
     | isVal 0 x = 0
     | isVal 1 y = x
-    | otherwise = eref $ EFractional $ Div x y
+    | otherwise = EFractional $ Div x y
 
-  fromRational = eref . EFractional . FromRational
+  fromRational = EFractional . FromRational
 
 instance (Floating a, Eq a) => Floating (Expr a) where
-  pi          = eref $ EConst pi
-  x ** y      = eref $ EFloating $ Pow x y
-  logBase x y = eref $ EFloating $ LogBase x y
+  pi          = EConst pi
+  x ** y      = EFloating $ Pow x y
+  logBase x y = EFloating $ LogBase x y
   exp         = applyFloatingUn (  exp,   Exp)
   log         = applyFloatingUn (  log,   Log)
   sin         = applyFloatingUn (  sin,   Sin)
@@ -312,22 +305,101 @@ applyFloatingUn :: Floating a => (t -> a, Expr t -> Floatings (Expr a)) -> Expr 
 applyFloatingUn (f,_) (EConst x) = EConst (f x)
 applyFloatingUn (f,_) (ENum (FromInteger x)) = EConst (f $ fromInteger x)
 applyFloatingUn (f,_) (EFractional (FromRational x)) = EConst (f $ fromRational x)
-applyFloatingUn (_,f) x = eref $ EFloating (f x)
+applyFloatingUn (_,f) x = EFloating (f x)
 
+---------------------------------- GExprs --------------------------------
+data GExpr a b where
+  GSym :: String -> GExpr a b
+  GConst :: a -> GExpr a b
+  GNum :: Num a => Nums b -> GExpr a b
+  GFractional :: Fractional a => Fractionals b -> GExpr a b
+  GFloating :: Floating a => Floatings b -> GExpr a b
+
+-- you might use this to use Expr's nice Show instance
+gexprToExpr :: (b -> Expr a) -> GExpr a b -> Expr a
+gexprToExpr _ (GSym name) = ESym name
+gexprToExpr _ (GConst c) = EConst c
+gexprToExpr f (GNum (Mul x y))               = ENum (Mul (f x) (f y))
+gexprToExpr f (GNum (Add x y))               = ENum (Add (f x) (f y))
+gexprToExpr f (GNum (Sub x y))               = ENum (Sub (f x) (f y))
+gexprToExpr f (GNum (Negate x))              = ENum (Negate (f x))
+gexprToExpr f (GNum (Abs x))                 = ENum (Abs (f x))
+gexprToExpr f (GNum (Signum x))              = ENum (Signum (f x))
+gexprToExpr _ (GNum (FromInteger x))         = ENum (FromInteger x)
+gexprToExpr f (GFractional (Div x y))        = EFractional (Div (f x) (f y))
+gexprToExpr _ (GFractional (FromRational x)) = EFractional (FromRational x)
+gexprToExpr f (GFloating (Pow x y))          = EFloating (Pow (f x) (f y))
+gexprToExpr f (GFloating (LogBase x y))      = EFloating (LogBase (f x) (f y))
+gexprToExpr f (GFloating (Exp x))            = EFloating (Exp   (f x))
+gexprToExpr f (GFloating (Log x))            = EFloating (Log   (f x))
+gexprToExpr f (GFloating (Sin x))            = EFloating (Sin   (f x))
+gexprToExpr f (GFloating (Cos x))            = EFloating (Cos   (f x))
+gexprToExpr f (GFloating (ASin x))           = EFloating (ASin  (f x))
+gexprToExpr f (GFloating (ATan x))           = EFloating (ATan  (f x))
+gexprToExpr f (GFloating (ACos x))           = EFloating (ACos  (f x))
+gexprToExpr f (GFloating (Sinh x))           = EFloating (Sinh  (f x))
+gexprToExpr f (GFloating (Cosh x))           = EFloating (Cosh  (f x))
+gexprToExpr f (GFloating (Tanh x))           = EFloating (Tanh  (f x))
+gexprToExpr f (GFloating (ASinh x))          = EFloating (ASinh (f x))
+gexprToExpr f (GFloating (ATanh x))          = EFloating (ATanh (f x))
+gexprToExpr f (GFloating (ACosh x))          = EFloating (ACosh (f x))
+
+instance (Show a, Show b) => Show (GExpr a b) where
+  show = show . (gexprToExpr (\x -> ESym ("{" ++ show x ++ "}")))
+  
+--deriving instance (Show a, Show b) => Show (GExpr a b)
+deriving instance (Eq a, Eq b) => Eq (GExpr a b)
+
+instance (Hashable a, Hashable b) => Hashable (GExpr a b) where
+  hash (GSym name)     = hash "GSym"        `combine` hash name
+  hash (GConst x)      = hash "GConst"      `combine` hash x
+  hash (GNum x)        = hash "GNum"        `combine` hash x
+  hash (GFractional x) = hash "GFractional" `combine` hash x
+  hash (GFloating x)   = hash "GFloating"   `combine` hash x
+
+instance MuRef (Expr a) where
+  type DeRef (Expr a) = GExpr a
+  mapDeRef _ (ESym name) = pure (GSym name)
+  mapDeRef _ (EConst c)  = pure (GConst c)
+  mapDeRef f (ENum (Mul x y)) = GNum <$> (Mul <$> (f x) <*> (f y))
+  mapDeRef f (ENum (Add x y)) = GNum <$> (Add <$> (f x) <*> (f y))
+  mapDeRef f (ENum (Sub x y)) = GNum <$> (Sub <$> (f x) <*> (f y))
+  mapDeRef f (ENum (Negate x)) = GNum <$> (Negate <$> (f x))
+  mapDeRef f (ENum (Abs x)) = GNum <$> (Negate <$> (f x))
+  mapDeRef f (ENum (Signum x)) = GNum <$> (Signum <$> (f x))
+  mapDeRef _ (ENum (FromInteger k)) = pure $ GNum (FromInteger k)
+  
+  mapDeRef f (EFractional (Div x y)) = GFractional <$> (Div <$> (f x) <*> (f y))
+  mapDeRef _ (EFractional (FromRational x)) = pure $ GFractional (FromRational x)
+
+  mapDeRef f (EFloating (Pow x y))     = GFloating <$> (Pow <$> (f x) <*> (f y))
+  mapDeRef f (EFloating (LogBase x y)) = GFloating <$> (LogBase <$> (f x) <*> (f y))
+  mapDeRef f (EFloating (Exp   x))     = GFloating <$> (Exp   <$> (f x))
+  mapDeRef f (EFloating (Log   x))     = GFloating <$> (Log   <$> (f x))
+  mapDeRef f (EFloating (Sin   x))     = GFloating <$> (Sin   <$> (f x))
+  mapDeRef f (EFloating (Cos   x))     = GFloating <$> (Cos   <$> (f x))
+  mapDeRef f (EFloating (ASin  x))     = GFloating <$> (ASin  <$> (f x))
+  mapDeRef f (EFloating (ATan  x))     = GFloating <$> (ATan  <$> (f x))
+  mapDeRef f (EFloating (ACos  x))     = GFloating <$> (ACos  <$> (f x))
+  mapDeRef f (EFloating (Sinh  x))     = GFloating <$> (Sinh  <$> (f x))
+  mapDeRef f (EFloating (Cosh  x))     = GFloating <$> (Cosh  <$> (f x))
+  mapDeRef f (EFloating (Tanh  x))     = GFloating <$> (Tanh  <$> (f x))
+  mapDeRef f (EFloating (ASinh x))     = GFloating <$> (ASinh <$> (f x))
+  mapDeRef f (EFloating (ATanh x))     = GFloating <$> (ATanh <$> (f x))
+  mapDeRef f (EFloating (ACosh x))     = GFloating <$> (ACosh <$> (f x))
+
+  mapDeRef f (EGraphRef _ _) = $(err "why would you even consider doing that")
+
+---------------------------------- utility functions -------------------------------
 
 sym :: String -> Expr a
-sym name = eref (ESym name)
+sym = ESym
 
 const' :: a -> Expr a
 const' = EConst
 
-readExpr :: Expr a -> IO (Expr a)
-readExpr (ERef mx) = readMVar mx >>= readExpr
-readExpr x = return x
-
 -- | Checks to see if an Expr is equal to a value
 isVal :: Eq a => a -> Expr a -> Bool
-isVal v e@(ERef _) = isVal v (unsafePerformIO $ readExpr e)
 isVal v (EConst c) = v == c
 isVal v (ENum (FromInteger k)) = v == fromInteger k
 isVal v (EFractional (FromRational r)) = v == fromRational r

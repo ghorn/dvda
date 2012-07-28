@@ -17,6 +17,7 @@ import Text.Printf ( printf )
 import qualified Data.HashSet as HS
 
 import MutableDvda.Expr
+import MutableDvda.FunGraph ( FunGraph(..), (:*)(..) )
 import MutableDvda.Graph
 
 run :: IO ()

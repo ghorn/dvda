@@ -12,34 +12,33 @@ import Dvda.Dual hiding ( fad, fad' )
 
 import MutableDvda.Expr
 
--- fad :: Num a => (Dual a -> [Dual a]) -> a -> [a]
--- fad f x = map dualPerturbation $ f (Dual x 1)
+--fad :: Num a => (Dual a -> [Dual a]) -> a -> [a]
+--fad f x = map dualPerturbation $ f (Dual x 1)
 
 bpBinary :: (Eq a, Num a)
             => Expr a -> Expr a -> Expr a
             -> (Dual (Expr a) -> Dual (Expr a) -> Dual (Expr a))
-            -> IO [(Expr a, Expr a)]
-bpBinary sens g h binop = do
-   let dfdg = dualPerturbation $ binop (Dual g 1) (Dual h 0)
-       dfdh = dualPerturbation $ binop (Dual g 0) (Dual h 1)
-   gsens <- backpropNode (sens*dfdg) g
-   hsens <- backpropNode (sens*dfdh) h
-   return $ gsens ++ hsens
+            -> [(Expr a, Expr a)]
+bpBinary sens g h binop = gsens ++ hsens
+  where
+    dfdg = dualPerturbation $ binop (Dual g 1) (Dual h 0)
+    dfdh = dualPerturbation $ binop (Dual g 0) (Dual h 1)
+    gsens = backpropNode (sens*dfdg) g
+    hsens = backpropNode (sens*dfdh) h
 
 bpUnary :: (Eq a, Num a)
            => Expr a -> Expr a
            -> (Dual (Expr a) -> Dual (Expr a))
-           -> IO [(Expr a, Expr a)]
-bpUnary sens g unop = do
-   let dfdg = dualPerturbation $ unop (Dual g 1)
-   backpropNode (sens*dfdg) g
+           -> [(Expr a, Expr a)]
+bpUnary sens g unop = backpropNode (sens*dfdg) g
+  where
+    dfdg = dualPerturbation $ unop (Dual g 1)
 
-backpropNode :: Eq a => Expr a -> Expr a -> IO [(Expr a, Expr a)]
-backpropNode sens e@(ERef _) = readExpr e >>= backpropNode sens
-backpropNode sens e@(ESym _) = return [(e,sens)]
-backpropNode _ (EConst _) = return []
-backpropNode _ (ENum (FromInteger _)) = return []
-backpropNode _ (EFractional (FromRational _)) = return []
+backpropNode :: Eq a => Expr a -> Expr a -> [(Expr a, Expr a)]
+backpropNode sens e@(ESym _) = [(e,sens)]
+backpropNode _ (EConst _) = []
+backpropNode _ (ENum (FromInteger _)) = []
+backpropNode _ (EFractional (FromRational _)) = []
 backpropNode sens (ENum (Mul x y)) = bpBinary sens x y (*)
 backpropNode sens (ENum (Add x y)) = bpBinary sens x y (+)
 backpropNode sens (ENum (Sub x y)) = bpBinary sens x y (-)
@@ -64,12 +63,10 @@ backpropNode sens (EFloating (ATanh x)) = bpUnary sens x atanh
 backpropNode sens (EFloating (ACosh x)) = bpUnary sens x acosh
 backpropNode sens (EGraphRef x _)       = backpropNode sens x
 
-backprop :: (Num a, Eq a, Hashable a) => Expr a -> IO (HashMap (Expr a) (Expr a))
-backprop x = do
-  sensitivities <- backpropNode 1 x
-  return $ HM.fromListWith (+) sensitivities
+backprop :: (Num a, Eq a, Hashable a) => Expr a -> HashMap (Expr a) (Expr a)
+backprop x = HM.fromListWith (+) (backpropNode 1 x)
 
-rad :: (Num a, Eq a, Hashable a) => Expr a -> [Expr a] -> IO [Expr a]
-rad x args = do
-  sensitivities <- backprop x
-  return $ map (\arg -> HM.lookupDefault 0 arg sensitivities) args
+rad :: (Num a, Eq a, Hashable a) => Expr a -> [Expr a] -> [Expr a]
+rad x args = map (\arg -> HM.lookupDefault 0 arg sensitivities) args
+  where
+    sensitivities = backprop x

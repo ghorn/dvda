@@ -3,15 +3,13 @@
 
 module Main where
 
-import qualified Dvda.HashMap as HM
-
 import MutableDvda.AD
 import MutableDvda.Expr
-import MutableDvda.FullShow
+import MutableDvda.FunGraph
 import MutableDvda.Graph
 
 bg :: Floating a => a -> a
-bg x' = f''
+bg x' = f'''
   where
     y' = 2*x'
     z' = 4*y'
@@ -35,50 +33,28 @@ bg x' = f''
 --    fy = diff f y'
 --    fz = diff f z'
 
-g :: Expr Double
-g = bg (sym "x")
-
 --f :: Expr Double
 --f = x + x where x = sym "x"
 
---main :: IO ()
---main = do
-----  (fullShow booboo) >>= putStrLn
---  (toIO $ countNodes booboo) >>= print
-----  putStrLn "--------------------------------------------------"
---  bam <- toIO (backprop 1 booboo)
-------  mapM (\(_,x) -> fullShow x) bam >>= mapM_ putStrLn
-------  mapM_ putStrLn $ map (\(x,_) -> show x) bam
---  toIO (fmap sum (mapM (\(_,x) -> countNodes x) bam)) >>= print
-----  print $ length $ bam
-
---main :: IO ()
---main = do
-----  (_, n, _) <- toGExprs [booboo]
---  sf <- fullShow f
---  putStrLn $ "f = " ++ sf ++ " ( " ++ show (unsafePerformIO $ readExpr f) ++ " )"
-----  putStrLn "\nrunning rad..."
-----  radMap <- rad f
-----  sx <- fullShow (head $ HM.keys radMap)
-----  sdx <- fullShow (head $ HM.elems radMap)
-----  putStrLn $ "df/d" ++ sx ++ " = " ++ sdx
---  putStrLn "\nmaking graph / performing CSE..."
---  (_,n,hm) <- toGExprs [f] -- :(HM.elems radMap))
---  putStrLn $ show n ++ " nodes"
---
---  putStrLn "\nhashmap:"
---  mapM_ print (HM.toList hm)
-
---main :: IO ()
---main = do
-----  (_, n, _) <- toGExprs [g]
+main :: IO ()
+main = do
+--  (_, n, _) <- toGExprs [booboo]
+  let x = sym "x" :: Expr Double
+      g = bg x
+      g' = rad g [x]
+--  print (bg x)
 --  putStrLn "\nrunning rad..."
---  radMap <- rad g
-----  sg <- fullShow g
-----  putStrLn sg
---  putStrLn "\nmaking graph / performing CSE..."
-----  (_,n,hm,_) <- unsafeToGExprs (g:(HM.elems radMap))
---  (_,n,hm) <- toFunGraph (g:(HM.elems radMap))
---  putStrLn $ show n ++ " nodes"
-----  print (graphCount hm)
-----  putStrLn (graphShow hm)
+--  radMap <- rad f
+--  sx <- fullShow (head $ HM.keys radMap)
+--  sdx <- fullShow (head $ HM.elems radMap)
+--  putStrLn $ "df/d" ++ sx ++ " = " ++ sdx
+  putStrLn "\nmaking graph..."
+  FunGraph gr ins outs <- toFunGraph x (g :* g') -- :(HM.elems radMap))
+
+  putStrLn $ "\nlength graph:" ++ show (length gr)
+
+  putStrLn "\ninputs:"
+  print ins
+
+  putStrLn "\noutputs:"
+  print outs
