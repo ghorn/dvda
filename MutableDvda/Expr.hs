@@ -3,6 +3,7 @@
 {-# Language TemplateHaskell #-}
 {-# Language TypeFamilies #-}
 {-# Language StandaloneDeriving #-}
+{-# Language DeriveDataTypeable #-}
 
 module MutableDvda.Expr ( Expr(..)
                         , GExpr(..)
@@ -15,8 +16,9 @@ module MutableDvda.Expr ( Expr(..)
                         , getParents
                         ) where
 
-import Data.Hashable ( Hashable, hash, combine )
 import Control.Applicative
+import Data.Data ( Data, Typeable1, Typeable2 )
+import Data.Hashable ( Hashable, hash, combine )
 
 import MutableDvda.Reify ( MuRef(..) )
 
@@ -59,6 +61,18 @@ data Floatings a = Pow a a
                  | ASinh a
                  | ATanh a
                  | ACosh a deriving Eq
+
+deriving instance Data a => Data (Nums a)
+deriving instance Data a => Data (Fractionals a)
+deriving instance Data a => Data (Floatings a)
+deriving instance (Data a, Floating a) => Data (Expr a)
+deriving instance (Data a, Data b, Floating a) => Data (GExpr a b)
+
+deriving instance Typeable1 Nums
+deriving instance Typeable1 Fractionals
+deriving instance Typeable1 Floatings
+deriving instance Typeable1 Expr
+deriving instance Typeable2 GExpr
 
 ----------------------- Show instances -------------------------
 showsInfixBinary :: (Show a, Show b) => Int -> Int -> String -> a -> b -> ShowS
@@ -364,7 +378,6 @@ getParents (GFloating (ACosh x))          = [x]
 instance (Show a, Show b) => Show (GExpr a b) where
   show = show . (gexprToExpr (\x -> ESym ("{" ++ show x ++ "}")))
   
---deriving instance (Show a, Show b) => Show (GExpr a b)
 deriving instance (Eq a, Eq b) => Eq (GExpr a b)
 
 instance (Hashable a, Hashable b) => Hashable (GExpr a b) where
