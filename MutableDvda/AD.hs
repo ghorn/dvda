@@ -61,7 +61,6 @@ backpropNode sens (EFloating (Tanh x))  = bpUnary sens x tanh
 backpropNode sens (EFloating (ASinh x)) = bpUnary sens x asinh
 backpropNode sens (EFloating (ATanh x)) = bpUnary sens x atanh
 backpropNode sens (EFloating (ACosh x)) = bpUnary sens x acosh
-backpropNode sens (EGraphRef x _)       = backpropNode sens x
 
 backprop :: (Num a, Eq a, Hashable a) => Expr a -> HashMap (Expr a) (Expr a)
 backprop x = HM.fromListWith (+) (backpropNode 1 x)

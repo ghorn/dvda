@@ -7,11 +7,10 @@ import Data.Hashable ( Hashable )
 
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
-import MutableDvda.Expr ( Expr(..), GExpr(..), Floatings(..), Fractionals(..), Nums(..), GraphRef(..) )
+import MutableDvda.Expr ( Expr(..), GExpr(..), Floatings(..), Fractionals(..), Nums(..) )
 
-insert :: (Eq a, Hashable a) => HashMap (GExpr a GraphRef) GraphRef -> HashMap (Expr a) GraphRef
-          -> Int -> Expr a -> (GraphRef, Int, HashMap (GExpr a GraphRef) GraphRef, HashMap (Expr a) GraphRef)
-insert hm im n (EGraphRef _ gr)               = (gr, n, hm, im)
+insert :: (Eq a, Hashable a) => HashMap (GExpr a Int) Int -> HashMap (Expr a) Int
+          -> Int -> Expr a -> (Int, Int, HashMap (GExpr a Int) Int, HashMap (Expr a) Int)
 insert hm im0 n expr@(ESym name)              = tupleAppend im ret
   where
     ret@(graphRef, _, _) = cseInsert hm n (GSym name)
@@ -47,14 +46,14 @@ tupleAppend d (a,b,c) = (a,b,c,d)
 
 binaryInsert
   :: (Eq a, Hashable a)
-     => HashMap (GExpr a GraphRef) GraphRef
-     -> HashMap (Expr a) GraphRef
+     => HashMap (GExpr a Int) Int
+     -> HashMap (Expr a) Int
      -> Int
-     -> (t -> GExpr a GraphRef)
-     -> (GraphRef -> GraphRef -> t)
+     -> (t -> GExpr a Int)
+     -> (Int -> Int -> t)
      -> Expr a
      -> Expr a
-     -> (GraphRef, Int, HashMap (GExpr a GraphRef) GraphRef, HashMap (Expr a) GraphRef)
+     -> (Int, Int, HashMap (GExpr a Int) Int, HashMap (Expr a) Int)
 binaryInsert hm0 im0 n0 gnum mul x y = tupleAppend im2 $ cseInsert hm2 n2 (gnum (mul kx ky))
   where
     (kx,n1,hm1,im1) = insert hm0 im0 n0 x
@@ -62,18 +61,18 @@ binaryInsert hm0 im0 n0 gnum mul x y = tupleAppend im2 $ cseInsert hm2 n2 (gnum 
 
 unaryInsert
   :: (Eq a, Hashable a)
-     => HashMap (GExpr a GraphRef) GraphRef
-     -> HashMap (Expr a) GraphRef
+     => HashMap (GExpr a Int) Int
+     -> HashMap (Expr a) Int
      -> Int
-     -> (nf GraphRef -> GExpr a GraphRef)
-     -> (GraphRef -> nf GraphRef)
+     -> (nf Int -> GExpr a Int)
+     -> (Int -> nf Int)
      -> Expr a
-     -> (GraphRef, Int, HashMap (GExpr a GraphRef) GraphRef, HashMap (Expr a) GraphRef)
+     -> (Int, Int, HashMap (GExpr a Int) Int, HashMap (Expr a) Int)
 unaryInsert hm0 im0 n0 gnum mul x = tupleAppend im1 $ cseInsert hm1 n1 (gnum (mul k))
   where
     (k,n1,hm1,im1) = insert hm0 im0 n0 x
 
-cseInsert :: (Eq k, Hashable k) => HashMap k GraphRef -> Int -> k -> (GraphRef, Int, HashMap k GraphRef)
+cseInsert :: (Eq k, Hashable k) => HashMap k Int -> Int -> k -> (Int, Int, HashMap k Int)
 cseInsert hm n gexpr = case HM.lookup gexpr hm of
-  Nothing -> (GraphRef n, n+1, HM.insert gexpr (GraphRef n) hm)
+  Nothing -> (n, n+1, HM.insert gexpr n hm)
   Just k -> (k, n, hm)

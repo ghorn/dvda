@@ -9,7 +9,6 @@ module MutableDvda.Expr ( Expr(..)
                         , Nums(..)
                         , Fractionals(..)
                         , Floatings(..)
-                        , GraphRef(..)
                         , isVal
                         , sym
                         , const'
@@ -17,7 +16,6 @@ module MutableDvda.Expr ( Expr(..)
                         ) where
 
 import Data.Hashable ( Hashable, hash, combine )
-import FileLocation ( err )
 import Control.Applicative
 
 import MutableDvda.Reify ( MuRef(..) )
@@ -28,17 +26,12 @@ commutativeMul = True
 commutativeAdd :: Bool
 commutativeAdd = True
 
-data GraphRef = GraphRef Int deriving (Eq, Show)
-instance Hashable GraphRef where
-  hash (GraphRef k) = hash "GraphRef" `combine` k
-
 data Expr a where
   ESym :: String -> Expr a
   EConst :: a -> Expr a
   ENum :: Num a => Nums (Expr a) -> Expr a
   EFractional :: Fractional a => Fractionals (Expr a) -> Expr a
   EFloating :: Floating a => Floatings (Expr a) -> Expr a
-  EGraphRef :: Expr a -> GraphRef -> Expr a
 
 data Nums a = Mul a a
             | Add a a
@@ -115,8 +108,6 @@ instance Show a => Show (Expr a) where
   showsPrec d (ENum x) = showsPrec d x
   showsPrec d (EFractional x) = showsPrec d x
   showsPrec d (EFloating x) = showsPrec d x
-  showsPrec d (EGraphRef x k) = showString ("EGraphRef(" ++ show k ++ "): ") .
-                                showsPrec d x
 
 
 ----------------------- Eq instances -------------------------
@@ -126,8 +117,6 @@ instance Eq a => Eq (Expr a) where
   (==) (ENum x) (ENum y) = x == y
   (==) (EFractional x) (EFractional y) = x == y
   (==) (EFloating x) (EFloating y) = x == y
-  (==) (EGraphRef x _) y = x == y
-  (==) x (EGraphRef y _) = x == y
   (==) _ _ = False
 
 instance Eq a => Eq (Nums a) where
@@ -194,7 +183,6 @@ instance Hashable a => Hashable (Expr a) where
   hash (ENum x)        = hash "ENum"        `combine` hash x
   hash (EFractional x) = hash "EFractional" `combine` hash x
   hash (EFloating x)   = hash "EFloating"   `combine` hash x
-  hash (EGraphRef x _) = hash x
 
 --deriving instance Enum a => Enum (Nums a)
 --deriving instance Bounded a => Bounded (Nums a)
@@ -416,8 +404,6 @@ instance MuRef (Expr a) where
   mapDeRef f (EFloating (ASinh x))     = GFloating <$> (ASinh <$> (f x))
   mapDeRef f (EFloating (ATanh x))     = GFloating <$> (ATanh <$> (f x))
   mapDeRef f (EFloating (ACosh x))     = GFloating <$> (ACosh <$> (f x))
-
-  mapDeRef f (EGraphRef _ _) = $(err "why would you even consider doing that")
 
 ---------------------------------- utility functions -------------------------------
 
