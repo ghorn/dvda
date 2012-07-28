@@ -13,14 +13,13 @@ module MutableDvda.Reify ( MuRef(..)
 import Control.Concurrent.MVar ( newMVar, takeMVar, putMVar, MVar, readMVar )
 import Control.Applicative ( Applicative )
 import Data.Hashable ( Hashable, hash )
-import FileLocation ( err )
 import System.Mem.StableName ( StableName, makeStableName, hashStableName )
 import Unsafe.Coerce ( unsafeCoerce )
 
-import Dvda.HashMap ( HashMap )
-import qualified Dvda.HashMap as HM
-
 import MutableDvda.ReifyGraph ( ReifyGraph(..) )
+
+import qualified Data.HashTable.IO as H
+type HashTable k v = H.CuckooHashTable k v
 
 class MuRef a where
   type DeRef a :: * -> *
@@ -34,7 +33,7 @@ class MuRef a where
 
 reifyGraphs :: MuRef s => [[[[s]]]] -> IO (ReifyGraph (DeRef s), [[[[Int]]]])
 reifyGraphs m = do
-  stableNameMap <- newMVar HM.empty
+  stableNameMap <- H.new >>= newMVar
   graph <- newMVar []
   uVar <- newMVar 0
   roots <- mapM (mapM (mapM (mapM (findNodes stableNameMap graph uVar)))) m
@@ -42,7 +41,7 @@ reifyGraphs m = do
   return (ReifyGraph pairs, roots)
 
 findNodes :: MuRef s
-          => MVar (HashMap DynStableName Int)
+          => MVar (HashTable DynStableName Int)
           -> MVar [(Int,DeRef s Int)]
           -> MVar Int
           -> s
@@ -50,14 +49,15 @@ findNodes :: MuRef s
 findNodes stableNameMap graph uVar j | j `seq` True = do
   st <- makeDynStableName j
   tab <- takeMVar stableNameMap
-  case HM.lookup st tab of
+  amIHere <- H.lookup tab st
+  case amIHere of
     -- if the j's StableName is already in the table, return the element
     Just var -> do putMVar stableNameMap tab
                    return var
     -- if j's StableName is not yet in the table, recursively call findNodes
     Nothing -> do var <- newUnique uVar
-                  let errmsg = $(err "ERROR: collision in supposedly unique graph")
-                  putMVar stableNameMap $ HM.insertWith errmsg st var tab
+                  H.insert tab st var
+                  putMVar stableNameMap tab
                   res <- mapDeRef (findNodes stableNameMap graph uVar) j
                   tab' <- takeMVar graph
                   putMVar graph $ (var,res) : tab'

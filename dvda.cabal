@@ -82,6 +82,7 @@ Library
                      hashable  >= 1.1 && < 1.2,
                      containers >= 0.4 && < 0.5,
                      unordered-containers  >= 0.2 && < 0.3,
+                     hashtables  >= 1.0.1.6 && < 1.1,
                      graphviz >= 2999.12 && < 2999.13,
                      fgl >= 5.4 && < 5.5,
                      mtl >= 2.0 && < 2.1,
