@@ -113,24 +113,24 @@ msCoctave userStep odeError n funDir name = do
       -------------------------------------------------------------------------------------
       dvs = concat states ++ concat actions ++ params
       
-  costSource <- do
+  (costSource,costFg) <- do
     let costGrad = rad cost dvs
-    showMex (name ++ "_cost") (dvs :* constants) (cost :* costGrad)
+    showMex' (name ++ "_cost") (dvs :* constants) (cost :* costGrad)
   
-  constraintsSource <- do
+  (constraintsSource,constraintsFg) <- do
     let cineqJacob = map (flip rad dvs) cineq
         ceqJacob   = map (flip rad dvs) ceq
-    showMex (name ++ "_constraints") (dvs :* constants) (cineq :* ceq :* cineqJacob :* ceqJacob)
+    showMex' (name ++ "_constraints") (dvs :* constants) (cineq :* ceq :* cineqJacob :* ceqJacob)
   
-  timeSource <- showMex (name ++ "_time") (dvs :* constants) (init $ scanl (+) 0 dts)
+  (timeSource,timeFg) <- showMex' (name ++ "_time") (dvs :* constants) (init $ scanl (+) 0 dts)
   
-  outputSource <- showMex (name ++ "_outputs") (dvs :* constants) (HM.elems outputMap)
+  (outputSource,outputFg) <- showMex' (name ++ "_outputs") (dvs :* constants) (HM.elems outputMap)
   
-  simSource <- do
+  (simSource,simFg) <- do
     let x' = head states
         u' = head actions
         dxdt' = fromJustErr "dxdt' error" $ stepDxdt $ head steps
-    showMex (name ++ "_sim") (x' :* u' :* params :* constants) dxdt'
+    showMex' (name ++ "_sim") (x' :* u' :* params :* constants) dxdt'
       
   let (lbs, ubs, _) = unzip3 $ map getBnd dvs
         where
@@ -223,7 +223,7 @@ msCoctave userStep odeError n funDir name = do
 
       mexAllSource = unlines $ map f ["cost", "constraints", "time", "outputs", "sim"]
         where
-          f x = "disp('mexing " ++ file ++ "')\n"++"mex " ++ file
+          f x = "tic\nfprintf('mexing " ++ file ++ "...  ')\n"++"mex " ++ file ++ "\nt1 = toc;\nfprintf('finished in %.2f seconds\\n', t1)"
             where
               file = name ++ "_" ++ x ++ ".c"
   
@@ -240,12 +240,11 @@ msCoctave userStep odeError n funDir name = do
   _ <- writeSourceFile       unstructSource funDir $ name ++ "_unstruct.m"
   _ <- writeSourceFile           plotSource funDir $ name ++ "_plot.m"
 
-  return ()
---  putStrLn $ "cost        " ++ showCollisions costFg
---  putStrLn $ "constraints " ++ showCollisions constraintsFg
---  putStrLn $ "time        " ++ showCollisions timeFg
---  putStrLn $ "output      " ++ showCollisions outputFg
---  putStrLn $ "sim         " ++ showCollisions simFg
+  putStrLn $ "nodes in cost:        " ++ show (countNodes costFg)
+  putStrLn $ "nodes in constraints: " ++ show (countNodes constraintsFg)
+  putStrLn $ "nodes in time:        " ++ show (countNodes timeFg)
+  putStrLn $ "nodes in output:      " ++ show (countNodes outputFg)
+  putStrLn $ "nodes in sim:         " ++ show (countNodes simFg)
 
 fromJustErr :: String -> Maybe a -> a
 fromJustErr _ (Just x) = x
@@ -260,7 +259,6 @@ spring = do
   setDxdt [v, -k*x - b*v + u]
   setDt 0.1
   let cost = 2*x*x + 3*v*v + 10*u*u
---  let cost = 2*x*x -- + 3*v*v + 10*u*u
   setCost cost
   addOutput cost "cost"
 
