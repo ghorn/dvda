@@ -72,6 +72,7 @@ Library
                      MutableDvda.Expr
                      MutableDvda.FunGraph
                      MutableDvda.Graph
+                     MutableDvda.MultipleShooting.MSCoctave
                      MutableDvda.MultipleShooting.MSMonad
                      MutableDvda.MultipleShooting.Types
                      MutableDvda.Reify

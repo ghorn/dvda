@@ -4,6 +4,7 @@
 {-# Language TypeFamilies #-}
 {-# Language StandaloneDeriving #-}
 {-# Language DeriveDataTypeable #-}
+{-# Language FlexibleInstances #-}
 
 module MutableDvda.Expr ( Expr(..)
                         , GExpr(..)

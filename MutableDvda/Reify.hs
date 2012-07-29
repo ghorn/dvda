@@ -31,12 +31,12 @@ class MuRef a where
 -- | 'reifyGraph' takes a data structure that admits 'MuRef', and returns a 'ReifyGraph' that contains
 -- the dereferenced nodes, with their children as 'Int' rather than recursive values.
 
-reifyGraphs :: MuRef s => [[[[s]]]] -> IO (ReifyGraph (DeRef s), [[[[Int]]]])
+reifyGraphs :: MuRef s => [[[s]]] -> IO (ReifyGraph (DeRef s), [[[Int]]])
 reifyGraphs m = do
   stableNameMap <- H.new >>= newMVar
   graph <- newMVar []
   uVar <- newMVar 0
-  roots <- mapM (mapM (mapM (mapM (findNodes stableNameMap graph uVar)))) m
+  roots <- mapM (mapM (mapM (findNodes stableNameMap graph uVar))) m
   pairs <- readMVar graph
   return (ReifyGraph pairs, roots)
 

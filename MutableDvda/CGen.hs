@@ -2,19 +2,20 @@
 {-# Language TypeFamilies #-}
 {-# Language FlexibleContexts #-}
 
-module MutableDvda.CGen ( run
-                        , showC
+module MutableDvda.CGen ( showC
                         , showMex
+                        , showMex'
                         ) where
 
 import Data.Hashable ( Hashable )
 import Data.Maybe ( catMaybes )
 import Data.List ( intercalate )
 import Text.Printf ( printf )
-import qualified Data.HashSet as HS
 
 import MutableDvda.Expr
 import MutableDvda.FunGraph
+
+import Dvda.Codegen ( writeSourceFile )
 
 run :: IO ()
 run = do
@@ -25,36 +26,47 @@ run = do
       w1 = sym "w1"
       w2 = sym "w2"
       w3 = sym "w3"
-      f0 = x*y + z + w1 + w2 + w3
+      f0 = x*y + z + w1 + w2
+      f2 = f0 * w2/w3
       
       f1 = [f0/2, f0*y, w, 0.0, 0]
---  showC "foo" (x :* [y]:*[[z]]) (f0:*f1:*[[f0*f0]]) >>= putStrLn
-  showMex "foo" (x :* [y,w3]:*[[z,w], [w1,w2]]) (f0:*f1:*[[f0*f0]]:*[f1]) >>= putStrLn
+      boo = x
 
+      inputs = boo :* [y]:*[[z]] :* [w3,w1,w2,w]
+      outputs = f0:*f1:*f2:*[[f0*f0]]
 
-writeInputs :: [MVS Int] -> ([String], [String])
+--  showC "foo" (boo :* [y]:*[[z]]) (f0:*f1:*f2:*[[f0*f0]]) >>= putStrLn
+
+  fg' <- toFunGraph inputs outputs
+  putStrLn $ "cost has " ++ show (countNodes fg') ++ " nodes"
+  fg <- toFunGraph inputs outputs
+  putStrLn $ "cost has " ++ show (countNodes fg) ++ " nodes"
+  previewGraph fg
+
+  mexSrc <- showMex "foo" inputs outputs -- (x :* [y,w3]:*[[z,w], [w1,w2]]) (f0:*f1:*[[f0*f0]]:*[f1])
+  _ <- writeSourceFile mexSrc "../Documents/MATLAB" $ "foo.c"
+  return ()
+
+writeInputs :: [MVS (String,Maybe Int)] -> ([String], [String])
 writeInputs ins = (concatMap fst dcs, concatMap snd dcs)
   where
     dcs :: [([String],[String])]
     dcs = zipWith writeInput ins [0..]
     
-    writeInput :: MVS Int -> Int -> ([String], [String])
-    writeInput (Sca k) inputK = (decls, prototype)
+    writeInput :: MVS (String,Maybe Int) -> Int -> ([String], [String])
+    writeInput (Sca k') inputK = ([printf "/* input %d */" inputK, decl], prototype)
       where
-        (bc,ec) = case k of (-1) -> ("/* ", " */")
-                            _ -> ("","")
-        decls =
-          [printf "/* input %d */" inputK, printf "%sconst double %s = *input%d;%s" bc (nameNode k) inputK ec]
         prototype = ["const double * input" ++ show inputK]
+        decl = case k' of
+          (name,Just k) -> printf "const double %s = *input%d; /* %s */" (nameNode k) inputK name
+          (name,_) -> printf "/* *input%d; unused ( %s )*/" inputK name
     writeInput (Vec ks) inputK = (decls, prototype)
       where
         prototype = ["const double input" ++ show inputK ++ "[" ++ show (length ks) ++ "]"]
         decls = (printf "/* input %d */" inputK):(zipWith f [(0::Int)..] ks)
           where
-            f inIdx k = printf "%sconst double %s = input%d[%d];%s" bc (nameNode k) inputK inIdx ec
-              where
-                (bc,ec) = case k of (-1) -> ("/* ", " */")
-                                    _ -> ("","")
+            f inIdx (name,Just k) = printf "const double %s = input%d[%d]; /* %s */" (nameNode k) inputK inIdx name
+            f inIdx (name,_) = printf "/* input%d[%d] unused ( %s ) */" inputK inIdx name
     writeInput (Mat ks) inputK
       | any ((ncols /=) . length) ks =
           error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length ks)
@@ -66,11 +78,10 @@ writeInputs ins = (concatMap fst dcs, concatMap snd dcs)
         decls = (printf "/* input %d */" inputK):
                 zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat ks)
           where
-            f (rowIdx,colIdx) gref = printf "%sconst double %s = input%d[%d][%d];%s"
-                                     bc (nameNode gref) inputK rowIdx colIdx ec
-              where
-                (bc,ec) = case gref of (-1) -> ("/* ", " */")
-                                       _ -> ("","")
+            f (rowIdx,colIdx) (name,Just k) = printf "const double %s = input%d[%d][%d]; /* %s */"
+                                              (nameNode k) inputK rowIdx colIdx name
+            f (rowIdx,colIdx) (name,_) = printf "/* input%d[%d][%d]; unused ( %s ) */"
+                                         inputK rowIdx colIdx name
 
 
 writeOutputs :: [MVS Int] -> ([String], [String])
@@ -179,37 +190,34 @@ checkMxInputDims (Mat grefs) functionName inputK =
 -- .
 --   Also pass a name to give to the C function
 -- .
---   This function simply calls showCWithGraphRefs and discards the first two outputs
-showC :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a,
-          ToFunGraph b, ToFunGraph c)
+--   This function simply calls showCWithFunGraph and discards the first two outputs
+showC :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a, ToFunGraph b, ToFunGraph c)
          => String -> b -> c -> IO String
 showC functionName inputs outputs = do
-  (_,_,txt) <- showCWithGraphRefs functionName inputs outputs
+  (txt,_) <- showCWithFunGraph functionName inputs outputs
   return txt
 
 -- | Turns inputs and outputs into a string containing C code. Also return indices of the inputs and outputs
 -- .
 --   Also pass a name to give to the C function
-showCWithGraphRefs :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a, ToFunGraph b, ToFunGraph c)
-                      => String -> b -> c -> IO ([MVS Int], [MVS Int], String)
-showCWithGraphRefs functionName inputs outputs = case getRedundantExprs inputs of
-  Just res -> error $ "showCWithGraphRefs saw redundant inputs: " ++ show (HS.toList res)
-  Nothing -> do
-    fg <- toFunGraph inputs outputs
-    let (inDecls, inPrototypes) = writeInputs (fgInputs fg)
-        (outDecls, outPrototypes) = writeOutputs (fgOutputs fg)
-        mainDecls = catMaybes $ map (\gref -> lookupGExpr gref fg >>= cAssignment gref) $ reverse $ topSort fg
-    
-        body = unlines $ map ("    "++) $
-               inDecls ++
-               ["","/* body */"] ++
-               mainDecls ++ [""] ++
-               outDecls
-    
-        txt = "#include <math.h>\n\n" ++
-              "void " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes++outPrototypes)) ++ " )\n{\n" ++
-              body ++ "}\n"
-    return (fgInputs fg, fgOutputs fg, txt)
+showCWithFunGraph :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a, ToFunGraph b, ToFunGraph c)
+                     => String -> b -> c -> IO (String, FunGraph a)
+showCWithFunGraph functionName inputs outputs = do
+  fg <- toFunGraph inputs outputs
+  let (inDecls, inPrototypes) = writeInputs (fgInputs fg)
+      (outDecls, outPrototypes) = writeOutputs (fgOutputs fg)
+      mainDecls = catMaybes $ map (\k -> fgLookupGExpr fg k >>= cAssignment k) $ reverse $ topSort fg
+  
+      body = unlines $ map ("    "++) $
+             inDecls ++
+             ["","/* body */"] ++
+             mainDecls ++ [""] ++
+             outDecls
+  
+      txt = "#include <math.h>\n\n" ++
+            "void " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes++outPrototypes)) ++ " )\n{\n" ++
+            body ++ "}\n"
+  return (txt, fg)
 
 nameNode :: Int -> String
 nameNode k = "v_" ++ show k
@@ -254,11 +262,15 @@ cAssignment k gexpr = fmap (\cop -> "const double " ++ nameNode k ++ " = " ++ co
     toCOp (GFloating (ACosh _))          = error "C generation doesn't support ACosh"
 
 
-showMex :: (Eq (NumT c), Show (NumT c), Hashable (NumT c), ToFunGraph b, ToFunGraph c, NumT b ~ NumT c)
+showMex :: (Eq a, Show a, Hashable a, ToFunGraph b, ToFunGraph c, NumT b ~ a, NumT c ~ a)
            => String -> b -> c -> IO String
-showMex functionName inputs outputs = do
-  (inputIndices, outputIndices, cText) <- showCWithGraphRefs functionName inputs outputs
-  return $ cText ++ "\n\n\n" ++ mexFun functionName inputIndices outputIndices
+showMex functionName inputs outputs = fmap fst (showMex' functionName inputs outputs)
+
+showMex' :: (Eq a, Show a, Hashable a, ToFunGraph b, ToFunGraph c, NumT b ~ a, NumT c ~ a)
+            => String -> b -> c -> IO (String, FunGraph a)
+showMex' functionName inputs outputs = do
+  (cText, fg) <- showCWithFunGraph functionName inputs outputs
+  return (cText ++ "\n\n\n" ++ mexFun functionName (fgInputs fg) (fgOutputs fg), fg)
 
 mexFun :: String -> [MVS a] -> [MVS Int] -> String
 mexFun functionName ins outs =
@@ -306,5 +318,13 @@ mexFun functionName ins outs =
   where
     nlhs = length outs
     nrhs = length ins
-    inputPtrs = map (\k -> "mxGetPr(prhs[" ++ show k ++ "])") [0..(nrhs-1)]
-    outputPtrs = map (\k -> "outputs[" ++ show k ++ "]") [0..(nlhs-1)]
+    inputPtrs  = zipWith (\i k -> cast i "const " ++ "mxGetPr(prhs[" ++ show k ++ "])") ins  [(0::Int)..]
+    outputPtrs = zipWith (\o k -> cast o    ""    ++ "(outputs[" ++ show k ++ "])")     outs [(0::Int)..]
+
+    cast :: MVS a -> String -> String
+    cast (Sca _) _ = ""
+    cast (Vec _) _ = ""
+    cast (Mat []) cnst = "(" ++ cnst ++ "double (*)[0])"
+    cast (Mat xs) cnst = "(" ++ cnst ++ "double (*)[" ++ show ncols ++ "])"
+      where
+        ncols = length (head xs)
