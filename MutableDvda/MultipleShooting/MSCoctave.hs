@@ -15,7 +15,7 @@ import qualified Dvda.HashMap as HM
 import Dvda.Codegen ( writeSourceFile )
 import MutableDvda.AD ( rad )
 import MutableDvda.CGen -- ( showMex )
-import MutableDvda.Expr ( Expr(..) )
+import MutableDvda.Expr ( Expr(..), Sym(..) )
 import MutableDvda.FunGraph -- ( (:*)(..), previewGraph, toFunGraph )
 import MutableDvda.MultipleShooting.MSMonad
 import MutableDvda.MultipleShooting.Types
@@ -181,8 +181,8 @@ msCoctave userStep odeError n funDir name = do
         ]
         where
           readName e = case e of
-            ESym nm -> nm
-            _ -> error "param not ESym"
+            ESym (Sym nm) -> nm
+            _ -> error "param not ESym Sym"
           fromParam e = "dvs(" ++ show (1 + (fromJustErr "fromParam error" $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ readName e ++ ";\n"
       
           fromXU nm e k =
@@ -198,8 +198,8 @@ msCoctave userStep odeError n funDir name = do
         ]
         where
           readName e = case e of
-            ESym nm -> nm
-            _ -> error "const not ESym"
+            ESym (Sym nm) -> nm
+            _ -> error "const not ESym Sym"
           fromConst e = "constants(" ++ show (1 + (fromJustErr "fromConst error" $ e `elemIndex` constants)) ++ ") = constStruct." ++ readName e ++ ";\n"
       
       plotSource =

@@ -176,7 +176,7 @@ tlv :: Int -> String -> Label
 tlv k s = toLabelValue $ show k ++ ": " ++ s
 
 instance Show a => Labellable (FGLNode a) where
-  toLabelValue (FGLNode (k, (GSym name)))                    = tlv k name
+  toLabelValue (FGLNode (k, (GSym s)))                       = tlv k (show s)
   toLabelValue (FGLNode (k, (GConst c)))                     = tlv k (show c)
   toLabelValue (FGLNode (k, (GNum (Mul _ _))))               = tlv k "*"
   toLabelValue (FGLNode (k, (GNum (Add _ _))))               = tlv k "+"

@@ -11,14 +11,17 @@ module MutableDvda.Expr ( Expr(..)
                         , Nums(..)
                         , Fractionals(..)
                         , Floatings(..)
+                        , Sym(..)
                         , isVal
                         , sym
+                        , symDependent
+                        , symDependentN
                         , const'
                         , getParents
                         ) where
 
 import Control.Applicative
-import Data.Data ( Data, Typeable1, Typeable2 )
+import Data.Data ( Data, Typeable, Typeable1, Typeable2 )
 import Data.Hashable ( Hashable, hash, combine )
 
 import MutableDvda.Reify ( MuRef(..) )
@@ -29,8 +32,16 @@ commutativeMul = True
 commutativeAdd :: Bool
 commutativeAdd = True
 
+data Sym = Sym String                  -- doesn't depend on independent variable, or is an independent variable
+         | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
+           deriving Eq
+
+instance Show Sym where
+  show (Sym name) = name
+  show (SymDependent name k s) = name ++ replicate k '\'' ++ "(" ++ show s ++ ")"
+
 data Expr a where
-  ESym :: String -> Expr a
+  ESym :: Sym -> Expr a
   EConst :: a -> Expr a
   ENum :: Num a => Nums (Expr a) -> Expr a
   EFractional :: Fractional a => Fractionals (Expr a) -> Expr a
@@ -63,12 +74,14 @@ data Floatings a = Pow a a
                  | ATanh a
                  | ACosh a deriving Eq
 
+deriving instance Data Sym
 deriving instance Data a => Data (Nums a)
 deriving instance Data a => Data (Fractionals a)
 deriving instance Data a => Data (Floatings a)
 deriving instance (Data a, Floating a) => Data (Expr a)
 deriving instance (Data a, Data b, Floating a) => Data (GExpr a b)
 
+deriving instance Typeable Sym
 deriving instance Typeable1 Nums
 deriving instance Typeable1 Fractionals
 deriving instance Typeable1 Floatings
@@ -118,7 +131,7 @@ instance Show a => Show (Floatings a) where
   showsPrec d (ACosh x) = showsUnary d 10 "acosh" x
 
 instance Show a => Show (Expr a) where
-  showsPrec _ (ESym name) = showString name
+  showsPrec _ (ESym s) = showString (show s)
   showsPrec _ (EConst x) = showString (show x)
   showsPrec d (ENum x) = showsPrec d x
   showsPrec d (EFractional x) = showsPrec d x
@@ -150,6 +163,10 @@ instance Eq a => Eq (Nums a) where
   
 
 ----------------------------- hashable instances --------------------------
+instance Hashable Sym where
+  hash (Sym name) = hash "Sym" `combine` hash name
+  hash (SymDependent name k s) = hash ("SymDependent", name, k, s)
+
 instance Hashable a => Hashable (Nums a) where
   hash (Mul x y)  = hash "Mul" `combine` hx `combine` hy
     where
@@ -313,7 +330,7 @@ applyFloatingUn (_,f) x = EFloating (f x)
 
 ---------------------------------- GExprs --------------------------------
 data GExpr a b where
-  GSym :: String -> GExpr a b
+  GSym :: Sym -> GExpr a b
   GConst :: a -> GExpr a b
   GNum :: Num a => Nums b -> GExpr a b
   GFractional :: Fractional a => Fractionals b -> GExpr a b
@@ -321,7 +338,8 @@ data GExpr a b where
 
 -- you might use this to use Expr's nice Show instance
 gexprToExpr :: (b -> Expr a) -> GExpr a b -> Expr a
-gexprToExpr _ (GSym name) = ESym name
+gexprToExpr _ (GSym s@(Sym _)) = ESym s
+gexprToExpr _ (GSym sd@(SymDependent _ _ _)) = ESym sd
 gexprToExpr _ (GConst c) = EConst c
 gexprToExpr f (GNum (Mul x y))               = ENum (Mul (f x) (f y))
 gexprToExpr f (GNum (Add x y))               = ENum (Add (f x) (f y))
@@ -377,7 +395,7 @@ getParents (GFloating (ATanh x))          = [x]
 getParents (GFloating (ACosh x))          = [x]
 
 instance (Show a, Show b) => Show (GExpr a b) where
-  show = show . (gexprToExpr (\x -> ESym ("{" ++ show x ++ "}")))
+  show = show . (gexprToExpr (\x -> ESym (Sym ("{" ++ show x ++ "}"))))
   
 deriving instance (Eq a, Eq b) => Eq (GExpr a b)
 
@@ -421,8 +439,21 @@ instance MuRef (Expr a) where
 
 ---------------------------------- utility functions -------------------------------
 
+-- | symbolic scalar
 sym :: String -> Expr a
-sym = ESym
+sym = ESym . Sym
+
+-- | Symbolic scalar which is a function of some independent variable, like time.
+-- .
+-- This lets you do d(f(g(t)))/dt == f'(g(t))*g'(t)
+symDependent :: String -> Expr a -> Expr a
+symDependent name s = symDependentN name s 0
+
+-- | same as symDependent but it can start as the Nth derivative
+symDependentN :: String -> Expr a -> Int -> Expr a
+symDependentN name (ESym s) n = ESym (SymDependent name n s)
+symDependentN _ _ _ = error "symDependent got non ESym dependency"
+
 
 const' :: a -> Expr a
 const' = EConst

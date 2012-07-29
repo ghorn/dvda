@@ -34,8 +34,12 @@ bpUnary sens g unop = backpropNode (sens*dfdg) g
   where
     dfdg = dualPerturbation $ unop (Dual g 1)
 
-backpropNode :: Eq a => Expr a -> Expr a -> [(Expr a, Expr a)]
-backpropNode sens e@(ESym _) = [(e,sens)]
+backpropNode :: (Eq a, Num a) => Expr a -> Expr a -> [(Expr a, Expr a)]
+backpropNode sens e@(ESym (SymDependent name k dep_)) = (e,sens):(backpropNode (sens*primal') dep)
+  where
+    primal' = ESym (SymDependent name (k+1) dep_)
+    dep = ESym dep_
+backpropNode sens e@(ESym (Sym _)) = [(e,sens)]
 backpropNode _ (EConst _) = []
 backpropNode _ (ENum (FromInteger _)) = []
 backpropNode _ (EFractional (FromRational _)) = []

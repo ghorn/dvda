@@ -135,8 +135,7 @@ setCost var = do
 
 setBound :: (Show a, Eq a, Show (Expr a), Eq (Expr a), Hashable (Expr a))
             => Expr a -> (a, a) -> BCTime -> State (Step a) ()
---setBound var@(ESym _ _) (lb, ub) bnd = do
-setBound var (lb, ub) bnd = do
+setBound var@(ESym _) (lb, ub) bnd = do
   step <- State.get
   let k = stepIdx step
       newbnd = (lb,ub,bnd)
