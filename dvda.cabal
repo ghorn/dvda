@@ -66,7 +66,6 @@ Library
                      Dvda.Tests.Function
                      Dvda.Tests.Unary
 
-  Other-modules:     Dvda.HashMap
                      MutableDvda.AD
                      MutableDvda.CGen
                      MutableDvda.Expr
@@ -77,6 +76,8 @@ Library
                      MutableDvda.MultipleShooting.Types
                      MutableDvda.Reify
                      MutableDvda.ReifyGraph
+
+  Other-modules:     Dvda.HashMap
 
   Build-depends:     base       >= 4     && < 5,
                      file-location >= 0.4.4 && < 0.5,
@@ -98,7 +99,7 @@ Library
 --                     unix
 --                     text,
 
-  Ghc-options:       -Wall
+  Ghc-options:       -Wall -O2
   GHC-Prof-Options:  -prof -fprof-auto -fprof-cafs -rtsopts
   GHC-Shared-Options: -fPIC
 

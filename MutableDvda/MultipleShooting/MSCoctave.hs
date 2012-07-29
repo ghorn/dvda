@@ -115,14 +115,7 @@ msCoctave userStep odeError n funDir name = do
       
   costSource <- do
     let costGrad = rad cost dvs
-    (_,fg0) <- showMex' (name ++ "_cost") (dvs :* constants) (cost :* costGrad)
-    putStrLn $ "cost has " ++ show (countNodes fg0) ++ " nodes"
-    (_,fg1) <- showMex' (name ++ "_cost") (dvs :* constants) (cost :* costGrad)
-    putStrLn $ "cost has " ++ show (countNodes fg1) ++ " nodes"
-    (txt,fg) <- showMex' (name ++ "_cost") (dvs :* constants) (cost :* costGrad)
-    putStrLn $ "cost has " ++ show (countNodes fg) ++ " nodes"
---    previewGraph fg
-    return txt
+    showMex (name ++ "_cost") (dvs :* constants) (cost :* costGrad)
   
   constraintsSource <- do
     let cineqJacob = map (flip rad dvs) cineq

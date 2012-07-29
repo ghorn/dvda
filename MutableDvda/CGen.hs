@@ -6,6 +6,7 @@
 module MutableDvda.CGen ( showC
                         , showMex
                         , showMex'
+                        , MatrixStorageOrder(..)
                         ) where
 
 
@@ -20,41 +21,68 @@ import MutableDvda.FunGraph
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 
+data MatrixStorageOrder = RowMajor | ColMajor
+
+--run :: IO ()
+--run = do
+--  let x = sym "x" :: Expr Double
+--      y = sym "y"
+--      z = sym "z"
+--      w = sym "w"
+--      w1 = sym "w1"
+--      w2 = sym "w2"
+--      w3 = sym "w3"
+--      f0 = x*y + z + w1 + w2
+--      f2 = f0 * w2/w3
+--      
+--      f1 = [f0/2, f0*y, w, 0.0, 0]
+--      boo = x
+--
+--      inputs = boo :* [y]:*[[z]] :* [w3,w1,w2,w]
+--      outputs = f0:*f1:*f2:*[[f0*f0]]
+--
+----  showC "foo" inputs outputs >>= putStrLn
+--
+--  fg' <- toFunGraph inputs outputs
+--  putStrLn $ "cost has " ++ show (countNodes fg') ++ " nodes"
+--  fg <- toFunGraph inputs outputs
+--  putStrLn $ "cost has " ++ show (countNodes fg) ++ " nodes"
+--  previewGraph fg
+--
+--  mexSrc <- showMex "foo" inputs outputs -- (x :* [y,w3]:*[[z,w], [w1,w2]]) (f0:*f1:*[[f0*f0]]:*[f1])
+--  _ <- writeSourceFile mexSrc "../Documents/MATLAB" $ "foo.c"
+--  return ()
+
 run :: IO ()
 run = do
-  let x = sym "x" :: Expr Double
-      y = sym "y"
-      z = sym "z"
-      w = sym "w"
-      w1 = sym "w1"
-      w2 = sym "w2"
-      w3 = sym "w3"
-      f0 = x*y + z + w1 + w2
-      f2 = f0 * w2/w3
-      
-      f1 = [f0/2, f0*y, w, 0.0, 0]
-      boo = x
+  let a = sym "a" :: Expr Double
+      b = sym "b"
+      c = sym "c"
+      d = sym "d"
+      e = sym "e"
+      f = sym "f"
 
-      inputs = boo :* [y]:*[[z]] :* [w3,w1,w2,w]
-      outputs = f0:*f1:*f2:*[[f0*f0]]
+      inputs = [[a,b,c],[d,e,f]]
+      outputs = [[a,b,c],[d,e,f]]
 
---  showC "foo" inputs outputs >>= putStrLn
+  showC RowMajor "foo" inputs outputs >>= putStrLn
 
-  fg' <- toFunGraph inputs outputs
-  putStrLn $ "cost has " ++ show (countNodes fg') ++ " nodes"
-  fg <- toFunGraph inputs outputs
-  putStrLn $ "cost has " ++ show (countNodes fg) ++ " nodes"
-  previewGraph fg
-
-  mexSrc <- showMex "foo" inputs outputs -- (x :* [y,w3]:*[[z,w], [w1,w2]]) (f0:*f1:*[[f0*f0]]:*[f1])
-  _ <- writeSourceFile mexSrc "../Documents/MATLAB" $ "foo.c"
-  return ()
+--  fg' <- toFunGraph inputs outputs
+--  putStrLn $ "cost has " ++ show (countNodes fg') ++ " nodes"
+--  fg <- toFunGraph inputs outputs
+--  putStrLn $ "cost has " ++ show (countNodes fg) ++ " nodes"
+--  previewGraph fg
+--
+--  mexSrc <- showMex "foo" inputs outputs -- (x :* [y,w3]:*[[z,w], [w1,w2]]) (f0:*f1:*[[f0*f0]]:*[f1])
+--  _ <- writeSourceFile mexSrc "../Documents/MATLAB" $ "foo.c"
+--  return ()
 
 
 -- | take a list of pair of inputs to indices which reference them
 --  create a hashmap from GSyms to strings which hold the declaration
-makeInputMap :: (Eq a, Hashable a, Show a) => [MVS (GExpr a Int)] -> HashMap (GExpr a Int) String
-makeInputMap ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] ins
+makeInputMap :: (Eq a, Hashable a, Show a)
+                => MatrixStorageOrder -> [MVS (GExpr a Int)] -> HashMap (GExpr a Int) String
+makeInputMap matStorageOrder ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] ins
   where
     writeInput inputK (Sca g) = [(g, printf "*input%d; /* %s */" inputK (show g))]
     writeInput inputK (Vec gs) = zipWith f [(0::Int)..] gs
@@ -67,25 +95,30 @@ makeInputMap ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] ins
       where
         nrows = length gs
         ncols = if nrows == 0 then 0 else length (head gs)
-        f (rowIdx,colIdx) g = (g,printf "input%d[%d][%d]; /* %s */" inputK rowIdx colIdx (show g))
+        f (rowIdx,colIdx) g = (g,printf "input%d[%d][%d]; /* %s */" inputK fstIdx sndIdx (show g))
+          where
+            (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (rowIdx,colIdx)
+                                                      ColMajor -> (colIdx,rowIdx)
 
 
-writeInputPrototypes :: [MVS a] -> [String]
-writeInputPrototypes ins = concat $ zipWith inputPrototype [(0::Int)..] ins
+writeInputPrototypes :: MatrixStorageOrder -> [MVS a] -> [String]
+writeInputPrototypes matStorageOrder ins = concat $ zipWith inputPrototype [(0::Int)..] ins
   where
     inputPrototype inputK (Sca _) = ["const double * input" ++ show inputK]
     inputPrototype inputK (Vec gs) = ["const double input" ++ show inputK ++ "[" ++ show (length gs) ++ "]"]
     inputPrototype inputK (Mat gs)
       | any ((ncols /=) . length) gs =
           error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
-      | otherwise = ["const double input" ++ show inputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
+      | otherwise = ["const double input" ++ show inputK ++ "[" ++ show fstIdx ++ "][" ++ show sndIdx ++ "]"]
       where
         nrows = length gs
         ncols = if nrows == 0 then 0 else length (head gs)
+        (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (nrows,ncols)
+                                                  ColMajor -> (ncols,nrows)
 
 
-writeOutputs :: [MVS Int] -> ([String], [String])
-writeOutputs ins = (concatMap fst dcs, concatMap snd dcs)
+writeOutputs :: MatrixStorageOrder -> [MVS Int] -> ([String], [String])
+writeOutputs matStorageOrder ins = (concatMap fst dcs, concatMap snd dcs)
   where
     dcs :: [([String],[String])]
     dcs = zipWith writeOutput ins [0..]
@@ -109,11 +142,18 @@ writeOutputs ins = (concatMap fst dcs, concatMap snd dcs)
       where
         nrows = length grefs
         ncols = if nrows == 0 then 0 else length (head grefs)
-        prototype = ["double output" ++ show outputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
+        prototype = ["double output" ++ show outputK ++ "[" ++ show fstIdx ++ "][" ++ show sndIdx ++ "]"]
+          where
+            (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (nrows,ncols)
+                                                      ColMajor -> (ncols,nrows)
         decls = (printf "/* output %d */" outputK):
                 zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat grefs)
           where
-            f (rowIdx,colIdx) gref = printf "output%d[%d][%d] = %s;" outputK rowIdx colIdx (nameNode gref)
+            f (rowIdx,colIdx) gref = printf "output%d[%d][%d] = %s;" outputK fstIdx sndIdx (nameNode gref)
+              where
+                (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (rowIdx,colIdx)
+                                                          ColMajor -> (colIdx,rowIdx)
+
 
 createMxOutputs :: [MVS Int] -> [String]
 createMxOutputs xs = concat $ zipWith createMxOutput xs [0..]
@@ -192,21 +232,21 @@ checkMxInputDims (Mat grefs) functionName inputK =
 -- .
 --   This function simply calls showCWithFunGraph and discards the first two outputs
 showC :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a, ToFunGraph b, ToFunGraph c)
-         => String -> b -> c -> IO String
-showC functionName inputs outputs = do
-  (txt,_) <- showCWithFunGraph functionName inputs outputs
+         => MatrixStorageOrder -> String -> b -> c -> IO String
+showC matStorageOrder functionName inputs outputs = do
+  (txt,_) <- showCWithFunGraph matStorageOrder functionName inputs outputs
   return txt
 
 -- | Turns inputs and outputs into a string containing C code. Also return indices of the inputs and outputs
 -- .
 --   Also pass a name to give to the C function
 showCWithFunGraph :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a, ToFunGraph b, ToFunGraph c)
-                     => String -> b -> c -> IO (String, FunGraph a)
-showCWithFunGraph functionName inputs outputs = do
+                     => MatrixStorageOrder -> String -> b -> c -> IO (String, FunGraph a)
+showCWithFunGraph matStorageOrder functionName inputs outputs = do
   fg <- toFunGraph inputs outputs
-  let inPrototypes = writeInputPrototypes (fgInputs fg)
-      (outDecls, outPrototypes) = writeOutputs (fgOutputs fg)
-      inputMap = makeInputMap (fgInputs fg)
+  let inPrototypes = writeInputPrototypes matStorageOrder (fgInputs fg)
+      (outDecls, outPrototypes) = writeOutputs matStorageOrder (fgOutputs fg)
+      inputMap = makeInputMap matStorageOrder (fgInputs fg)
       mainDecls = let f k = case fgLookupGExpr fg k of
                         Just v -> cAssignment inputMap k v
                         Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("
@@ -274,7 +314,7 @@ showMex functionName inputs outputs = fmap fst (showMex' functionName inputs out
 showMex' :: (Eq a, Show a, Hashable a, ToFunGraph b, ToFunGraph c, NumT b ~ a, NumT c ~ a)
             => String -> b -> c -> IO (String, FunGraph a)
 showMex' functionName inputs outputs = do
-  (cText, fg) <- showCWithFunGraph functionName inputs outputs
+  (cText, fg) <- showCWithFunGraph ColMajor functionName inputs outputs -- matlab is column major >_<
   return (cText ++ "\n\n\n" ++ mexFun functionName (fgInputs fg) (fgOutputs fg), fg)
 
 mexFun :: String -> [MVS a] -> [MVS Int] -> String
@@ -329,7 +369,6 @@ mexFun functionName ins outs =
     cast :: MVS a -> String -> String
     cast (Sca _) _ = ""
     cast (Vec _) _ = ""
-    cast (Mat []) cnst = "(" ++ cnst ++ "double (*)[0])"
-    cast (Mat xs) cnst = "(" ++ cnst ++ "double (*)[" ++ show ncols ++ "])"
+    cast (Mat xs) cnst = "(" ++ cnst ++ "double (*)[" ++ show nrows ++ "])" -- column major order
       where
-        ncols = length (head xs)
+        nrows = length xs
