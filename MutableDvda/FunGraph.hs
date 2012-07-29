@@ -22,32 +22,27 @@ module MutableDvda.FunGraph ( FunGraph
 
 import Control.Applicative
 import Control.Concurrent ( threadDelay )
-import Control.Monad.ST ( runST )
 import qualified Data.Graph as Graph
 import Data.Hashable ( Hashable )
 import qualified Data.HashSet as HS
-import Data.Tuple ( swap )
 import FileLocation ( err )
-import MutableDvda.Expr
-import MutableDvda.Reify -- ( reifyGraph )
-
 import Data.GraphViz ( Labellable, toLabelValue, preview )
 import Data.GraphViz.Attributes.Complete ( Label )
 import qualified Data.Graph.Inductive as FGL
 
-import qualified Data.HashTable.Class as HT
-import qualified Data.HashTable.ST.Basic as BHT
+import MutableDvda.Expr
+import MutableDvda.Reify ( ReifyGraph(..), reifyGraphs )
 
 
 data FunGraph a = FunGraph { fgGraph :: Graph.Graph
-                           , fgInputs :: [MVS (String, (Maybe Int))]
+                           , fgInputs :: [MVS (GExpr a Int)]
                            , fgOutputs :: [MVS Int]
                            , fgReified :: [(Int, GExpr a Int)]
                            , fgLookupGExpr :: (Int -> Maybe (GExpr a Int))
                            , fgVertexFromKey :: Int -> Maybe Int
                            , fgNodeFromVertex :: Int -> (GExpr a Int, Int, [Int])
                            }
-instance Show (FunGraph a) where
+instance Show a => Show (FunGraph a) where
   show fg = "FunGraph\ninputs:\n" ++ show (fgInputs fg) ++ "\noutputs:\n" ++ show (fgOutputs fg) ++ "\ngraph:\n" ++ show (fgGraph fg)
 
 ---- | matrix or vector or scalar
@@ -88,19 +83,12 @@ instance (ToFunGraph a, ToFunGraph b, NumT a ~ NumT b) => ToFunGraph (a :* b) wh
   type NumT (a :* b) = NumT a
   toMVSList (x :* y) = toMVSList x ++ toMVSList y
 
-findInputIndices :: (Eq a, Hashable a, Show a) => [MVS (Expr a)] -> [(Int,GExpr a Int)] -> [MVS (String,Maybe Int)]
-findInputIndices exprs gr = runST $ do
-  ht <- HT.fromList (map swap gr)
-  let findInputIndex (ESym name) = fmap ((,) name) $ BHT.lookup ht (GSym name)
-      findInputIndex x = error $ "ERROR: findInputIndex given non-ESym input \"" ++ show x ++ "\" in a FunGraph"
-  indices <- mapM (mapM (mapM findInputIndex)) (map mvsToLists exprs)
-  return $ zipWith listsToMVS exprs indices
-
-findMissingInputs :: (Eq a, Hashable a, Show a) => [MVS (Expr a)] -> [(Int,GExpr a Int)] -> [GExpr a Int]
-findMissingInputs exprs gr = HS.toList $ HS.difference allGraphInputs allUserInputs
+-- | find any symbols which are parents of outputs, but are not supplied by the user
+detectMissingInputs :: (Eq a, Hashable a, Show a) => [MVS (Expr a)] -> [(Int,GExpr a Int)] -> [GExpr a Int]
+detectMissingInputs exprs gr = HS.toList $ HS.difference allGraphInputs allUserInputs
   where
     allUserInputs = let f (ESym name) acc = (GSym name):acc
-                        f _ e = error $ "findMissingInputs given non-ESym input \"" ++ show e ++ "\""
+                        f _ e = error $ "detectMissingInputs given non-ESym input \"" ++ show e ++ "\""
                     in HS.fromList $ foldr f [] (concat $ concatMap mvsToLists exprs)
 
     allGraphInputs = let f (_,(GSym name)) acc = (GSym name):acc
@@ -131,13 +119,16 @@ mvsToFunGraph inputMVSExprs outputMVSExprs = do
       outputMVSIndices = zipWith listsToMVS outputMVSExprs outputIndices
 
       -- make sure all the inputs are symbolic, and find their indices in the Expr graph
-      inputMVSIndices = findInputIndices inputMVSExprs rgr
+      inputMVSIndices = zipWith listsToMVS inputMVSExprs $ map (map (map f)) (map mvsToLists inputMVSExprs)
+        where
+          f (ESym name) = (GSym name)
+          f x = error $ "ERROR: mvsToFunGraph given non-ESym input \"" ++ show x ++ "\""
       
       (gr, lookupVertex, lookupKey) = Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, getParents gexpr)) rgr
       lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
 
   -- make sure all inputs to graph are provided by user
-  return $ case (findMissingInputs inputMVSExprs rgr, findConflictingInputs inputMVSExprs) of
+  return $ case (detectMissingInputs inputMVSExprs rgr, findConflictingInputs inputMVSExprs) of
     ([],[]) -> FunGraph { fgGraph = gr
                         , fgInputs = inputMVSIndices
                         , fgOutputs = outputMVSIndices

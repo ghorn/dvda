@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# Language TemplateHaskell #-}
 {-# Language TypeFamilies #-}
 {-# Language FlexibleContexts #-}
 
@@ -7,15 +8,17 @@ module MutableDvda.CGen ( showC
                         , showMex'
                         ) where
 
+
 import Data.Hashable ( Hashable )
-import Data.Maybe ( catMaybes )
 import Data.List ( intercalate )
+import FileLocation ( err )
 import Text.Printf ( printf )
 
+import Dvda.Codegen ( writeSourceFile )
 import MutableDvda.Expr
 import MutableDvda.FunGraph
-
-import Dvda.Codegen ( writeSourceFile )
+import Dvda.HashMap ( HashMap )
+import qualified Dvda.HashMap as HM
 
 run :: IO ()
 run = do
@@ -35,7 +38,7 @@ run = do
       inputs = boo :* [y]:*[[z]] :* [w3,w1,w2,w]
       outputs = f0:*f1:*f2:*[[f0*f0]]
 
---  showC "foo" (boo :* [y]:*[[z]]) (f0:*f1:*f2:*[[f0*f0]]) >>= putStrLn
+--  showC "foo" inputs outputs >>= putStrLn
 
   fg' <- toFunGraph inputs outputs
   putStrLn $ "cost has " ++ show (countNodes fg') ++ " nodes"
@@ -47,41 +50,38 @@ run = do
   _ <- writeSourceFile mexSrc "../Documents/MATLAB" $ "foo.c"
   return ()
 
-writeInputs :: [MVS (String,Maybe Int)] -> ([String], [String])
-writeInputs ins = (concatMap fst dcs, concatMap snd dcs)
+
+-- | take a list of pair of inputs to indices which reference them
+--  create a hashmap from GSyms to strings which hold the declaration
+makeInputMap :: (Eq a, Hashable a, Show a) => [MVS (GExpr a Int)] -> HashMap (GExpr a Int) String
+makeInputMap ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] ins
   where
-    dcs :: [([String],[String])]
-    dcs = zipWith writeInput ins [0..]
-    
-    writeInput :: MVS (String,Maybe Int) -> Int -> ([String], [String])
-    writeInput (Sca k') inputK = ([printf "/* input %d */" inputK, decl], prototype)
+    writeInput inputK (Sca g) = [(g, printf "*input%d; /* %s */" inputK (show g))]
+    writeInput inputK (Vec gs) = zipWith f [(0::Int)..] gs
       where
-        prototype = ["const double * input" ++ show inputK]
-        decl = case k' of
-          (name,Just k) -> printf "const double %s = *input%d; /* %s */" (nameNode k) inputK name
-          (name,_) -> printf "/* *input%d; unused ( %s )*/" inputK name
-    writeInput (Vec ks) inputK = (decls, prototype)
+        f inIdx g = (g, printf "input%d[%d]; /* %s */" inputK inIdx (show g))
+    writeInput inputK (Mat gs)
+      | any ((ncols /=) . length) gs =
+          error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
+      | otherwise = zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat gs)
       where
-        prototype = ["const double input" ++ show inputK ++ "[" ++ show (length ks) ++ "]"]
-        decls = (printf "/* input %d */" inputK):(zipWith f [(0::Int)..] ks)
-          where
-            f inIdx (name,Just k) = printf "const double %s = input%d[%d]; /* %s */" (nameNode k) inputK inIdx name
-            f inIdx (name,_) = printf "/* input%d[%d] unused ( %s ) */" inputK inIdx name
-    writeInput (Mat ks) inputK
-      | any ((ncols /=) . length) ks =
-          error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length ks)
-      | otherwise = (decls, prototype)
+        nrows = length gs
+        ncols = if nrows == 0 then 0 else length (head gs)
+        f (rowIdx,colIdx) g = (g,printf "input%d[%d][%d]; /* %s */" inputK rowIdx colIdx (show g))
+
+
+writeInputPrototypes :: [MVS a] -> [String]
+writeInputPrototypes ins = concat $ zipWith inputPrototype [(0::Int)..] ins
+  where
+    inputPrototype inputK (Sca _) = ["const double * input" ++ show inputK]
+    inputPrototype inputK (Vec gs) = ["const double input" ++ show inputK ++ "[" ++ show (length gs) ++ "]"]
+    inputPrototype inputK (Mat gs)
+      | any ((ncols /=) . length) gs =
+          error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
+      | otherwise = ["const double input" ++ show inputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
       where
-        nrows = length ks
-        ncols = if nrows == 0 then 0 else length (head ks)
-        prototype = ["const double input" ++ show inputK ++ "[" ++ show nrows ++ "][" ++ show ncols ++ "]"]
-        decls = (printf "/* input %d */" inputK):
-                zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat ks)
-          where
-            f (rowIdx,colIdx) (name,Just k) = printf "const double %s = input%d[%d][%d]; /* %s */"
-                                              (nameNode k) inputK rowIdx colIdx name
-            f (rowIdx,colIdx) (name,_) = printf "/* input%d[%d][%d]; unused ( %s ) */"
-                                         inputK rowIdx colIdx name
+        nrows = length gs
+        ncols = if nrows == 0 then 0 else length (head gs)
 
 
 writeOutputs :: [MVS Int] -> ([String], [String])
@@ -204,13 +204,15 @@ showCWithFunGraph :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a, ToFunGra
                      => String -> b -> c -> IO (String, FunGraph a)
 showCWithFunGraph functionName inputs outputs = do
   fg <- toFunGraph inputs outputs
-  let (inDecls, inPrototypes) = writeInputs (fgInputs fg)
+  let inPrototypes = writeInputPrototypes (fgInputs fg)
       (outDecls, outPrototypes) = writeOutputs (fgOutputs fg)
-      mainDecls = catMaybes $ map (\k -> fgLookupGExpr fg k >>= cAssignment k) $ reverse $ topSort fg
+      inputMap = makeInputMap (fgInputs fg)
+      mainDecls = let f k = case fgLookupGExpr fg k of
+                        Just v -> cAssignment inputMap k v
+                        Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("
+                  in map f $ reverse $ topSort fg
   
       body = unlines $ map ("    "++) $
-             inDecls ++
-             ["","/* body */"] ++
              mainDecls ++ [""] ++
              outDecls
   
@@ -222,8 +224,11 @@ showCWithFunGraph functionName inputs outputs = do
 nameNode :: Int -> String
 nameNode k = "v_" ++ show k
 
-cAssignment :: Show a => Int -> GExpr a Int -> Maybe String
-cAssignment k gexpr = fmap (\cop -> "const double " ++ nameNode k ++ " = " ++ cop ++ ";") (toCOp gexpr)
+cAssignment :: (Eq a, Hashable a, Show a) => HashMap (GExpr a Int) String -> Int -> GExpr a Int -> String
+cAssignment inputMap k g@(GSym _) = case HM.lookup g inputMap of
+  Nothing -> error $ "cAssignment: couldn't find " ++ show g ++ " in the input map"
+  Just str -> "const double " ++ nameNode k ++ " = " ++ str
+cAssignment inputMap k gexpr = (\cop -> "const double " ++ nameNode k ++ " = " ++ cop ++ ";") (toCOp gexpr)
   where
     bin :: Int -> Int -> String -> String
     bin x y op = nameNode x ++ " " ++ op ++ " " ++ nameNode y
@@ -234,29 +239,29 @@ cAssignment k gexpr = fmap (\cop -> "const double " ++ nameNode k ++ " = " ++ co
     asTypeOfG :: a -> GExpr a b -> a
     asTypeOfG x _ = x
     
-    toCOp (GSym _)                       = Nothing
-    toCOp (GConst c)                     = Just $ show c
-    toCOp (GNum (Mul x y))               = Just $ bin x y "*"
-    toCOp (GNum (Add x y))               = Just $ bin x y "+"
-    toCOp (GNum (Sub x y))               = Just $ bin x y "-"
-    toCOp (GNum (Negate x))              = Just $ un x "-"
-    toCOp (GNum (Abs x))                 = Just $ un x "abs"
-    toCOp (GNum (Signum x))              = Just $ un x "sign"
-    toCOp (GNum (FromInteger x))         = Just $ show x
-    toCOp (GFractional (Div x y))        = Just $ bin x y "/"
-    toCOp (GFractional (FromRational x)) = Just $ show (fromRational x `asTypeOfG` gexpr)
-    toCOp (GFloating (Pow x y))          = Just $ "pow( " ++ nameNode x ++ ", " ++ nameNode y ++ " )"
-    toCOp (GFloating (LogBase x y))      = Just $ "log( " ++ nameNode y ++ ") / log( " ++ nameNode x ++ " )"
-    toCOp (GFloating (Exp x))            = Just $ un x "exp"
-    toCOp (GFloating (Log x))            = Just $ un x "log"
-    toCOp (GFloating (Sin x))            = Just $ un x "sin"
-    toCOp (GFloating (Cos x))            = Just $ un x "cos"
-    toCOp (GFloating (ASin x))           = Just $ un x "asin"
-    toCOp (GFloating (ATan x))           = Just $ un x "atan"
-    toCOp (GFloating (ACos x))           = Just $ un x "acos"
-    toCOp (GFloating (Sinh x))           = Just $ un x "sinh"
-    toCOp (GFloating (Cosh x))           = Just $ un x "cosh"
-    toCOp (GFloating (Tanh x))           = Just $ un x "tanh"
+    toCOp (GSym _)                       = $(err "This should be impossible")
+    toCOp (GConst c)                     = show c
+    toCOp (GNum (Mul x y))               = bin x y "*"
+    toCOp (GNum (Add x y))               = bin x y "+"
+    toCOp (GNum (Sub x y))               = bin x y "-"
+    toCOp (GNum (Negate x))              = un x "-"
+    toCOp (GNum (Abs x))                 = un x "abs"
+    toCOp (GNum (Signum x))              = un x "sign"
+    toCOp (GNum (FromInteger x))         = show x
+    toCOp (GFractional (Div x y))        = bin x y "/"
+    toCOp (GFractional (FromRational x)) = show (fromRational x `asTypeOfG` gexpr)
+    toCOp (GFloating (Pow x y))          = "pow( " ++ nameNode x ++ ", " ++ nameNode y ++ " )"
+    toCOp (GFloating (LogBase x y))      = "log( " ++ nameNode y ++ ") / log( " ++ nameNode x ++ " )"
+    toCOp (GFloating (Exp x))            = un x "exp"
+    toCOp (GFloating (Log x))            = un x "log"
+    toCOp (GFloating (Sin x))            = un x "sin"
+    toCOp (GFloating (Cos x))            = un x "cos"
+    toCOp (GFloating (ASin x))           = un x "asin"
+    toCOp (GFloating (ATan x))           = un x "atan"
+    toCOp (GFloating (ACos x))           = un x "acos"
+    toCOp (GFloating (Sinh x))           = un x "sinh"
+    toCOp (GFloating (Cosh x))           = un x "cosh"
+    toCOp (GFloating (Tanh x))           = un x "tanh"
     toCOp (GFloating (ASinh _))          = error "C generation doesn't support ASinh"
     toCOp (GFloating (ATanh _))          = error "C generation doesn't support ATanh"
     toCOp (GFloating (ACosh _))          = error "C generation doesn't support ACosh"

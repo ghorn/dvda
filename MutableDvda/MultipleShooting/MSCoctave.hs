@@ -2,9 +2,9 @@
 {-# Language FlexibleContexts #-}
 {-# Language TypeFamilies #-}
 
-module Dvda.MultipleShooting.MSCoctave ( msCoctave
-                                       , run
-                                       ) where
+module MutableDvda.MultipleShooting.MSCoctave ( msCoctave
+                                              , run
+                                              ) where
 
 import qualified Data.HashSet as HS
 import Data.List ( zipWith6, transpose, elemIndex )
@@ -263,9 +263,8 @@ spring :: State (Step Double) ()
 spring = do
   [x, v] <- setStates ["x","v"]
   [u] <- setActions ["u"]
---  [k, b] <- addConstants ["k", "b"]
---  setDxdt [v, -k*x - b*v + u]
-  setDxdt [0,0] -- v, x]
+  [k, b] <- addConstants ["k", "b"]
+  setDxdt [v, -k*x - b*v + u]
   setDt 0.1
   let cost = 2*x*x + 3*v*v + 10*u*u
 --  let cost = 2*x*x -- + 3*v*v + 10*u*u
@@ -284,7 +283,7 @@ spring = do
   setPeriodic x
 
 n' :: Int
-n' = 2
+n' = 30
 
 run :: IO ()
 --run = msCoctave spring simpsonsRuleError' n' "../Documents/MATLAB/" "spring"
