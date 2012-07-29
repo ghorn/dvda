@@ -4,8 +4,8 @@
 
 -- this file is a modified version from Andy Gill's data-reify package
 
-module MutableDvda.ReifyGraph ( ReifyGraph(..)
-                              ) where
+module Dvda.ReifyGraph ( ReifyGraph(..)
+                       ) where
 
 data ReifyGraph e = ReifyGraph [(Unique,e Unique)]
 

@@ -1,16 +1,15 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module MutableDvda.AD ( backprop
-                      , rad
-                      ) where
+module Dvda.AD ( backprop
+               , rad
+               ) where
 
-import Data.HashMap.Lazy ( HashMap )
-import qualified Data.HashMap.Lazy as HM
 import Data.Hashable ( Hashable )
 
 import Dvda.Dual hiding ( fad, fad' )
-
-import MutableDvda.Expr
+import Dvda.Expr
+import Dvda.HashMap ( HashMap )
+import qualified Dvda.HashMap as HM
 
 --fad :: Num a => (Dual a -> [Dual a]) -> a -> [a]
 --fad f x = map dualPerturbation $ f (Dual x 1)

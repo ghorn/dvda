@@ -5,10 +5,10 @@
 
 -- this file is a modified version from Andy Gill's data-reify package
 
-module MutableDvda.Reify ( MuRef(..)
-                         , ReifyGraph(..)
-                         , reifyGraphs
-                         ) where
+module Dvda.Reify ( MuRef(..)
+                  , ReifyGraph(..)
+                  , reifyGraphs
+                  ) where
 
 import Control.Concurrent.MVar ( newMVar, takeMVar, putMVar, MVar, readMVar )
 import Control.Applicative ( Applicative )
@@ -16,7 +16,7 @@ import Data.Hashable ( Hashable, hash )
 import System.Mem.StableName ( StableName, makeStableName, hashStableName )
 import Unsafe.Coerce ( unsafeCoerce )
 
-import MutableDvda.ReifyGraph ( ReifyGraph(..) )
+import Dvda.ReifyGraph ( ReifyGraph(..) )
 
 import qualified Data.HashTable.IO as H
 type HashTable k v = H.CuckooHashTable k v

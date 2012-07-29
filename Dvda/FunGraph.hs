@@ -5,20 +5,20 @@
 {-# Language FlexibleInstances #-}
 {-# Language FlexibleContexts #-}
 
-module MutableDvda.FunGraph ( FunGraph
-                            , ToFunGraph
-                            , NumT
-                            , (:*)(..)
-                            , MVS(..)
-                            , toFunGraph
-                            , countNodes
-                            , fgInputs
-                            , fgOutputs
-                            , fgLookupGExpr
-                            , topSort
-                            , fgGraph
-                            , previewGraph
-                            ) where
+module Dvda.FunGraph ( FunGraph
+                     , ToFunGraph
+                     , NumT
+                     , (:*)(..)
+                     , MVS(..)
+                     , toFunGraph
+                     , countNodes
+                     , fgInputs
+                     , fgOutputs
+                     , fgLookupGExpr
+                     , topSort
+                     , fgGraph
+                     , previewGraph
+                     ) where
 
 import Control.Applicative
 import Control.Concurrent ( threadDelay )
@@ -30,8 +30,8 @@ import Data.GraphViz ( Labellable, toLabelValue, preview )
 import Data.GraphViz.Attributes.Complete ( Label )
 import qualified Data.Graph.Inductive as FGL
 
-import MutableDvda.Expr
-import MutableDvda.Reify ( ReifyGraph(..), reifyGraphs )
+import Dvda.Expr
+import Dvda.Reify ( ReifyGraph(..), reifyGraphs )
 
 
 data FunGraph a = FunGraph { fgGraph :: Graph.Graph

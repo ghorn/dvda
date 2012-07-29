@@ -47,36 +47,27 @@ Flag stressTest
 
 Library
   Exposed-modules:   Dvda
-                     Dvda.BinUn
-                     Dvda.CallNative
+--                     Dvda.CallNative
                      Dvda.Codegen
                      Dvda.Config
                      Dvda.Dual
-                     Dvda.Examples
+--                     Dvda.OldExamples
+--                     Dvda.OctaveSyntax
+--                     Dvda.Tests.Function
+--                     Dvda.Tests.Unary
+                     Dvda.SparseLA
+
+                     Dvda.AD
+                     Dvda.CGen
                      Dvda.Expr
+                     Dvda.Examples
+                     Dvda.FunGraph
                      Dvda.Graph
                      Dvda.MultipleShooting.MSCoctave
                      Dvda.MultipleShooting.MSMonad
-                     Dvda.MultipleShooting.MultipleShooting
                      Dvda.MultipleShooting.Types
-                     Dvda.OctaveSyntax
-                     Dvda.Shape
-                     Dvda.SparseLA
-                     Dvda.SymMonad
-                     Dvda.Tests.Function
-                     Dvda.Tests.Unary
-
-                     MutableDvda.AD
-                     MutableDvda.CGen
-                     MutableDvda.Expr
-                     MutableDvda.Examples
-                     MutableDvda.FunGraph
-                     MutableDvda.Graph
-                     MutableDvda.MultipleShooting.MSCoctave
-                     MutableDvda.MultipleShooting.MSMonad
-                     MutableDvda.MultipleShooting.Types
-                     MutableDvda.Reify
-                     MutableDvda.ReifyGraph
+                     Dvda.Reify
+                     Dvda.ReifyGraph
 
   Other-modules:     Dvda.HashMap
 

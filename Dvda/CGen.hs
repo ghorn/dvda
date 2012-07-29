@@ -3,11 +3,11 @@
 {-# Language TypeFamilies #-}
 {-# Language FlexibleContexts #-}
 
-module MutableDvda.CGen ( showC
-                        , showMex
-                        , showMex'
-                        , MatrixStorageOrder(..)
-                        ) where
+module Dvda.CGen ( showC
+                 , showMex
+                 , showMex'
+                 , MatrixStorageOrder(..)
+                 ) where
 
 
 import Data.Hashable ( Hashable )
@@ -15,8 +15,8 @@ import Data.List ( intercalate )
 import FileLocation ( err )
 import Text.Printf ( printf )
 
-import MutableDvda.Expr
-import MutableDvda.FunGraph
+import Dvda.Expr
+import Dvda.FunGraph
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 
