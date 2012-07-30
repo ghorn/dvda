@@ -19,9 +19,11 @@ module Dvda.Expr ( Expr(..)
                  , symDependentN
                  , const'
                  , getParents
+                 , extractLinearPart
+                 , getConst
                  ) where
 
-import Control.Applicative
+import Control.Applicative ( (<$>), (<*>), pure )
 import Data.Data ( Data, Typeable, Typeable1, Typeable2 )
 import Data.Hashable ( Hashable, hash, combine )
 --import Test.QuickCheck -- ( Arbitrary(..) )
@@ -466,6 +468,61 @@ isVal v (EConst c) = v == c
 isVal v (ENum (FromInteger k)) = v == fromInteger k
 isVal v (EFractional (FromRational r)) = v == fromRational r
 isVal _ _ = False
+
+-- | if the expression is a constant, a fromInteger, or a fromRational, return the constant part
+--   otherwise return nothing
+getConst :: Expr a -> Maybe a
+getConst (EConst x) = Just x
+getConst (ENum (FromInteger k)) = Just (fromInteger k)
+getConst (EFractional (FromRational r)) = Just (fromRational r)
+getConst _ = Nothing
+
+-- | Separate nonlinear and linear parts of an expression
+--   @extractLinearPart (fNonLin(x)+a*x) x == (fNonLin(x), a)
+extractLinearPart :: (Num a, Eq a, Show a) => Expr a -> Expr a -> (Expr a, a)
+extractLinearPart e@(EConst _) _ = (e,0)
+extractLinearPart e@(ENum (FromInteger _)) _ = (e,0)
+extractLinearPart e@(EFractional (FromRational _)) _ = (e,0)
+extractLinearPart e@(ESym _) arg
+  | e == arg = (0,1)
+  | otherwise = (e,0)
+extractLinearPart (ENum (Add x y)) arg = (xNonlin+yNonlin, xLin+yLin)
+  where
+    (xNonlin,xLin) = extractLinearPart x arg
+    (yNonlin,yLin) = extractLinearPart y arg
+extractLinearPart (ENum (Sub x y)) arg = (xNonlin-yNonlin, xLin-yLin)
+  where
+    (xNonlin,xLin) = extractLinearPart x arg
+    (yNonlin,yLin) = extractLinearPart y arg
+extractLinearPart (ENum (Negate x)) arg = (-xNonlin, -xLin)
+  where
+    (xNonlin,xLin) = extractLinearPart x arg
+extractLinearPart e@(ENum (Mul x y)) arg = case (getConst x, getConst y) of
+  (Nothing,Nothing) -> (e,0)
+  (Just cx, Nothing) -> let (yNl,yL) = extractLinearPart y arg in ((EConst cx)*yNl,cx*yL)
+  (Nothing, Just cy) -> let (xNl,xL) = extractLinearPart x arg in (xNl*(EConst cy),xL*cy)
+  _ -> error $ "extractLinearPart got ENum (Mul x y) where x and y are both constants\n"++
+       "x: " ++ show x ++ "\ny: " ++ show y
+extractLinearPart e@(EFractional (Div x y)) arg = case getConst y of
+  Nothing -> (e,0)
+  Just cy -> let (xNl,xL) = extractLinearPart x arg in (xNl/(EConst cy),xL/cy)
+extractLinearPart e@(ENum (Abs _))    _ = (e,0)
+extractLinearPart e@(ENum (Signum _)) _ = (e,0)
+extractLinearPart e@(EFloating (Pow _ _)) _ = (e,0)
+extractLinearPart e@(EFloating (LogBase _ _)) _ = (e,0)
+extractLinearPart e@(EFloating (Exp _))   _ = (e,0)
+extractLinearPart e@(EFloating (Log _))   _ = (e,0)
+extractLinearPart e@(EFloating (Sin _))   _ = (e,0)
+extractLinearPart e@(EFloating (Cos _))   _ = (e,0)
+extractLinearPart e@(EFloating (ASin _))  _ = (e,0)
+extractLinearPart e@(EFloating (ATan _))  _ = (e,0)
+extractLinearPart e@(EFloating (ACos _))  _ = (e,0)
+extractLinearPart e@(EFloating (Sinh _))  _ = (e,0)
+extractLinearPart e@(EFloating (Cosh _))  _ = (e,0)
+extractLinearPart e@(EFloating (Tanh _))  _ = (e,0)
+extractLinearPart e@(EFloating (ASinh _)) _ = (e,0)
+extractLinearPart e@(EFloating (ATanh _)) _ = (e,0)
+extractLinearPart e@(EFloating (ACosh _)) _ = (e,0)
 
 
 ------------------------------- arbitrary instances --------------------------
