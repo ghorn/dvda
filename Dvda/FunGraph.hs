@@ -3,7 +3,6 @@
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
 {-# Language FlexibleInstances #-}
-{-# Language FlexibleContexts #-}
 
 module Dvda.FunGraph ( FunGraph
                      , ToFunGraph
@@ -107,6 +106,12 @@ findConflictingInputs exprs = HS.toList redundant
         f _ e = error $ "findConflictingInputs saw non-ESym input \"" ++ show e ++ "\""
 
 
+-- | Take inputs and outputs which are of classes ToFunGraph (heterogenous lists of @Expr a@)
+--   and traverse the outputs reifying all expressions and creating a hashmap of StableNames (stable pointers).
+--   Once the hashmap is created, lookup the provided inputs and return a FunGraph which contains an
+--   expression graph, input/output indices, and other useful functions. StableNames is non-deterministic
+--   so this function may return graphs with more or fewer CSE's eliminated.
+--   If CSE is then performed on the graph, the result is deterministic.
 toFunGraph :: (Eq a, Hashable a, Show a, ToFunGraph b, ToFunGraph c, NumT b ~ a, NumT c ~ a)
               => b -> c -> IO (FunGraph a)
 toFunGraph inputs outputs = mvsToFunGraph (toMVSList inputs) (toMVSList outputs)
