@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language TemplateHaskell #-}
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
 {-# Language FlexibleInstances #-}
@@ -21,10 +20,13 @@ module Dvda.FunGraph ( FunGraph
 
 import Control.Applicative
 import Control.Concurrent ( threadDelay )
+import Data.Foldable ( Foldable )
+import qualified Data.Foldable as F
 import qualified Data.Graph as Graph
 import Data.Hashable ( Hashable )
 import qualified Data.HashSet as HS
-import FileLocation ( err )
+import Data.Traversable ( Traversable )
+import qualified Data.Traversable as T
 import Data.GraphViz ( Labellable, toLabelValue, preview )
 import Data.GraphViz.Attributes.Complete ( Label )
 import qualified Data.Graph.Inductive as FGL
@@ -47,21 +49,20 @@ instance Show a => Show (FunGraph a) where
 ---- | matrix or vector or scalar
 data MVS a = Mat [[a]] | Vec [a] | Sca a deriving Show
 
-mvsToLists :: MVS a -> [[a]]
-mvsToLists (Mat x) = x
-mvsToLists (Vec x) = [x]
-mvsToLists (Sca x) = [[x]]
+instance Functor MVS where
+  fmap f (Sca x)  = Sca (f x)
+  fmap f (Vec xs) = Vec (map f xs)
+  fmap f (Mat xs) = Mat (map (map f) xs)
 
-listsToMVS :: MVS a -> [[b]] -> MVS b
-listsToMVS (Sca _) [[x]] = Sca x
-listsToMVS (Sca _) _ = $(err "reifyGraphs returned non-scalar output for scalar input")
-listsToMVS (Vec []) [] = Vec []
-listsToMVS (Vec v) [x]
-  | length v == length x = Vec x
-listsToMVS (Vec _) _ = $(err "reifyGraphs returned different number of output indices than inputs for Vec")
-listsToMVS (Mat m) x
-  | length m == length x && and (zipWith (\u v -> length u == length v) m x) = Mat x
-  | otherwise = $(err "reifyGraphs returned different number of output indices than inputs for Mat")
+instance Foldable MVS where
+  foldr f x0 (Sca x)  = foldr f x0 [x]
+  foldr f x0 (Vec xs) = foldr f x0 xs
+  foldr f x0 (Mat xs) = foldr f x0 (concat xs)
+
+instance Traversable MVS where
+  traverse f (Sca x)  = Sca <$> f x
+  traverse f (Vec xs) = Vec <$> T.traverse f xs
+  traverse f (Mat xs) = Mat <$> T.traverse (T.traverse f) xs
 
 class ToFunGraph a where
   type NumT a
@@ -88,7 +89,7 @@ detectMissingInputs exprs gr = HS.toList $ HS.difference allGraphInputs allUserI
   where
     allUserInputs = let f (ESym name) acc = (GSym name):acc
                         f _ e = error $ "detectMissingInputs given non-ESym input \"" ++ show e ++ "\""
-                    in HS.fromList $ foldr f [] (concat $ concatMap mvsToLists exprs)
+                    in HS.fromList $ foldr f [] (concatMap F.toList exprs)
 
     allGraphInputs = let f (_,(GSym name)) acc = (GSym name):acc
                          f _ acc = acc
@@ -98,7 +99,7 @@ detectMissingInputs exprs gr = HS.toList $ HS.difference allGraphInputs allUserI
 findConflictingInputs :: (Eq a, Hashable a, Show a) => [MVS (Expr a)] -> [Expr a]
 findConflictingInputs exprs = HS.toList redundant
   where
-    redundant = snd $ foldl f (HS.empty, HS.empty) (concat $ concatMap mvsToLists exprs)
+    redundant = snd $ foldl f (HS.empty, HS.empty) (concatMap F.toList exprs)
       where
         f (knownExprs, redundantExprs) expr@(ESym _)
           | HS.member expr knownExprs = (knownExprs, HS.insert expr redundantExprs)
@@ -119,12 +120,9 @@ toFunGraph inputs outputs = mvsToFunGraph (toMVSList inputs) (toMVSList outputs)
 mvsToFunGraph :: (Eq a, Hashable a, Show a) => [MVS (Expr a)] -> [MVS (Expr a)] -> IO (FunGraph a)
 mvsToFunGraph inputMVSExprs outputMVSExprs = do
   -- reify the outputs
-  (ReifyGraph rgr, outputIndices) <- reifyGraphs (map mvsToLists outputMVSExprs)
-  let outputMVSIndices :: [MVS Int]
-      outputMVSIndices = zipWith listsToMVS outputMVSExprs outputIndices
-
+  (ReifyGraph rgr, outputMVSIndices) <- reifyGraphs outputMVSExprs
       -- make sure all the inputs are symbolic, and find their indices in the Expr graph
-      inputMVSIndices = zipWith listsToMVS inputMVSExprs $ map (map (map f)) (map mvsToLists inputMVSExprs)
+  let inputMVSIndices = map (fmap f) inputMVSExprs
         where
           f (ESym name) = (GSym name)
           f x = error $ "ERROR: mvsToFunGraph given non-ESym input \"" ++ show x ++ "\""
