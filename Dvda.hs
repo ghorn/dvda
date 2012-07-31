@@ -29,5 +29,6 @@ module Dvda ( -- * primitives
 
 import Dvda.AD ( rad )
 import Dvda.Expr ( Expr, sym, symDependent, symDependentN )
-import Dvda.FunGraph ( toFunGraph, previewGraph, (:*)(..) )
+import Dvda.FunGraph ( toFunGraph, (:*)(..) )
+import Dvda.Vis ( previewGraph )
 --import Dvda.HSBuilder

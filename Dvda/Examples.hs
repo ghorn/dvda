@@ -7,6 +7,7 @@ module Dvda.Examples ( run
 import Dvda.Expr
 import Dvda.FunGraph
 import Dvda.CGen
+import Dvda.Vis
 
 
 run :: IO ()
