@@ -11,10 +11,11 @@ import Data.List ( zipWith6, transpose, elemIndex )
 import Data.Maybe ( catMaybes )
 
 import Dvda.AD ( rad )
-import Dvda.CGen  ( showMex' )
+import Dvda.CGen  ( showMex )
+import Dvda.CSE ( cse )
 import Dvda.Codegen ( writeSourceFile )
 import Dvda.Expr ( Expr(..), Sym(..) )
-import Dvda.FunGraph ( (:*)(..), countNodes )
+import Dvda.FunGraph ( (:*)(..), toFunGraph, countNodes )
 import qualified Dvda.HashMap as HM
 import Dvda.MultipleShooting.MSMonad
 import Dvda.MultipleShooting.Types
@@ -112,24 +113,33 @@ msCoctave userStep odeError n funDir name = do
       -------------------------------------------------------------------------------------
       dvs = concat states ++ concat actions ++ params
       
-  (costSource,costFg) <- do
+  (costSource,costFg0,costFg) <- do
     let costGrad = rad cost dvs
-    showMex' (name ++ "_cost") (dvs :* constants) (cost :* costGrad)
+    fg0 <- toFunGraph (dvs :* constants) (cost :* costGrad)
+    let fg = cse fg0
+    return (showMex (name ++ "_cost") fg, fg0, fg)
   
-  (constraintsSource,constraintsFg) <- do
+  (constraintsSource,constraintsFg0,constraintsFg) <- do
     let cineqJacob = map (flip rad dvs) cineq
         ceqJacob   = map (flip rad dvs) ceq
-    showMex' (name ++ "_constraints") (dvs :* constants) (cineq :* ceq :* cineqJacob :* ceqJacob)
+    fg0 <- toFunGraph (dvs :* constants) (cineq :* ceq :* cineqJacob :* ceqJacob)
+    let fg = cse fg0
+    return (showMex (name ++ "_constraints") fg, fg0, fg)
   
-  (timeSource,timeFg) <- showMex' (name ++ "_time") (dvs :* constants) (init $ scanl (+) 0 dts)
+  (timeSource,timeFg) <- do
+    fg <- toFunGraph (dvs :* constants) (init $ scanl (+) 0 dts)
+    return (showMex (name ++ "_time") fg, fg)
   
-  (outputSource,outputFg) <- showMex' (name ++ "_outputs") (dvs :* constants) (HM.elems outputMap)
-  
+  (outputSource,outputFg) <- do
+    fg <- toFunGraph (dvs :* constants) (HM.elems outputMap)
+    return (showMex (name ++ "_outputs") fg, fg)
+    
   (simSource,simFg) <- do
     let x' = head states
         u' = head actions
         dxdt' = fromJustErr "dxdt' error" $ stepDxdt $ head steps
-    showMex' (name ++ "_sim") (x' :* u' :* params :* constants) dxdt'
+    fg <- toFunGraph (x' :* u' :* params :* constants) dxdt'
+    return (showMex (name ++ "_sim") fg, fg)
       
   let (lbs, ubs, _) = unzip3 $ map getBnd dvs
         where
@@ -239,8 +249,10 @@ msCoctave userStep odeError n funDir name = do
   _ <- writeSourceFile       unstructSource funDir $ name ++ "_unstruct.m"
   _ <- writeSourceFile           plotSource funDir $ name ++ "_plot.m"
 
-  putStrLn $ "nodes in cost:        " ++ show (countNodes costFg)
-  putStrLn $ "nodes in constraints: " ++ show (countNodes constraintsFg)
+  putStrLn $ "nodes in cost:        " ++ show (countNodes costFg) ++
+    " (" ++ show (countNodes costFg0) ++ " before CSE)"
+  putStrLn $ "nodes in constraints: " ++ show (countNodes constraintsFg) ++
+    " (" ++ show (countNodes constraintsFg0) ++ " before CSE)"
   putStrLn $ "nodes in time:        " ++ show (countNodes timeFg)
   putStrLn $ "nodes in output:      " ++ show (countNodes outputFg)
   putStrLn $ "nodes in sim:         " ++ show (countNodes simFg)

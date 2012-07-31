@@ -67,22 +67,3 @@ instance Show a => Labellable (FGLNode a) where
   toLabelValue (FGLNode (k, (GFloating (ASinh _))))          = tlv k "asinh"
   toLabelValue (FGLNode (k, (GFloating (ATanh _))))          = tlv k "atanh"
   toLabelValue (FGLNode (k, (GFloating (ACosh _))))          = tlv k "acosh"
-
-
-
-run :: IO ()
-run = do
-  let x = sym "x" :: Expr Double
---      y = sym "y"
---      z = sym "z"
---
---      a0 = x + y + z
---      a1 = x*a0/z
---      a2 = a1 + a0/y
-
-      inputs = x -- :* [y] :* [[z]]
-      outputs = x*x -- a1 :* a0 :* [[a2]]
-  fg <- toFunGraph inputs outputs
-  print $ fgReified fg
-  print $ topSort fg
-  previewGraph fg

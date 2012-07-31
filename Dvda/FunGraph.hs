@@ -16,6 +16,7 @@ module Dvda.FunGraph ( FunGraph
                      , fgReified
                      , topSort
 --                     , fgGraph
+                     , nodelistToFunGraph
                      ) where
 
 import Control.Applicative
@@ -117,27 +118,30 @@ mvsToFunGraph :: (Eq a, Hashable a, Show a) => [MVS (Expr a)] -> [MVS (Expr a)] 
 mvsToFunGraph inputMVSExprs outputMVSExprs = do
   -- reify the outputs
   (ReifyGraph rgr, outputMVSIndices) <- reifyGraphs outputMVSExprs
-      -- make sure all the inputs are symbolic, and find their indices in the Expr graph
-  let inputMVSIndices = map (fmap f) inputMVSExprs
+  let fg = nodelistToFunGraph rgr inputMVSGExprs outputMVSIndices
+      inputMVSGExprs = map (fmap f) inputMVSExprs
         where
           f (ESym name) = (GSym name)
           f x = error $ "ERROR: mvsToFunGraph given non-ESym input \"" ++ show x ++ "\""
-      
-      (gr, lookupVertex, lookupKey) = Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, getParents gexpr)) rgr
-      lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
-
-  -- make sure all inputs to graph are provided by user
   return $ case (detectMissingInputs inputMVSExprs rgr, findConflictingInputs inputMVSExprs) of
-    ([],[]) -> FunGraph { fgGraph = gr
-                        , fgInputs = inputMVSIndices
-                        , fgOutputs = outputMVSIndices
-                        , fgLookupGExpr = lookupG
-                        , fgReified = rgr
-                        , fgVertexFromKey = lookupKey
-                        , fgNodeFromVertex = lookupVertex
-                        }
+    ([],[]) -> fg
     (xs,[]) -> error $ "mvsToFunGraph found inputs that were not provided by the user: " ++ show xs
     ( _,xs) -> error $ "mvsToFunGraph found idential inputs set more than once: " ++ show xs
+
+nodelistToFunGraph :: [(Int,GExpr a Int)] -> [MVS (GExpr a Int)] -> [MVS Int] -> FunGraph a
+nodelistToFunGraph rgr inputMVSIndices outputMVSIndices =
+  FunGraph { fgGraph = gr
+           , fgInputs = inputMVSIndices
+           , fgOutputs = outputMVSIndices
+           , fgLookupGExpr = lookupG
+           , fgReified = rgr
+           , fgVertexFromKey = lookupKey
+           , fgNodeFromVertex = lookupVertex
+           }
+  where
+    -- make sure all the inputs are symbolic, and find their indices in the Expr graph
+    (gr, lookupVertex, lookupKey) = Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, getParents gexpr)) rgr
+    lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
 
 
 ---------------------------------- utilities -----------------------------

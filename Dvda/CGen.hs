@@ -5,7 +5,6 @@
 
 module Dvda.CGen ( showC
                  , showMex
-                 , showMex'
                  , MatrixStorageOrder(..)
                  ) where
 
@@ -15,8 +14,8 @@ import Data.List ( intercalate )
 import FileLocation ( err )
 import Text.Printf ( printf )
 
-import Dvda.Expr
-import Dvda.FunGraph
+import Dvda.Expr ( GExpr(..), Floatings(..), Nums(..), Fractionals(..) )
+import Dvda.FunGraph ( FunGraph, MVS(..), topSort, fgInputs, fgOutputs, fgLookupGExpr )
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 
@@ -44,7 +43,6 @@ makeInputMap matStorageOrder ins = HM.fromList $ concat $ zipWith writeInput [(0
             (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (rowIdx,colIdx)
                                                       ColMajor -> (colIdx,rowIdx)
 
-
 writeInputPrototypes :: MatrixStorageOrder -> [MVS a] -> [String]
 writeInputPrototypes matStorageOrder ins = concat $ zipWith inputPrototype [(0::Int)..] ins
   where
@@ -59,7 +57,6 @@ writeInputPrototypes matStorageOrder ins = concat $ zipWith inputPrototype [(0::
         ncols = if nrows == 0 then 0 else length (head gs)
         (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (nrows,ncols)
                                                   ColMajor -> (ncols,nrows)
-
 
 writeOutputs :: MatrixStorageOrder -> [MVS Int] -> ([String], [String])
 writeOutputs matStorageOrder ins = (concatMap fst dcs, concatMap snd dcs)
@@ -170,40 +167,25 @@ checkMxInputDims (Mat grefs) functionName inputK =
     ncols = if nrows == 0 then 0 else length (head grefs)
 
 
--- | Turns inputs and outputs into a string containing C code.
--- .
---   Also pass a name to give to the C function
--- .
---   This function simply calls showCWithFunGraph and discards the first two outputs
-showC :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a, ToFunGraph b, ToFunGraph c)
-         => MatrixStorageOrder -> String -> b -> c -> IO String
-showC matStorageOrder functionName inputs outputs = do
-  (txt,_) <- showCWithFunGraph matStorageOrder functionName inputs outputs
-  return txt
-
--- | Turns inputs and outputs into a string containing C code. Also return indices of the inputs and outputs
--- .
---   Also pass a name to give to the C function
-showCWithFunGraph :: (Eq a, Show a, Hashable a, NumT b ~ a, NumT c ~ a, ToFunGraph b, ToFunGraph c)
-                     => MatrixStorageOrder -> String -> b -> c -> IO (String, FunGraph a)
-showCWithFunGraph matStorageOrder functionName inputs outputs = do
-  fg <- toFunGraph inputs outputs
-  let inPrototypes = writeInputPrototypes matStorageOrder (fgInputs fg)
-      (outDecls, outPrototypes) = writeOutputs matStorageOrder (fgOutputs fg)
-      inputMap = makeInputMap matStorageOrder (fgInputs fg)
-      mainDecls = let f k = case fgLookupGExpr fg k of
-                        Just v -> cAssignment inputMap k v
-                        Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("
-                  in map f $ reverse $ topSort fg
+-- | Turns a FunGraph into a string containing C code
+showC :: (Eq a, Show a, Hashable a) => MatrixStorageOrder -> String -> FunGraph a -> String
+showC matStorageOrder functionName fg = txt
+  where
+    inPrototypes = writeInputPrototypes matStorageOrder (fgInputs fg)
+    (outDecls, outPrototypes) = writeOutputs matStorageOrder (fgOutputs fg)
+    inputMap = makeInputMap matStorageOrder (fgInputs fg)
+    mainDecls = let f k = case fgLookupGExpr fg k of
+                      Just v -> cAssignment inputMap k v
+                      Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("
+                in map f $ reverse $ topSort fg
   
-      body = unlines $ map ("    "++) $
-             mainDecls ++ [""] ++
-             outDecls
+    body = unlines $ map ("    "++) $
+           mainDecls ++ [""] ++
+           outDecls
   
-      txt = "#include <math.h>\n\n" ++
-            "void " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes++outPrototypes)) ++ " )\n{\n" ++
-            body ++ "}\n"
-  return (txt, fg)
+    txt = "#include <math.h>\n\n" ++
+          "void " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes++outPrototypes)) ++ " )\n{\n" ++
+          body ++ "}\n"
 
 nameNode :: Int -> String
 nameNode k = "v_" ++ show k
@@ -251,15 +233,10 @@ cAssignment inputMap k gexpr = (\cop -> "const double " ++ nameNode k ++ " = " +
     toCOp (GFloating (ACosh _))          = error "C generation doesn't support ACosh"
 
 
-showMex :: (Eq a, Show a, Hashable a, ToFunGraph b, ToFunGraph c, NumT b ~ a, NumT c ~ a)
-           => String -> b -> c -> IO String
-showMex functionName inputs outputs = fmap fst (showMex' functionName inputs outputs)
-
-showMex' :: (Eq a, Show a, Hashable a, ToFunGraph b, ToFunGraph c, NumT b ~ a, NumT c ~ a)
-            => String -> b -> c -> IO (String, FunGraph a)
-showMex' functionName inputs outputs = do
-  (cText, fg) <- showCWithFunGraph ColMajor functionName inputs outputs -- matlab is column major >_<
-  return (cText ++ "\n\n\n" ++ mexFun functionName (fgInputs fg) (fgOutputs fg), fg)
+showMex :: (Eq a, Show a, Hashable a) => String -> FunGraph a -> String
+showMex functionName fg = cText ++ "\n\n\n" ++ mexFun functionName (fgInputs fg) (fgOutputs fg)
+  where
+    cText = showC ColMajor functionName fg -- matlab is column major >_<
 
 mexFun :: String -> [MVS a] -> [MVS Int] -> String
 mexFun functionName ins outs =

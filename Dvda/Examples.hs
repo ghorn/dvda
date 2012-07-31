@@ -2,13 +2,13 @@
 
 module Dvda.Examples ( run
                      , run1
+                     , dotVis
                      ) where
 
 import Dvda.Expr
 import Dvda.FunGraph
 import Dvda.CGen
 import Dvda.Vis
-
 
 run :: IO ()
 run = do
@@ -35,7 +35,7 @@ run = do
   fg <- toFunGraph inputs outputs
   putStrLn $ "cost has " ++ show (countNodes fg) ++ " nodes"
   previewGraph fg
-  showMex "foo" inputs outputs >>= putStrLn
+  putStrLn $ showMex "foo" fg
 
 run1 :: IO ()
 run1 = do
@@ -49,5 +49,21 @@ run1 = do
       inputs = [[a,b,c],[d,e,f]]
       outputs = [[a,b,c],[d,e,f]]
 
-  showC RowMajor "foo" inputs outputs >>= putStrLn
-  showMex "foo" inputs outputs >>= putStrLn
+  fg <- toFunGraph inputs outputs
+  putStrLn $ showC RowMajor "foo" fg
+  putStrLn $ showMex "foo" fg
+
+dotVis :: IO ()
+dotVis = do
+  let x = sym "x" :: Expr Double
+      y = sym "y"
+      z = sym "z"
+
+      a0 = x + y + z
+      a1 = x*a0/z
+      a2 = a1 + a0/y
+
+      inputs = x :* [y] :* [[z]]
+      outputs = x*x :* a1 :* a0 :* [[a2]]
+  fg <- toFunGraph inputs outputs
+  previewGraph fg

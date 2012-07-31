@@ -10,6 +10,7 @@ import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 import Data.IntMap ( IntMap )
 import qualified Data.IntMap as IM
+import Data.Tuple ( swap )
 
 import Dvda.Expr ( GExpr(..), Floatings(..), Fractionals(..), Nums(..) )
 import Dvda.FunGraph
@@ -17,25 +18,38 @@ import Dvda.FunGraph
 --import qualified Data.HashTable.ST.Cuckoo as HT
 --type HashTable s v k = HT.HashTable s v k
 
-cse ::
+cse :: (Eq a, Hashable a) => FunGraph a -> FunGraph a
+cse fg = nodelistToFunGraph (map swap (HM.toList hm)) (fgInputs fg) outputIndices
+  where
+    (hm, im) = cse' (fgLookupGExpr fg) (fgOutputs fg)
+    -- since the fgInputs are all symbolic (GSym _) there is no need for mapping old inputs to new inputs
+    outputIndices = let
+      oldIndexToNewIndex k = case IM.lookup k im of
+        Just k' -> k'
+        Nothing -> error $
+                   "CSE error, in mapping old output indices to new, found an old one which was missing from" ++
+                   "the old --> new Int mapping"
+      in map (fmap oldIndexToNewIndex) (fgOutputs fg)
+
+cse' ::
   (Eq a, Hashable a)
-  => (Int -> GExpr a Int)
+  => (Int -> Maybe (GExpr a Int))
   -> [MVS Int]
   -> (HashMap (GExpr a Int) Int, IntMap Int)
-cse lookupFun outputIndices = (hm,oldToNewIdx)
+cse' lookupFun outputIndices = (hm,oldToNewIdx)
   where
     -- folding function
     f k (hm0,im0,n0) = (\(_,hm',im',n') -> (hm',im',n')) $ insertOldNode k lookupFun hm0 im0 n0
     -- outputs
     (hm,oldToNewIdx,_) = foldr f (HM.empty,IM.empty,0) (concatMap toList outputIndices)
-        
+
 
 -- | take in an Int that represents a node in the original graph
 -- see if that int has been inserted in the new graph
 insertOldNode ::
   (Eq a, Hashable a)
   => Int -- ^ Int to be inserted
-  -> (Int -> GExpr a Int) -- ^ function to lookup old GExpr from old Int reference
+  -> (Int -> Maybe (GExpr a Int)) -- ^ function to lookup old GExpr from old Int reference
   -> HashMap (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
   -> IntMap Int -- ^ intmap of old int reference to new int references
   -> Int -- ^ next free index
@@ -48,15 +62,16 @@ insertOldNode kOld lookupOldGExpr hm0 oldNodeToNewNode0 nextFreeInt0 =
     Nothing -> (k, hm1, IM.insert kOld k oldNodeToNewNode1, nextFreeInt1)
       where
         -- get the old GExpr to which this node corresponds
-        oldGExpr = lookupOldGExpr kOld
-        -- insert this old GExpr
-        (k, hm1, oldNodeToNewNode1, nextFreeInt1) =
-          insertOldGExpr oldGExpr lookupOldGExpr hm0 oldNodeToNewNode0 nextFreeInt0
+        (k, hm1, oldNodeToNewNode1, nextFreeInt1) = case lookupOldGExpr kOld of
+          -- insert this old GExpr
+          Just oldGExpr -> insertOldGExpr oldGExpr lookupOldGExpr hm0 oldNodeToNewNode0 nextFreeInt0
+          Nothing -> error $ "in CSE, insertOldNode got an old key \"" ++ show kOld ++
+                     "\" with was not found in the old graph"
 
 insertOldGExpr ::
   (Eq a, Hashable a)
   => GExpr a Int -- ^ GExpr to be inserted
-  -> (Int -> GExpr a Int) -- ^ function to lookup old GExpr from old Int reference
+  -> (Int -> Maybe (GExpr a Int)) -- ^ function to lookup old GExpr from old Int reference
   -> HashMap (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
   -> IntMap Int -- ^ intmap of old int reference to new int references
   -> Int -- ^ next free index
@@ -97,7 +112,7 @@ insertOldGExprBinary ::
   => (f -> GExpr a Int)
   -> (Int -> Int -> f)
   -> Int -> Int
-  -> (Int -> GExpr a Int) -- ^ function to lookup old GExpr from old Int reference
+  -> (Int -> Maybe (GExpr a Int)) -- ^ function to lookup old GExpr from old Int reference
   -> HashMap (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
   -> IntMap Int -- ^ intmap of old int reference to new int references
   -> Int -- ^ next free index
@@ -114,7 +129,7 @@ insertOldGExprUnary ::
   => (f -> GExpr a Int)
   -> (Int -> f)
   -> Int
-  -> (Int -> GExpr a Int) -- ^ function to lookup old GExpr from old Int reference
+  -> (Int -> Maybe (GExpr a Int)) -- ^ function to lookup old GExpr from old Int reference
   -> HashMap (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
   -> IntMap Int -- ^ intmap of old int reference to new int references
   -> Int -- ^ next free index
