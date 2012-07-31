@@ -30,7 +30,6 @@ import qualified Data.Traversable as T
 import Dvda.Expr
 import Dvda.Reify ( ReifyGraph(..), reifyGraphs )
 
-
 data FunGraph a = FunGraph { fgGraph :: Graph.Graph
                            , fgInputs :: [MVS (GExpr a Int)]
                            , fgOutputs :: [MVS Int]
@@ -39,6 +38,7 @@ data FunGraph a = FunGraph { fgGraph :: Graph.Graph
                            , fgVertexFromKey :: Int -> Maybe Int
                            , fgNodeFromVertex :: Int -> (GExpr a Int, Int, [Int])
                            }
+
 instance Show a => Show (FunGraph a) where
   show fg = "FunGraph\ninputs:\n" ++ show (fgInputs fg) ++ "\noutputs:\n" ++ show (fgOutputs fg) ++ "\ngraph:\n" ++ show (fgGraph fg)
 

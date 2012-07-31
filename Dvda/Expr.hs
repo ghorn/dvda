@@ -421,7 +421,7 @@ instance MuRef (Expr a) where
   mapDeRef f (ENum (Abs x)) = GNum <$> (Negate <$> (f x))
   mapDeRef f (ENum (Signum x)) = GNum <$> (Signum <$> (f x))
   mapDeRef _ (ENum (FromInteger k)) = pure $ GNum (FromInteger k)
-  
+
   mapDeRef f (EFractional (Div x y)) = GFractional <$> (Div <$> (f x) <*> (f y))
   mapDeRef _ (EFractional (FromRational x)) = pure $ GFractional (FromRational x)
 
