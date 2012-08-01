@@ -17,7 +17,7 @@ import Dvda.CGen  ( showMex )
 import Dvda.CSE ( cse )
 import Dvda.Codegen ( writeSourceFile )
 import Dvda.Expr ( Expr(..), Sym(..), sym, substitute )
-import Dvda.FunGraph -- ( (:*)(..), toFunGraph, countNodes )
+import Dvda.FunGraph ( (:*)(..), toFunGraph, countNodes )
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 import Dvda.MultipleShooting.MSMonad

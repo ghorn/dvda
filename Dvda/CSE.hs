@@ -3,11 +3,9 @@
 module Dvda.CSE ( cse
                 ) where
 
---import Control.Monad.ST -- ( runST )
+import Control.Monad.ST ( ST, runST )
 import Data.Foldable ( toList )
 import Data.Hashable ( Hashable )
-import Dvda.HashMap ( HashMap )
-import qualified Dvda.HashMap as HM
 import Data.IntMap ( IntMap )
 import qualified Data.IntMap as IM
 import Data.Tuple ( swap )
@@ -15,13 +13,14 @@ import Data.Tuple ( swap )
 import Dvda.Expr ( GExpr(..), Floatings(..), Fractionals(..), Nums(..) )
 import Dvda.FunGraph
 
---import qualified Data.HashTable.ST.Cuckoo as HT
---type HashTable s v k = HT.HashTable s v k
+import qualified Data.HashTable.Class as HT
+import qualified Data.HashTable.ST.Cuckoo as C
+type HashTable s v k = C.HashTable s v k
 
 cse :: (Eq a, Hashable a) => FunGraph a -> FunGraph a
-cse fg = nodelistToFunGraph (map swap (HM.toList hm)) (fgInputs fg) outputIndices
+cse fg = nodelistToFunGraph (map swap htList) (fgInputs fg) outputIndices
   where
-    (hm, im) = cse' (fgLookupGExpr fg) (fgOutputs fg)
+    (htList, im) = cse' (fgLookupGExpr fg) (fgOutputs fg)
     -- since the fgInputs are all symbolic (GSym _) there is no need for mapping old inputs to new inputs
     outputIndices = let
       oldIndexToNewIndex k = case IM.lookup k im of
@@ -35,47 +34,52 @@ cse' ::
   (Eq a, Hashable a)
   => (Int -> Maybe (GExpr a Int))
   -> [MVS Int]
-  -> (HashMap (GExpr a Int) Int, IntMap Int)
-cse' lookupFun outputIndices = (hm,oldToNewIdx)
-  where
-    -- folding function
-    f k (hm0,im0,n0) = (\(_,hm',im',n') -> (hm',im',n')) $ insertOldNode k lookupFun hm0 im0 n0
-    -- outputs
-    (hm,oldToNewIdx,_) = foldr f (HM.empty,IM.empty,0) (concatMap toList outputIndices)
+  -> ([(GExpr a Int, Int)], IntMap Int)
+cse' lookupFun outputIndices = runST $ do
+  ht <- HT.new
+  let -- folding function
+      f (im,n) [] = return (im,n)
+      f (im0,n0) (k:ks) = do
+        (_,im,n) <- insertOldNode k lookupFun ht im0 n0
+        f (im,n) ks
+  -- outputs
+  (oldToNewIdx,_) <- f (IM.empty,0) (concatMap toList outputIndices)
+  htList <- HT.toList ht
+  return (htList, oldToNewIdx)
 
-
--- | take in an Int that represents a node in the original graph
--- see if that int has been inserted in the new graph
+  
+---- | take in an Int that represents a node in the original graph
+---- see if that int has been inserted in the new graph
 insertOldNode ::
   (Eq a, Hashable a)
   => Int -- ^ Int to be inserted
   -> (Int -> Maybe (GExpr a Int)) -- ^ function to lookup old GExpr from old Int reference
-  -> HashMap (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
+  -> HashTable s (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
   -> IntMap Int -- ^ intmap of old int reference to new int references
   -> Int -- ^ next free index
-  -> (Int, HashMap (GExpr a Int) Int, IntMap Int, Int)
-insertOldNode kOld lookupOldGExpr hm0 oldNodeToNewNode0 nextFreeInt0 =
+  -> ST s (Int, IntMap Int, Int)
+insertOldNode kOld lookupOldGExpr ht oldNodeToNewNode0 nextFreeInt0 =
   case IM.lookup kOld oldNodeToNewNode0 of
     -- if the int has already been inserted in the new graph, return it
-    Just k -> (k, hm0, oldNodeToNewNode0, nextFreeInt0)
+    Just k -> return (k, oldNodeToNewNode0, nextFreeInt0)
     -- if the int has not yet been inserted, then insert it
-    Nothing -> (k, hm1, IM.insert kOld k oldNodeToNewNode1, nextFreeInt1)
-      where
-        -- get the old GExpr to which this node corresponds
-        (k, hm1, oldNodeToNewNode1, nextFreeInt1) = case lookupOldGExpr kOld of
-          -- insert this old GExpr
-          Just oldGExpr -> insertOldGExpr oldGExpr lookupOldGExpr hm0 oldNodeToNewNode0 nextFreeInt0
-          Nothing -> error $ "in CSE, insertOldNode got an old key \"" ++ show kOld ++
-                     "\" with was not found in the old graph"
+    -- get the old GExpr to which this node corresponds
+    Nothing ->  case lookupOldGExpr kOld of
+      Nothing -> error $ "in CSE, insertOldNode got an old key \"" ++ show kOld ++
+                 "\" with was not found in the old graph"
+      -- insert this old GExpr
+      Just oldGExpr -> do
+        (k, oldNodeToNewNode1, nextFreeInt1) <- insertOldGExpr oldGExpr lookupOldGExpr ht oldNodeToNewNode0 nextFreeInt0
+        return (k, IM.insert kOld k oldNodeToNewNode1, nextFreeInt1)
 
 insertOldGExpr ::
   (Eq a, Hashable a)
   => GExpr a Int -- ^ GExpr to be inserted
   -> (Int -> Maybe (GExpr a Int)) -- ^ function to lookup old GExpr from old Int reference
-  -> HashMap (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
+  -> HashTable s (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
   -> IntMap Int -- ^ intmap of old int reference to new int references
   -> Int -- ^ next free index
-  -> (Int, HashMap (GExpr a Int) Int, IntMap Int, Int)
+  -> ST s (Int, IntMap Int, Int)
 
 insertOldGExpr g@(GSym _)                       = \_ ->  cseInsert g
 insertOldGExpr g@(GConst _)                     = \_ ->  cseInsert g
@@ -106,23 +110,21 @@ insertOldGExpr (GFloating (ASinh x))     = insertOldGExprUnary  GFloating ASinh 
 insertOldGExpr (GFloating (ATanh x))     = insertOldGExprUnary  GFloating ATanh x
 insertOldGExpr (GFloating (ACosh x))     = insertOldGExprUnary  GFloating ACosh x
 
-
 insertOldGExprBinary ::
   (Eq a, Hashable a)
   => (f -> GExpr a Int)
   -> (Int -> Int -> f)
   -> Int -> Int
   -> (Int -> Maybe (GExpr a Int)) -- ^ function to lookup old GExpr from old Int reference
-  -> HashMap (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
+  -> HashTable s (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
   -> IntMap Int -- ^ intmap of old int reference to new int references
   -> Int -- ^ next free index
-  -> (Int, HashMap (GExpr a Int) Int, IntMap Int, Int)
-insertOldGExprBinary gnum mul kxOld kyOld lookupOldGExpr hm0 oldNodeToNewNode0 nextFreeInt0 = let
-  (kx, hm1, oldNodeToNewNode1,nextFreeInt1) = insertOldNode kxOld lookupOldGExpr hm0 oldNodeToNewNode0 nextFreeInt0
-  (ky, hm2, oldNodeToNewNode2,nextFreeInt2) = insertOldNode kyOld lookupOldGExpr hm1 oldNodeToNewNode1 nextFreeInt1
-  newGExpr = gnum (mul kx ky)
-  in
-   cseInsert newGExpr hm2 oldNodeToNewNode2 nextFreeInt2
+  -> ST s (Int, IntMap Int, Int)
+insertOldGExprBinary gnum mul kxOld kyOld lookupOldGExpr ht oldNodeToNewNode0 nextFreeInt0 = do
+  (kx, oldNodeToNewNode1,nextFreeInt1) <- insertOldNode kxOld lookupOldGExpr ht oldNodeToNewNode0 nextFreeInt0
+  (ky, oldNodeToNewNode2,nextFreeInt2) <- insertOldNode kyOld lookupOldGExpr ht oldNodeToNewNode1 nextFreeInt1
+  let newGExpr = gnum (mul kx ky)
+  cseInsert newGExpr ht oldNodeToNewNode2 nextFreeInt2
 
 insertOldGExprUnary ::
   (Eq a, Hashable a)
@@ -130,20 +132,22 @@ insertOldGExprUnary ::
   -> (Int -> f)
   -> Int
   -> (Int -> Maybe (GExpr a Int)) -- ^ function to lookup old GExpr from old Int reference
-  -> HashMap (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
+  -> HashTable s (GExpr a Int) Int -- ^ hashmap of new GExprs to their new Int references
   -> IntMap Int -- ^ intmap of old int reference to new int references
   -> Int -- ^ next free index
-  -> (Int, HashMap (GExpr a Int) Int, IntMap Int, Int)
-insertOldGExprUnary gnum neg kxOld lookupOldGExpr hm0 oldNodeToNewNode0 nextFreeInt0 = let
-  (kx, hm1, oldNodeToNewNode1,nextFreeInt1) = insertOldNode kxOld lookupOldGExpr hm0 oldNodeToNewNode0 nextFreeInt0
-  newGExpr = gnum (neg kx)
-  in
-   cseInsert newGExpr hm1 oldNodeToNewNode1 nextFreeInt1
+  -> ST s (Int, IntMap Int, Int)
+insertOldGExprUnary gnum neg kxOld lookupOldGExpr ht oldNodeToNewNode0 nextFreeInt0 = do
+  (kx, oldNodeToNewNode1,nextFreeInt1) <- insertOldNode kxOld lookupOldGExpr ht oldNodeToNewNode0 nextFreeInt0
+  let newGExpr = gnum (neg kx)
+  cseInsert newGExpr ht oldNodeToNewNode1 nextFreeInt1
 
-cseInsert :: (Eq a, Hashable a) => GExpr a Int -> HashMap (GExpr a Int) Int -> IntMap Int -> Int
-             -> (Int, HashMap (GExpr a Int) Int, IntMap Int, Int)
-cseInsert gexpr hm0 oldNodeToNewNode0 nextFreeInt0 = case HM.lookup gexpr hm0 of
-  Just k -> (k, hm0, oldNodeToNewNode0, nextFreeInt0)
-  Nothing -> (nextFreeInt0, hm1, oldNodeToNewNode0, nextFreeInt0+1)
-    where
-      hm1 = HM.insert gexpr nextFreeInt0 hm0
+cseInsert :: (Eq a, Hashable a) => GExpr a Int -> HashTable s (GExpr a Int) Int -> IntMap Int -> Int
+             -> ST s (Int, IntMap Int, Int)
+cseInsert gexpr ht oldNodeToNewNode0 nextFreeInt0 = do
+  lu <- HT.lookup ht gexpr
+  case lu of
+    Just k -> return (k, oldNodeToNewNode0, nextFreeInt0)
+    Nothing -> do
+      HT.insert ht gexpr nextFreeInt0
+      return (nextFreeInt0, oldNodeToNewNode0, nextFreeInt0+1)
+        
