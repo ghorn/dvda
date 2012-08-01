@@ -6,16 +6,19 @@ module Dvda.MultipleShooting.MSCoctave ( msCoctave
                                        , run
                                        ) where
 
+import qualified Control.Monad.State as State
+import Data.Hashable ( Hashable )
 import qualified Data.HashSet as HS
-import Data.List ( zipWith6, transpose, elemIndex )
-import Data.Maybe ( catMaybes )
+import Data.List ( elemIndex, transpose, zipWith6 )
+import Data.Maybe ( fromMaybe )
 
 import Dvda.AD ( rad )
 import Dvda.CGen  ( showMex )
 import Dvda.CSE ( cse )
 import Dvda.Codegen ( writeSourceFile )
-import Dvda.Expr ( Expr(..), Sym(..) )
-import Dvda.FunGraph ( (:*)(..), toFunGraph, countNodes )
+import Dvda.Expr ( Expr(..), Sym(..), sym, substitute )
+import Dvda.FunGraph -- ( (:*)(..), toFunGraph, countNodes )
+import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 import Dvda.MultipleShooting.MSMonad
 import Dvda.MultipleShooting.Types
@@ -29,10 +32,6 @@ import Dvda.MultipleShooting.Types
     Aeq*x == beq
     lb <= x <= ub
 -}
---type Integrator a = ([Expr a] -> [Expr a] -> [Expr a] -> [Expr a]
---                     -> ([Expr a] -> [Expr a] -> [Expr a])
---                     -> Expr a -> [Expr a])
-
 type Integrator a = [Expr Double]
                    -> [Expr Double]
                    -> [Expr Double]
@@ -42,77 +41,162 @@ type Integrator a = [Expr Double]
                    -> Expr Double
                    -> [Expr Double]
 
-msCoctave
-  :: (Double ~ a)
-     => State (Step a) b
-     -> Integrator a
-     -> Int
-     -> String
-     -> FilePath
-     -> IO ()
-msCoctave userStep odeError n funDir name = do
-  let steps = map (runOneStep userStep) [0..n-1]
-      dts = map ((fromJustErr "dts error") . stepDt) steps
-      
-      fromLeft (Left x) = x
-      fromLeft (Right _) = error "ERROR: fromLeft got Right"
-      
-      -- fromJust checked in runOneStep for states', actions', stateNames, actionNames
-      states'  = map (fst . unzip . (fromJustErr "states' error") . fromLeft . stepStates ) steps
-      actions' = map (fst . unzip . (fromJustErr "actions' error") . fromLeft . stepActions) steps
-      stateNames  = map (snd . unzip . (fromJustErr "stateNames error") . fromLeft . stepStates ) steps
-      actionNames = map (snd . unzip . (fromJustErr "actionNames error") . fromLeft . stepActions) steps
-      
-      -- ensure that state/action (names) are the same in all steps
-      states = if all (head stateNames  ==) stateNames
-               then states'
-               else error "ERROR: different states in different timesteps"
-      actions = if all (head actionNames  ==) actionNames
-                then actions'
-                else error "ERROR: different actions in different timesteps"
-      
-      params    = HS.toList $ foldr HS.union HS.empty (map stepParams    steps)
-      constants = HS.toList $ foldr HS.union HS.empty (map stepConstants steps)
-      
-      boundMap = foldr HM.union HM.empty (map stepBounds steps)
-      
-      outputMap = foldl (HM.unionWith (++)) HM.empty (map stepOutputs steps)
-      ------------------------------------------------------------------------------------
-      cost = case catMaybes $ map stepCost steps of [] -> error "need to set cost function"
-                                                    cs -> sum cs
-      
+-- take user provided bounds and make sure they're complete
+setupBounds :: (Eq a, Hashable a, Show a)
+               => [(Expr a, (a,a, BCTime))]
+               -> Int
+               -> (Expr a -> Int -> (a,a), Expr a -> (a,a))
+setupBounds userBounds nSteps = (lookupAll, lookupParam)
+  where
+    lookupAll x k
+      | k >= nSteps = error "don't ask for bounds at timestep >= number of total timesteps"
+      | otherwise = case HM.lookup (x,k) specificTimestepBounds of
+        Just bnd -> bnd
+        Nothing -> case HM.lookup x everyTimestepBounds of
+          Just bnd -> bnd
+          Nothing -> error $ "need to set bounds for \"" ++ show x ++ "\" at timestep " ++ show k
+
+    lookupParam x = case HM.lookup x everyTimestepBounds of
+        Just bnd -> bnd
+        Nothing -> error $ "need to set bounds for \"" ++ show x ++ "\""
+
+    -- bounds set at only one timestep
+--    everyTimestepBounds :: HashMap (Expr a) (a,a)
+    everyTimestepBounds = let
+      everyTS (e,(lb,ub,ALWAYS)) = [(e,(lb,ub))]
+      everyTS _ = []
+      f (e,lbub) hm =
+        if HM.member e hm
+        then error $ "you set bounds twice for \"" ++ show e ++ "\""
+        else HM.insert e lbub hm
+      in foldr f HM.empty $ concatMap everyTS userBounds
+
+    -- bounds set at specific timestep
+--    specificTimestepBounds :: HashMap (Expr a, Int) (a,a)
+    specificTimestepBounds = let
+      specificTS (e,(lb,ub,TIMESTEP k)) = [((e,k),(lb,ub))]
+      specificTS _ = []
+      f (e,lbub) hm =
+        if HM.member e hm
+        then error $ "you set bounds twice for \"" ++ show e ++ "\""
+        else HM.insert e lbub hm
+      in foldr f HM.empty $ concatMap specificTS userBounds
+
+vectorizeDvs :: [[a]] -> [[a]] -> [a] -> [a]
+vectorizeDvs allStates allActions params = concat allStates ++ concat allActions ++ params
+
+getWithErr :: Step a -> String -> (Step a -> Maybe c) -> c
+getWithErr step name f = case f step of
+  Nothing -> error $ "need to set " ++ name
+  Just ret -> ret
+
+msCoctave ::
+  State (Step Double) b
+  -> Integrator Double
+  -> Int
+  -> String
+  -> FilePath
+  -> IO ()
+msCoctave userStep' odeError n funDir name = do
+  let step = State.execState userStep' $
+             Step { stepStates  = Nothing
+                  , stepActions = Nothing
+                  , stepDxdt = Nothing
+                  , stepDt = Nothing
+                  , stepLagrangeTerm = Nothing
+                  , stepMayerTerm = Nothing
+                  , stepBounds = []
+                  , stepConstraints = []
+                  , stepParams = HS.empty
+                  , stepConstants = HS.empty
+                  , stepOutputs = HM.empty
+                  , stepPeriodic = HS.empty
+                  }
+      actions = getWithErr step "actions" stepActions
+      dt      = getWithErr step "dt"      stepDt
+      (states,outputs,dxdt,lagrangeState) = let
+        states'  = getWithErr step "states" stepStates
+        dxdt'    = getWithErr step "dxdt"   stepDxdt
+        outputs' = stepOutputs step
+        in
+         case stepLagrangeTerm step of
+           Nothing -> (states',outputs',dxdt',Nothing)
+           Just (lagrangeTerm,(lb,ub)) ->
+             ( states' ++ [lagrangeState']
+             , HM.union outputs' $ HM.fromList
+               [(lagrangeStateName, lagrangeState'), (lagrangeTermName, lagrangeTerm)]
+             , dxdt'++[lagrangeTerm]
+             , Just (lagrangeState',(lb,ub)) )
+              where
+                lagrangeState' = sym lagrangeStateName
+        
+      params    = HS.toList (stepParams    step)
+      constants = HS.toList (stepConstants step)
+
+      allStates   = [[sym $ show x ++ "__" ++ show k | x <-  states] | k <- [0..(n-1)]]
+      allActions  = [[sym $ show u ++ "__" ++ show k | u <- actions] | k <- [0..(n-1)]]
+      dvs = vectorizeDvs allStates allActions params
+
+      outputMap :: HashMap String [Expr Double]
+      outputMap = HM.map f outputs
+        where
+          f output = zipWith (subStatesActions output) allStates allActions
+
+      -- mapOverTimesteps :: [[Expr a]] -> [[Expr a]] -> [Expr a]
+--      mapOverTimesteps f = zipWith3 f allStates allActions (replicate params)
+      subStatesActions f x u = substitute f (zip states x ++ zip actions u)
+
+      subAllTimesteps :: Expr Double -> [Expr Double]
+      subAllTimesteps something = zipWith (subStatesActions something) allStates allActions
+
+      (lbs,ubs) = unzip $ vectorizeDvs stateBounds actionBounds paramBounds
+        where
+          (getAllBounds,getParamBounds) = setupBounds bounds n
+          stateBounds  = [[getAllBounds x k | x <- states ] | k <- [0..(n-1)]]
+          actionBounds = [[getAllBounds u k | u <- actions] | k <- [0..(n-1)]]
+          paramBounds  = [getParamBounds p | p <- params]
+
+          bounds = stepBounds step ++ lagrangeBound
+            where
+              lagrangeBound = case lagrangeState of
+                Nothing -> []
+                Just (ls,(lb,ub)) -> [(ls,(0,0,TIMESTEP 0)),(ls, (lb, ub, ALWAYS))]
+
+      cost = subStatesActions finalCost (last allStates) (last allActions)
+        where
+          finalCost = case (stepMayerTerm step, lagrangeState) of
+            (Just mc, Nothing) -> mc
+            (Nothing, Just (ls,_)) -> ls
+            (Just mc, Just (ls,_)) -> mc + ls
+            (Nothing,Nothing) -> error "need to set cost function"
+
       (ceq, cineq) = foldl f ([],[]) allConstraints
         where
           f (eqs,ineqs) (Constraint x EQ y) = (eqs ++ [x - y], ineqs)
           f (eqs,ineqs) (Constraint x LT y) = (eqs, ineqs ++ [x - y])
           f (eqs,ineqs) (Constraint x GT y) = (eqs, ineqs ++ [y - x])
       
+          execDxdt x u = map (flip substitute (zip states x ++ zip actions u)) dxdt
+
           dodeConstraints = map (Constraint 0 EQ) $ concat $
-                            zipWith6 odeError (init states) (init actions) (tail states) (tail actions)
-                            (map (execDxdt userStep) [0..]) dts
-      
-          allConstraints = dodeConstraints ++ (concatMap stepConstraints steps) ++ periodicConstraints
-      
-          periodicConstraints
-            | HS.size notXU > 0 = error $ "ERROR: can't set periodic constraints for non states/actions:" ++ show notXU
-            | otherwise = foldl g' [] $ map f' (transpose states ++ transpose actions)
+                            zipWith6 odeError (init allStates) (init allActions) (tail allStates) (tail allActions)
+                            (repeat execDxdt) (repeat dt)
+
+          allConstraints = dodeConstraints ++ (concatMap (g . (fmap subAllTimesteps)) (stepConstraints step)) ++ periodicConstraints
             where
-              pcSets = map stepPeriodic steps
-              dvSet = HS.fromList (concat states ++ concat actions)
-              notXU = HS.difference (foldl HS.union HS.empty pcSets) dvSet
-              pc0 = head pcSets
-              pcf = last pcSets
-      
-              -- match up states/actions by making sure they're in the same state/action list
-              f' xu = (HS.toList $ HS.filter (`elem` xu) pc0, HS.toList $ HS.filter (`elem` xu) pcf)
-              g' acc ( [],   _) = acc
-              g' acc (  _,  []) = acc
-              g' acc ([x], [y]) = acc ++ [Constraint x EQ y]
-              g'   _ (  _,   _) = error "ERROR: too many matching periodic constraints"
-      
-      -------------------------------------------------------------------------------------
-      dvs = concat states ++ concat actions ++ params
-      
+              g (Constraint [] _ _) = []
+              g (Constraint _ _ []) = []
+              g (Constraint (x:xs) ord (y:ys)) = Constraint x ord y : g (Constraint xs ord ys)
+            
+              periodicConstraints = map lookup' $ HS.toList (stepPeriodic step)
+                where
+                  lookup' x = fromMaybe (error $ "couldn't find periodic thing \"" ++ show x ++ "\" in hashmap")
+                              $ HM.lookup x xuMap
+                  xuMap = HM.fromList $ zip states  (zipWith setEqual (head  allStates) (last allStates )) ++
+                                        zip actions (zipWith setEqual (head allActions) (last allActions))
+                    where
+                      setEqual x y = Constraint x EQ y
+
   (costSource,costFg0,costFg) <- do
     let costGrad = rad cost dvs
     fg0 <- toFunGraph (dvs :* constants) (cost :* costGrad)
@@ -125,92 +209,41 @@ msCoctave userStep odeError n funDir name = do
     fg0 <- toFunGraph (dvs :* constants) (cineq :* ceq :* cineqJacob :* ceqJacob)
     let fg = cse fg0
     return (showMex (name ++ "_constraints") fg, fg0, fg)
-  
+
   (timeSource,timeFg) <- do
-    fg <- toFunGraph (dvs :* constants) (init $ scanl (+) 0 dts)
+    fg <- toFunGraph (dvs :* constants) (take n $ scanl (+) 0 (repeat dt))
     return (showMex (name ++ "_time") fg, fg)
-  
+
   (outputSource,outputFg) <- do
     fg <- toFunGraph (dvs :* constants) (HM.elems outputMap)
     return (showMex (name ++ "_outputs") fg, fg)
-    
+
   (simSource,simFg) <- do
-    let x' = head states
-        u' = head actions
-        dxdt' = fromJustErr "dxdt' error" $ stepDxdt $ head steps
-    fg <- toFunGraph (x' :* u' :* params :* constants) dxdt'
+    fg <- toFunGraph (states :* actions :* params :* constants) dxdt
     return (showMex (name ++ "_sim") fg, fg)
       
-  let (lbs, ubs, _) = unzip3 $ map getBnd dvs
-        where
-          getBnd dv = case HM.lookup dv boundMap of
-            Nothing -> error $ "ERROR: please set bounds for " ++ show dv
-            Just bnd -> bnd
+  let setupSource = writeSetupSource name dvs lbs ubs
+      mexAllSource = writeMexAll name
+      unstructConstsSource = writeUnstructConsts name constants
+      structSource = writeToStruct name dvs params constants outputMap
       
-      setupSource =
-        unlines $
-        [ "function [x0, Aineq, bineq, Aeq, beq, lb, ub] = "++ name ++"_setup()"
-        , ""
---        , "x0 = " ++ show (vectorizeDvs dvsGuess) ++ "';"
-        , "x0 = zeros(" ++ show (length dvs) ++ ",1);"
-        , "Aineq = [];"
-        , "bineq = [];"
-        , "Aeq = [];"
-        , "beq = [];"
-        , "lb = " ++ show lbs ++ "';"
-        , "ub = " ++ show ubs ++ "';"
-        ]
-      
-      -- take vector of design variables and vector of constants and return nice matlab struct
-      structSource =
-        unlines $
-        ["function ret = " ++ name ++ "_struct(designVars,constants)"
-        , ""
-        , "ret.time = " ++ name ++ "_time(designVars, constants);"
-        , "outs = " ++ name ++ "_outputs(designVars, constants);"
-        , concat $ zipWith (\name' k -> "ret." ++name'++ " = outs("++show k++",:);\n") (HM.keys outputMap) [(1::Int)..]
-        ] ++
-        toStruct dvs "designVars" (map show params) (map (\x -> [x]) params) ++
-        toStruct constants "constants" (map show constants) (map (\x -> [x]) constants)
-          where
-            dvsToIdx dvs' = (fromJustErr "toStruct error") . (flip HM.lookup (HM.fromList (zip dvs' [(1::Int)..])))
-      
-            toStruct dvs' nm = zipWith (\name' vars -> "ret." ++ name' ++ " = " ++ nm ++ "(" ++ show (map (dvsToIdx dvs') vars) ++ ");\n")
-  
-  
-      -- take nice matlab structs and return vectors of design variables and constants
+      -- take nice matlab structs and return vector of design variables
       unstructSource =
         unlines $
         [ "function dvs = " ++ name ++ "_unstruct(dvStruct)\n"
         , "dvs = zeros(" ++ show (length dvs) ++ ", 1);"
         , ""
         , concatMap fromParam params
-        , concat $ zipWith fromXUS (head  stateNames) (transpose states)
-        , concat $ zipWith fromXUS (head actionNames) (transpose actions)
+        , concat $ zipWith fromXU states  (transpose allStates)
+        , concat $ zipWith fromXU actions (transpose allActions)
         ]
         where
-          readName e = case e of
-            ESym (Sym nm) -> nm
-            _ -> error "param not ESym Sym"
-          fromParam e = "dvs(" ++ show (1 + (fromJustErr "fromParam error" $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ readName e ++ ";\n"
-      
-          fromXU nm e k =
-            "dvs(" ++ show (1 + (fromJustErr "fromXU error" $ e `elemIndex` dvs)) ++ ") = dvStruct." ++ nm ++ "(" ++ show k ++ ");\n"
-          fromXUS name' xs = (concat $ zipWith (fromXU name') xs [(1::Int)..]) ++ "\n"
-      
-      unstructConstsSource =
-        unlines $
-        [ "function constants = " ++ name ++ "_unstructConstants(constStruct)\n"
-        , "constants = zeros(" ++ show (length constants) ++ ", 1);"
-        , ""
-        , concatMap fromConst constants
-        ]
-        where
-          readName e = case e of
-            ESym (Sym nm) -> nm
-            _ -> error "const not ESym Sym"
-          fromConst e = "constants(" ++ show (1 + (fromJustErr "fromConst error" $ e `elemIndex` constants)) ++ ") = constStruct." ++ readName e ++ ";\n"
-      
+          dvIdx e = fromMaybe (error $ "dvIdx error - " ++ show e ++ " is not a design variable")
+                    (e `elemIndex` dvs)
+          fromParam e = "dvs(" ++ show (1 + dvIdx e) ++ ") = dvStruct." ++ show e ++ ";\n"
+          fromXU e es =
+            "dvs(" ++ show (map ((1 +) . dvIdx) es) ++ ") = dvStruct." ++ show e ++ ";\n"
+
       plotSource =
         unlines $
         [ "function " ++ name ++ "_plot(designVars, constants)\n"
@@ -230,18 +263,7 @@ msCoctave userStep odeError n funDir name = do
             where
               name'' = foldl (\acc x -> if x == '_' then acc ++ "\\_" else acc ++ [x]) "" name'
 
-      mexAllSource = unlines $ map f ["cost", "constraints", "time", "outputs", "sim"]
-        where
-          f x = "tic\nfprintf('mexing " ++ file ++ "...  ')\n"++"mex " ++ file ++ "\nt1 = toc;\nfprintf('finished in %.2f seconds\\n', t1)"
-            where
-              file = name ++ "_" ++ x ++ ".c"
-  
-  _ <- writeSourceFile           costSource funDir $ name ++ "_cost.c"
-  _ <- writeSourceFile    constraintsSource funDir $ name ++ "_constraints.c"
-  _ <- writeSourceFile           timeSource funDir $ name ++ "_time.c"
-  _ <- writeSourceFile         outputSource funDir $ name ++ "_outputs.c"
-  _ <- writeSourceFile            simSource funDir $ name ++ "_sim.c"
-  
+
   _ <- writeSourceFile         mexAllSource funDir $ name ++ "_mex_all.m"
   _ <- writeSourceFile          setupSource funDir $ name ++ "_setup.m"
   _ <- writeSourceFile         structSource funDir $ name ++ "_struct.m"
@@ -249,13 +271,79 @@ msCoctave userStep odeError n funDir name = do
   _ <- writeSourceFile       unstructSource funDir $ name ++ "_unstruct.m"
   _ <- writeSourceFile           plotSource funDir $ name ++ "_plot.m"
 
+  _ <- writeSourceFile           timeSource funDir $ name ++ "_time.c"
+  _ <- writeSourceFile         outputSource funDir $ name ++ "_outputs.c"
+  _ <- writeSourceFile            simSource funDir $ name ++ "_sim.c"
+  _ <- writeSourceFile           costSource funDir $ name ++ "_cost.c"
+  _ <- writeSourceFile    constraintsSource funDir $ name ++ "_constraints.c"
+
+  putStrLn $ "nodes in time:        " ++ show (countNodes timeFg)
+  putStrLn $ "nodes in output:      " ++ show (countNodes outputFg)
+  putStrLn $ "nodes in sim:         " ++ show (countNodes simFg)
   putStrLn $ "nodes in cost:        " ++ show (countNodes costFg) ++
     " (" ++ show (countNodes costFg0) ++ " before CSE)"
   putStrLn $ "nodes in constraints: " ++ show (countNodes constraintsFg) ++
     " (" ++ show (countNodes constraintsFg0) ++ " before CSE)"
-  putStrLn $ "nodes in time:        " ++ show (countNodes timeFg)
-  putStrLn $ "nodes in output:      " ++ show (countNodes outputFg)
-  putStrLn $ "nodes in sim:         " ++ show (countNodes simFg)
+  
+
+writeMexAll :: String -> String
+writeMexAll name = unlines $ map f ["time", "outputs", "sim", "cost", "constraints"]
+  where
+    f x = "tic\nfprintf('mexing " ++ file ++ "...  ')\n"++"mex " ++ file ++ "\nt1 = toc;\nfprintf('finished in %.2f seconds\\n', t1)"
+      where
+        file = name ++ "_" ++ x ++ ".c"
+
+
+writeSetupSource :: Show a => String -> [Expr a] -> [a] -> [a] -> String
+writeSetupSource name dvs lbs ubs =
+  unlines $
+  [ "function [x0, Aineq, bineq, Aeq, beq, lb, ub] = "++ name ++"_setup()"
+  , ""
+  , "x0 = zeros(" ++ show (length dvs) ++ ",1);"
+  , "Aineq = [];"
+  , "bineq = [];"
+  , "Aeq = [];"
+  , "beq = [];"
+  , "lb = " ++ show lbs ++ "';"
+  , "ub = " ++ show ubs ++ "';"
+  ]
+
+
+-- take nice matlab structs and return vector of design constants
+writeUnstructConsts :: Eq a => String -> [Expr a] -> String
+writeUnstructConsts name constants =
+  unlines $
+  [ "function constants = " ++ name ++ "_unstructConstants(constStruct)\n"
+  , "constants = zeros(" ++ show (length constants) ++ ", 1);"
+  , ""
+  , concatMap fromConst constants
+  ]
+  where
+    readName e = case e of
+      ESym (Sym nm) -> nm
+      _ -> error "const not ESym Sym"
+    fromConst e = "constants(" ++ show (1 + (fromJustErr "fromConst error" $ e `elemIndex` constants)) ++ ") = constStruct." ++ readName e ++ ";\n"
+
+
+---- take vector of design variables and vector of constants and return nice matlab struct
+writeToStruct :: (Eq a, Show a, Hashable a)
+                 => String -> [Expr a] -> [Expr a] -> [Expr a] -> HashMap String [Expr a] -> String
+writeToStruct name dvs params constants outputMap =
+  unlines $
+  ["function ret = " ++ name ++ "_struct(designVars,constants)"
+  , ""
+  , "ret.time = " ++ name ++ "_time(designVars, constants);"
+  , "outs = " ++ name ++ "_outputs(designVars, constants);"
+  , concat $ zipWith (\name' k -> "ret." ++name'++ " = outs("++show k++",:);\n") (HM.keys outputMap) [(1::Int)..]
+  ] ++
+  toStruct dvs "designVars" (map show params) (map (\x -> [x]) params) ++
+  toStruct constants "constants" (map show constants) (map (\x -> [x]) constants)
+    where
+      dvsToIdx dvs' = (fromJustErr "toStruct error") . (flip HM.lookup (HM.fromList (zip dvs' [(1::Int)..])))
+
+      toStruct dvs' nm = zipWith (\name' vars -> "ret." ++ name' ++ " = " ++ nm ++ "(" ++ show (map (dvsToIdx dvs') vars) ++ ");\n")
+
+
 
 fromJustErr :: String -> Maybe a -> a
 fromJustErr _ (Just x) = x
@@ -265,28 +353,32 @@ fromJustErr message Nothing = error $ "fromJustErr got Nothing, message: \"" ++ 
 spring :: State (Step Double) ()
 spring = do
   [x, v] <- setStates ["x","v"]
-  [u] <- setActions ["u"]
+  [u]    <- setActions ["u"]
   [k, b] <- addConstants ["k", "b"]
-  setDxdt [v, -k*x - b*v + u]
-  setDt 0.1
   let cost = 2*x*x + 3*v*v + 10*u*u
-  setCost cost
-  addOutput cost "cost"
+  setDxdt [v, -k*x - b*v + u]
+  setDt (tEnd/((fromIntegral n')-1))
+
+  setLagrangeTerm cost (-1,2000)
 
   setBound x (5,5) (TIMESTEP 0)
   setBound v (0,0) (TIMESTEP 0)
   
   setBound x (-5,5) ALWAYS
   setBound v (-10,10) ALWAYS
-  setBound u (-200, 100) ALWAYS
+  setBound u (-200, 200) ALWAYS
 
   setBound v (0,0) (TIMESTEP (n'-1))
 
   setPeriodic x
+  setPeriodic u
+
+tEnd :: Expr Double
+tEnd = 1.5
 
 n' :: Int
-n' = 30
+n' = 18
 
 run :: IO ()
---run = msCoctave spring simpsonsRuleError' n' "../Documents/MATLAB/" "spring"
-run = msCoctave spring eulerError' n' "../Documents/MATLAB/" "spring"
+run = msCoctave spring simpsonsRuleError' n' "../Documents/MATLAB/" "spring"
+--run = msCoctave spring eulerError' n' "../Documents/MATLAB/" "spring"

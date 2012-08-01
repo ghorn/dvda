@@ -19,19 +19,22 @@ import Dvda.SparseLA
 
 data BCTime = ALWAYS | TIMESTEP Int deriving (Show, Eq)
 
-data Constraint a = Constraint (Expr a) Ordering (Expr a) deriving Show
+data Constraint a = Constraint a Ordering a deriving Show
+instance Functor Constraint where
+  fmap f (Constraint x ordering y) = Constraint (f x) ordering (f y)
+  
 
-data Step a = Step { stepStates :: Either (Maybe [(Expr a, String)]) [Expr a]
-                   , stepActions :: Either (Maybe [(Expr a, String)]) [Expr a]
+data Step a = Step { stepStates :: Maybe [Expr a]
+                   , stepActions :: Maybe [Expr a]
                    , stepParams :: HashSet (Expr a)
                    , stepConstants :: HashSet (Expr a)
                    , stepDxdt :: Maybe [Expr a]
-                   , stepCost :: Maybe (Expr a)
+                   , stepLagrangeTerm :: Maybe (Expr a, (a,a))
+                   , stepMayerTerm :: Maybe (Expr a)
                    , stepDt :: Maybe (Expr a)
-                   , stepBounds :: HashMap (Expr a) (a,a, BCTime)
-                   , stepConstraints :: [Constraint a]
-                   , stepIdx :: Int
-                   , stepOutputs :: HashMap String [Expr a]
+                   , stepBounds :: [(Expr a, (a,a, BCTime))]
+                   , stepConstraints :: [Constraint (Expr a)]
+                   , stepOutputs :: HashMap String (Expr a)
                    , stepPeriodic :: HashSet (Expr a)
                    }
 

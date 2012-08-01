@@ -21,13 +21,17 @@ module Dvda.Expr ( Expr(..)
                  , getParents
                  , extractLinearPart
                  , getConst
+                 , substitute
+                 , sketchySubstitute
                  ) where
 
 import Control.Applicative ( (<$>), (<*>), pure )
 import Data.Data ( Data, Typeable, Typeable1, Typeable2 )
 import Data.Hashable ( Hashable, hash, combine )
+
 --import Test.QuickCheck -- ( Arbitrary(..) )
 
+import qualified Dvda.HashMap as HM
 import Dvda.Reify ( MuRef(..) )
 
 commutativeMul :: Bool
@@ -440,6 +444,88 @@ instance MuRef (Expr a) where
   mapDeRef f (EFloating (ASinh x))     = GFloating <$> (ASinh <$> (f x))
   mapDeRef f (EFloating (ATanh x))     = GFloating <$> (ATanh <$> (f x))
   mapDeRef f (EFloating (ACosh x))     = GFloating <$> (ACosh <$> (f x))
+
+substitute :: (Eq a, Hashable a, Show a) => Expr a -> [(Expr a, Expr a)] -> Expr a
+substitute expr subList
+  | nonSymInputs /= [] = error $ "substitute got non-ESym input: " ++ show nonSymInputs
+  | otherwise = subs expr
+  where
+    isSym (ESym _) = True
+    isSym _ = False
+    nonSymInputs = filter (not . isSym . fst) subList
+    lookup' e = let hm = HM.fromList subList in
+      HM.lookupDefault e e hm
+    
+    subs e@(ESym _) = lookup' e
+    subs e@(EConst _) = e
+    subs e@(ENum (FromInteger _)) = e
+    subs e@(EFractional (FromRational _)) = e
+    subs (ENum (Mul x y)) = (subs x) * (subs y)
+    subs (ENum (Add x y)) = (subs x) + (subs y)
+    subs (ENum (Sub x y)) = (subs x) - (subs y)
+    subs (ENum (Negate x)) = negate (subs x)
+    subs (ENum (Abs x))    = abs (subs x)
+    subs (ENum (Signum x)) = signum (subs x)
+    
+    subs (EFractional (Div x y)) = (subs x) / (subs y)
+    
+    subs (EFloating (Pow x y))     = (subs x) ** (subs y)
+    subs (EFloating (LogBase x y)) = logBase (subs x) (subs y)
+    subs (EFloating (Exp   x))     = exp   (subs x)
+    subs (EFloating (Log   x))     = log   (subs x)
+    subs (EFloating (Sin   x))     = sin   (subs x)
+    subs (EFloating (Cos   x))     = cos   (subs x)
+    subs (EFloating (ASin  x))     = asin  (subs x)
+    subs (EFloating (ATan  x))     = atan  (subs x)
+    subs (EFloating (ACos  x))     = acos  (subs x)
+    subs (EFloating (Sinh  x))     = sinh  (subs x)
+    subs (EFloating (Cosh  x))     = cosh  (subs x)
+    subs (EFloating (Tanh  x))     = tanh  (subs x)
+    subs (EFloating (ASinh x))     = asinh (subs x)
+    subs (EFloating (ATanh x))     = atanh (subs x)
+    subs (EFloating (ACosh x))     = acosh (subs x)
+
+-- | this substitute is sketchy because it doesn't perform simplifications that are often assumed to be done
+sketchySubstitute :: (Eq a, Hashable a, Show a) => Expr a -> [(Expr a, Expr a)] -> Expr a
+sketchySubstitute expr subList
+  | nonSymInputs /= [] = error $ "substitute got non-ESym input: " ++ show nonSymInputs
+  | otherwise = subs expr
+  where
+    isSym (ESym _) = True
+    isSym _ = False
+    nonSymInputs = filter (not . isSym . fst) subList
+    lookup' e = let hm = HM.fromList subList in
+      HM.lookupDefault e e hm
+    
+    subs e@(ESym _) = lookup' e
+    subs e@(EConst _)  = e
+    subs e@(ENum (FromInteger _)) = e
+    subs e@(EFractional (FromRational _)) = e
+    subs (ENum (Mul x y)) = ENum (Mul (subs x) (subs y))
+    subs (ENum (Add x y)) = ENum (Add (subs x) (subs y))
+    subs (ENum (Sub x y)) = ENum (Sub (subs x) (subs y))
+    subs (ENum (Negate x)) = ENum (Negate (subs x))
+    subs (ENum (Abs x)) = ENum (Negate (subs x))
+    subs (ENum (Signum x)) = ENum (Signum (subs x))
+  
+    subs (EFractional (Div x y)) = EFractional (Div (subs x) (subs y))
+  
+    subs (EFloating (Pow x y))     = EFloating (Pow (subs x) (subs y))
+    subs (EFloating (LogBase x y)) = EFloating (LogBase (subs x) (subs y))
+    subs (EFloating (Exp   x))     = EFloating (Exp   (subs x))
+    subs (EFloating (Log   x))     = EFloating (Log   (subs x))
+    subs (EFloating (Sin   x))     = EFloating (Sin   (subs x))
+    subs (EFloating (Cos   x))     = EFloating (Cos   (subs x))
+    subs (EFloating (ASin  x))     = EFloating (ASin  (subs x))
+    subs (EFloating (ATan  x))     = EFloating (ATan  (subs x))
+    subs (EFloating (ACos  x))     = EFloating (ACos  (subs x))
+    subs (EFloating (Sinh  x))     = EFloating (Sinh  (subs x))
+    subs (EFloating (Cosh  x))     = EFloating (Cosh  (subs x))
+    subs (EFloating (Tanh  x))     = EFloating (Tanh  (subs x))
+    subs (EFloating (ASinh x))     = EFloating (ASinh (subs x))
+    subs (EFloating (ATanh x))     = EFloating (ATanh (subs x))
+    subs (EFloating (ACosh x))     = EFloating (ACosh (subs x))
+
 
 ---------------------------------- utility functions -------------------------------
 

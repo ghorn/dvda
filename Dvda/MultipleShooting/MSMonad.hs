@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language FlexibleContexts #-}
 
 module Dvda.MultipleShooting.MSMonad ( State
                                      , setStates
@@ -9,31 +8,34 @@ module Dvda.MultipleShooting.MSMonad ( State
                                      , addConstant
                                      , addConstants
                                      , setDxdt
-                                     , setCost
+                                     , setLagrangeTerm
+                                     , setMayerTerm
                                      , setDt
                                      , addOutput
-                                     , getTimeStep
                                      , setPeriodic
                                      , addConstraint
                                      , setBound
-                                     , runOneStep
-                                     , execDxdt
+                                     , lagrangeStateName
+                                     , lagrangeTermName
                                      ) where
 
 import Data.Hashable ( Hashable )
 import qualified Data.HashSet as HS
-import Data.List ( nub, sort ) --, union )
-import Data.Maybe ( isJust, isNothing )
+import Data.List ( nub, sort )
+import Data.Maybe ( isJust, fromMaybe )
+import Data.Monoid ( mappend )
 import Control.Monad ( when, zipWithM_ )
 import Control.Monad.State ( State )
 import qualified Control.Monad.State as State
---import Debug.Trace ( trace )
-import Text.Printf ( printf )
 
 import qualified Dvda.HashMap as HM
 
 import Dvda.Expr ( Expr(..), sym )
 import Dvda.MultipleShooting.Types
+
+lagrangeStateName,lagrangeTermName :: String
+lagrangeStateName = "lagrangeState"
+lagrangeTermName = "lagrangeTerm"
 
 failDuplicates :: [String] -> [String]
 failDuplicates names
@@ -42,45 +44,48 @@ failDuplicates names
 
 checkOctaveName :: String -> String
 checkOctaveName name
-  | any (`elem` "\"'~!@#$%^&*()+`-=[]{}\\|;:,.<>/?") name =
-    error $ "ERROR: addOutput saw illegal octave variable character in string: \"" ++ name ++ "\""
+  | any (`elem` badChars) name =
+    error $ "ERROR: saw illegal octave variable character in string: \"" ++ name ++
+    "\", illegal characters: " ++ badChars
+  | name == lagrangeStateName = error "don't call your variable \"" ++ lagrangeStateName ++ "\", it's reserved"
+  | name == lagrangeTermName = error "don't call your variable \"" ++ lagrangeTermName ++ "\", it's reserved"
   | otherwise = name
+  where
+    badChars = "\"'~!@#$%^&*()+`-=[]{}\\|;:,.<>/?"
 
 setStates :: [String] -> State (Step a) [Expr a]
 setStates names' = do
   step <- State.get
-  case stepStates step of (Right states) -> return states
-                          (Left (Just _)) -> error "states already set, don't call setStates twice"
-                          (Left Nothing) -> do
+  case stepStates step of Just _ -> error "states already set, don't call setStates twice"
+                          Nothing -> do
                             let names = failDuplicates (map checkOctaveName names')
-                                syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
-                            State.put $ step {stepStates = Left (Just (zip syms names))}
+                                syms = map sym (failDuplicates names)
+                            State.put $ step {stepStates = Just syms}
                             zipWithM_ addOutput syms names
                             return syms
 
 setActions :: [String] -> State (Step a) [Expr a]
 setActions names' = do
   step <- State.get
-  case stepActions step of (Right actions) -> return actions
-                           (Left (Just _)) -> error "actions already set, don't call setActions twice"
-                           (Left Nothing) -> do
+  case stepActions step of Just _ -> error "actions already set, don't call setActions twice"
+                           Nothing -> do
                              let names = failDuplicates (map checkOctaveName names')
-                                 syms = map (sym . (++ "_" ++ show (stepIdx step))) (failDuplicates names)
-                             State.put $ step {stepActions = Left (Just (zip syms names))}
+                                 syms = map sym (failDuplicates names)
+                             State.put $ step {stepActions = Just syms}
                              zipWithM_ addOutput syms names
                              return syms
 
-addParam :: (Eq (Expr a), Hashable (Expr a)) => String -> State (Step a) (Expr a)
+addParam :: (Eq a, Hashable a) => String -> State (Step a) (Expr a)
 addParam name = do
   [blah] <- addParams [name]
   return blah
 
-addConstant :: (Eq (Expr a), Hashable (Expr a)) => String -> State (Step a) (Expr a)
+addConstant :: (Eq a, Hashable a) => String -> State (Step a) (Expr a)
 addConstant name = do
   [blah] <- addConstants [name]
   return blah
 
-addParams :: (Eq (Expr a), Hashable (Expr a)) => [String] -> State (Step a) [Expr a]
+addParams :: (Eq a, Hashable a) => [String] -> State (Step a) [Expr a]
 addParams names = do
   step  <- State.get
   let syms = map (sym . checkOctaveName) names
@@ -88,7 +93,7 @@ addParams names = do
   State.put $ step {stepParams = HS.union params0 (HS.fromList syms)}
   return syms
 
-addConstants :: (Eq (Expr a), Hashable (Expr a)) => [String] -> State (Step a) [Expr a]
+addConstants :: (Eq a, Hashable a) => [String] -> State (Step a) [Expr a]
 addConstants names = do
   step  <- State.get
   let syms = map (sym . checkOctaveName) names
@@ -101,7 +106,7 @@ addOutput var name = do
   step <- State.get
   let hm = stepOutputs step
       err = error $ "ERROR: already have an output with name: \"" ++ name ++ "\""
-  State.put $ step {stepOutputs = HM.insertWith err (checkOctaveName name) [var] hm}
+  State.put $ step {stepOutputs = HM.insertWith err (checkOctaveName name) var hm}
 
 setDt :: Expr a -> State (Step a) ()
 setDt expr = do
@@ -109,16 +114,15 @@ setDt expr = do
   when (isJust (stepDt step)) $ error "dt already set, don't call setDt twice"
   State.put $ step {stepDt = Just expr}
 
-getTimeStep :: State (Step a) Int
-getTimeStep = do
-  step <- State.get
-  return (stepIdx step)
-
-setPeriodic :: (Eq (Expr a), Hashable (Expr a)) => Expr a -> State (Step a) ()
+setPeriodic :: (Eq a, Hashable a, Show a) => Expr a -> State (Step a) ()
 setPeriodic var = do
   step <- State.get
-  State.put $ step {stepPeriodic = HS.insert var (stepPeriodic step)}
-  
+  let newPeriodic
+        | var `HS.member` (stepPeriodic step) = error $ "you called setPeriodic twice on \"" ++ show var ++ "\""
+        | not (var `elem` (fromMaybe [] (mappend (stepStates step) (stepActions step)))) =
+          error $ "you can only make states or actions periodic, you can't make \"" ++ show var ++ "\" periodic"
+        | otherwise = HS.insert var (stepPeriodic step)
+  State.put $ step {stepPeriodic = newPeriodic}
 -------------------------------------------
 
 setDxdt :: [Expr a] -> State (Step a) ()
@@ -127,87 +131,25 @@ setDxdt vars = do
   when (isJust (stepDxdt step)) $ error "dxdt already set, don't call setDxdt twice"
   State.put $ step {stepDxdt = Just vars}
 
-setCost :: Expr a -> State (Step a) ()
-setCost var = do
+setLagrangeTerm :: Expr a -> (a,a) -> State (Step a) ()
+setLagrangeTerm var (lb,ub) = do
   step  <- State.get
-  when (isJust (stepCost step)) $ error "cost already set, don't call setCost twice"
-  State.put $ step {stepCost = Just var}
+  when (isJust (stepLagrangeTerm step)) $ error "Lagrange term already set, don't call setLagrangeTerm twice"
+  State.put $ step {stepLagrangeTerm = Just (var,(lb,ub))}
 
-setBound :: (Show a, Eq a, Show (Expr a), Eq (Expr a), Hashable (Expr a))
+setMayerTerm :: Expr a -> State (Step a) ()
+setMayerTerm var = do
+  step  <- State.get
+  when (isJust (stepMayerTerm step)) $ error "Mayer term already set, don't call setMayerTerm twice"
+  State.put $ step {stepMayerTerm = Just var}
+
+setBound :: (Show a, Eq a, Hashable a)
             => Expr a -> (a, a) -> BCTime -> State (Step a) ()
-setBound var@(ESym _) (lb, ub) bnd = do
+setBound var@(ESym _) (lb, ub) bctime = do
   step <- State.get
-  let k = stepIdx step
-      newbnd = (lb,ub,bnd)
-      oldBounds = stepBounds step
-
-      err old = error $ printf "ERROR: setBound called twice on %s (old bound: %s, new bound: %s)" (show var) (show old) (show newbnd)
-
-  let putNewBnd = case bnd of
-        (TIMESTEP j) -> if j /= k
-                        then Nothing
-                        else case (HM.lookup var (stepBounds step)) of
-                          Just oldbnd@(_, _, TIMESTEP _) -> err oldbnd
-                          _ -> Just newbnd
-        ALWAYS -> case (HM.lookup var (stepBounds step)) of
-          Just oldbnd@(_,_,ALWAYS) -> err oldbnd
-          Just (_,_,TIMESTEP _) -> Nothing
-          Nothing -> Just newbnd
-
-  when (isJust putNewBnd) $
-    State.put $ step {stepBounds = HM.insert var newbnd oldBounds}
-setBound _ _ _ = do
-  -- if execDxdt has put the x/u, they won't be symbolic - ignore them
-  step <- State.get
-  case stepStates step of
-    Left _ -> error "WARNING - setBound called on non-design variable, use addConstraint instead"
-    _ -> return ()
-
+  State.put $ step {stepBounds = (var, (lb,ub,bctime)):(stepBounds step)}
+setBound _ _ _ = error "WARNING - setBound called on non-design variable, try addConstraint instead"
 
 addConstraint :: Expr a -> Ordering -> Expr a -> State (Step a) ()
 addConstraint x ordering y =
   State.state (\step -> ((), step {stepConstraints = (stepConstraints step) ++ [Constraint x ordering y]}))
-
-
-runOneStep :: State (Step a) b -> Int -> Step a
-runOneStep userStep k
-  | isNothing (stepDxdt ret) = error "ERROR: need to set dxdt"
-  | isNothing (stepDt ret) = error "ERROR: need to set timestep dt"
-  | otherwise = stateErr `seq` actionErr `seq` ret
-  where
-    stateErr = case stepStates ret of Left Nothing -> error "ERROR: need to set states"
-                                      _ -> ()
-    actionErr = case stepActions ret of Left Nothing -> error "ERROR: need to set actions"
-                                        _ -> ()
-    ret = State.execState userStep $ Step { stepStates = Left Nothing
-                                          , stepActions = Left Nothing
-                                          , stepDxdt = Nothing
-                                          , stepCost = Nothing
-                                          , stepDt = Nothing
-                                          , stepBounds = HM.empty
-                                          , stepConstraints = []
-                                          , stepParams = HS.empty
-                                          , stepConstants = HS.empty
-                                          , stepIdx = k
-                                          , stepOutputs = HM.empty
-                                          , stepPeriodic = HS.empty
-                                          }
-
-execDxdt :: Num (Expr a) => State (Step a) b -> Int -> [Expr a] -> [Expr a] -> [Expr a]
-execDxdt userStep k x u = case stepDxdt $ State.execState userStep step0 of
-  Nothing -> error "ERROR: need to set dxdt"
-  Just dxdt -> dxdt
-  where
-    step0 = Step { stepStates  = Right x
-                 , stepActions = Right u
-                 , stepDxdt = Nothing
-                 , stepDt = Nothing
-                 , stepCost = Nothing
-                 , stepBounds = HM.empty
-                 , stepConstraints = []
-                 , stepParams = HS.empty
-                 , stepConstants = HS.empty
-                 , stepIdx = k
-                 , stepOutputs = HM.empty
-                 , stepPeriodic = HS.empty
-                 }

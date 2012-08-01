@@ -35,7 +35,7 @@ data FunGraph a = FunGraph { fgGraph :: Graph.Graph
                            , fgInputs :: [MVS (GExpr a Int)]
                            , fgOutputs :: [MVS Int]
                            , fgReified :: [(Int, GExpr a Int)]
-                           , fgLookupGExpr :: (Int -> Maybe (GExpr a Int))
+                           , fgLookupGExpr :: Int -> Maybe (GExpr a Int)
                            , fgVertexFromKey :: Int -> Maybe Int
                            , fgNodeFromVertex :: Int -> (GExpr a Int, Int, [Int])
                            }
