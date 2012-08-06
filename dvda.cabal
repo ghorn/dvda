@@ -94,7 +94,7 @@ Library
 --                     text,
 
   Ghc-options:       -Wall -O2
-  GHC-Prof-Options:  -prof -fprof-auto -fprof-cafs -rtsopts
+  GHC-Prof-Options:  -Wall -O2 -prof -fprof-auto -fprof-cafs -rtsopts
   GHC-Shared-Options: -fPIC
 
 
