@@ -194,7 +194,7 @@ cAssignment :: (Eq a, Hashable a, Show a) => HashMap (GExpr a Int) String -> Int
 cAssignment inputMap k g@(GSym _) = case HM.lookup g inputMap of
   Nothing -> error $ "cAssignment: couldn't find " ++ show g ++ " in the input map"
   Just str -> "const double " ++ nameNode k ++ " = " ++ str
-cAssignment inputMap k gexpr = (\cop -> "const double " ++ nameNode k ++ " = " ++ cop ++ ";") (toCOp gexpr)
+cAssignment inputMap k gexpr = "const double " ++ nameNode k ++ " = " ++ toCOp gexpr ++ ";"
   where
     bin :: Int -> Int -> String -> String
     bin x y op = nameNode x ++ " " ++ op ++ " " ++ nameNode y
