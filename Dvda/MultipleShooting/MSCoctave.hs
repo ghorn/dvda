@@ -1,6 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language FlexibleContexts #-}
-{-# Language TypeFamilies #-}
 
 module Dvda.MultipleShooting.MSCoctave ( msCoctave
                                        , run
@@ -9,17 +7,18 @@ module Dvda.MultipleShooting.MSCoctave ( msCoctave
 import qualified Control.Monad.State as State
 import Data.Hashable ( Hashable )
 import qualified Data.HashSet as HS
-import Data.List ( elemIndex, transpose, zipWith6 )
+import Data.List ( zipWith6 )
 import Data.Maybe ( fromMaybe )
 
 import Dvda.AD ( rad )
 import Dvda.CGen  ( showMex )
 import Dvda.CSE ( cse )
 import Dvda.Codegen ( writeSourceFile )
-import Dvda.Expr ( Expr(..), Sym(..), sym, substitute )
+import Dvda.Expr ( Expr(..), sym, substitute )
 import Dvda.FunGraph ( (:*)(..), toFunGraph, countNodes )
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
+import Dvda.MultipleShooting.CoctaveTemplates
 import Dvda.MultipleShooting.MSMonad
 import Dvda.MultipleShooting.Types
 
@@ -42,6 +41,7 @@ type Integrator a = [Expr Double]
                    -> [Expr Double]
 
 -- take user provided bounds and make sure they're complete
+-- return functions which will lookup bounds on given state/action @ timestep, and given param
 setupBounds :: (Eq a, Hashable a, Show a)
                => [(Expr a, (a,a, BCTime))]
                -> Int
@@ -85,11 +85,6 @@ setupBounds userBounds nSteps = (lookupAll, lookupParam)
 vectorizeDvs :: [[a]] -> [[a]] -> [a] -> [a]
 vectorizeDvs allStates allActions params = concat allStates ++ concat allActions ++ params
 
-getWithErr :: Step a -> String -> (Step a -> Maybe c) -> c
-getWithErr step name f = case f step of
-  Nothing -> error $ "need to set " ++ name
-  Just ret -> ret
-
 msCoctave ::
   State (Step Double) b
   -> Integrator Double
@@ -112,11 +107,16 @@ msCoctave userStep' odeError n funDir name = do
                   , stepOutputs = HM.empty
                   , stepPeriodic = HS.empty
                   }
-      actions = getWithErr step "actions" stepActions
-      dt      = getWithErr step "dt"      stepDt
+      getWithErr :: String -> (Step Double -> Maybe c) -> c
+      getWithErr fieldName f = case f step of
+        Nothing -> error $ "need to set " ++ fieldName
+        Just ret -> ret
+
+      actions = getWithErr "actions" stepActions
+      dt      = getWithErr "dt"      stepDt
       (states,outputs,dxdt,lagrangeState) = let
-        states'  = getWithErr step "states" stepStates
-        dxdt'    = getWithErr step "dxdt"   stepDxdt
+        states'  = getWithErr "states" stepStates
+        dxdt'    = getWithErr "dxdt"   stepDxdt
         outputs' = stepOutputs step
         in
          case stepLagrangeTerm step of
@@ -142,8 +142,6 @@ msCoctave userStep' odeError n funDir name = do
         where
           f output = zipWith (subStatesActions output) allStates allActions
 
-      -- mapOverTimesteps :: [[Expr a]] -> [[Expr a]] -> [Expr a]
---      mapOverTimesteps f = zipWith3 f allStates allActions (replicate params)
       subStatesActions f x u = substitute f (zip states x ++ zip actions u)
 
       subAllTimesteps :: Expr Double -> [Expr Double]
@@ -226,43 +224,8 @@ msCoctave userStep' odeError n funDir name = do
       mexAllSource = writeMexAll name
       unstructConstsSource = writeUnstructConsts name constants
       structSource = writeToStruct name dvs params constants outputMap
-      
-      -- take nice matlab structs and return vector of design variables
-      unstructSource =
-        unlines $
-        [ "function dvs = " ++ name ++ "_unstruct(dvStruct)\n"
-        , "dvs = zeros(" ++ show (length dvs) ++ ", 1);"
-        , ""
-        , concatMap fromParam params
-        , concat $ zipWith fromXU states  (transpose allStates)
-        , concat $ zipWith fromXU actions (transpose allActions)
-        ]
-        where
-          dvIdx e = fromMaybe (error $ "dvIdx error - " ++ show e ++ " is not a design variable")
-                    (e `elemIndex` dvs)
-          fromParam e = "dvs(" ++ show (1 + dvIdx e) ++ ") = dvStruct." ++ show e ++ ";\n"
-          fromXU e es =
-            "dvs(" ++ show (map ((1 +) . dvIdx) es) ++ ") = dvStruct." ++ show e ++ ";\n"
-
-      plotSource =
-        unlines $
-        [ "function " ++ name ++ "_plot(designVars, constants)\n"
-        , "x = " ++ name ++ "_struct(designVars, constants);\n"
-        , init $ unlines $ zipWith f (HM.keys outputMap) [(1::Int)..]
-        ]
-        where
-          rows = ceiling $ sqrt $ (fromIntegral ::Int -> Double) $ HM.size outputMap
-          cols = (HM.size outputMap `div` rows) + 1
-          f name' k = unlines $
-                      [ "subplot(" ++ show rows ++ "," ++ show cols ++ ","++show k++");"
-                      , "plot( x.time, x." ++ name' ++ " );"
-                      , "xlabel('time');"
-                      , "ylabel('" ++ name'' ++ "');"
-                      , "title('"  ++ name'' ++ "');"
-                      ]
-            where
-              name'' = foldl (\acc x -> if x == '_' then acc ++ "\\_" else acc ++ [x]) "" name'
-
+      unstructSource = writeUnstruct name dvs params states allStates actions allActions
+      plotSource = writePlot name outputMap
 
   _ <- writeSourceFile         mexAllSource funDir $ name ++ "_mex_all.m"
   _ <- writeSourceFile          setupSource funDir $ name ++ "_setup.m"
@@ -285,70 +248,6 @@ msCoctave userStep' odeError n funDir name = do
   putStrLn $ "nodes in constraints: " ++ show (countNodes constraintsFg) ++
     " (" ++ show (countNodes constraintsFg0) ++ " before CSE)"
   
-
-writeMexAll :: String -> String
-writeMexAll name = unlines $ map f ["time", "outputs", "sim", "cost", "constraints"]
-  where
-    f x = "tic\nfprintf('mexing " ++ file ++ "...  ')\n"++"mex " ++ file ++ "\nt1 = toc;\nfprintf('finished in %.2f seconds\\n', t1)"
-      where
-        file = name ++ "_" ++ x ++ ".c"
-
-
-writeSetupSource :: Show a => String -> [Expr a] -> [a] -> [a] -> String
-writeSetupSource name dvs lbs ubs =
-  unlines $
-  [ "function [x0, Aineq, bineq, Aeq, beq, lb, ub] = "++ name ++"_setup()"
-  , ""
-  , "x0 = zeros(" ++ show (length dvs) ++ ",1);"
-  , "Aineq = [];"
-  , "bineq = [];"
-  , "Aeq = [];"
-  , "beq = [];"
-  , "lb = " ++ show lbs ++ "';"
-  , "ub = " ++ show ubs ++ "';"
-  ]
-
-
--- take nice matlab structs and return vector of design constants
-writeUnstructConsts :: Eq a => String -> [Expr a] -> String
-writeUnstructConsts name constants =
-  unlines $
-  [ "function constants = " ++ name ++ "_unstructConstants(constStruct)\n"
-  , "constants = zeros(" ++ show (length constants) ++ ", 1);"
-  , ""
-  , concatMap fromConst constants
-  ]
-  where
-    readName e = case e of
-      ESym (Sym nm) -> nm
-      _ -> error "const not ESym Sym"
-    fromConst e = "constants(" ++ show (1 + (fromJustErr "fromConst error" $ e `elemIndex` constants)) ++ ") = constStruct." ++ readName e ++ ";\n"
-
-
----- take vector of design variables and vector of constants and return nice matlab struct
-writeToStruct :: (Eq a, Show a, Hashable a)
-                 => String -> [Expr a] -> [Expr a] -> [Expr a] -> HashMap String [Expr a] -> String
-writeToStruct name dvs params constants outputMap =
-  unlines $
-  ["function ret = " ++ name ++ "_struct(designVars,constants)"
-  , ""
-  , "ret.time = " ++ name ++ "_time(designVars, constants);"
-  , "outs = " ++ name ++ "_outputs(designVars, constants);"
-  , concat $ zipWith (\name' k -> "ret." ++name'++ " = outs("++show k++",:);\n") (HM.keys outputMap) [(1::Int)..]
-  ] ++
-  toStruct dvs "designVars" (map show params) (map (\x -> [x]) params) ++
-  toStruct constants "constants" (map show constants) (map (\x -> [x]) constants)
-    where
-      dvsToIdx dvs' = (fromJustErr "toStruct error") . (flip HM.lookup (HM.fromList (zip dvs' [(1::Int)..])))
-
-      toStruct dvs' nm = zipWith (\name' vars -> "ret." ++ name' ++ " = " ++ nm ++ "(" ++ show (map (dvsToIdx dvs') vars) ++ ");\n")
-
-
-
-fromJustErr :: String -> Maybe a -> a
-fromJustErr _ (Just x) = x
-fromJustErr message Nothing = error $ "fromJustErr got Nothing, message: \"" ++ message ++ "\""
-
 
 spring :: State (Step Double) ()
 spring = do

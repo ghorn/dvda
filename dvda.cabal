@@ -63,6 +63,7 @@ Library
                      Dvda.Expr
                      Dvda.Examples
                      Dvda.FunGraph
+                     Dvda.MultipleShooting.CoctaveTemplates
                      Dvda.MultipleShooting.MSCoctave
                      Dvda.MultipleShooting.MSMonad
                      Dvda.MultipleShooting.Types
