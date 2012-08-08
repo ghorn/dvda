@@ -21,6 +21,9 @@ import Dvda.Graph ( FunGraph(..) )
 import Dvda.SymMonad ( MkFunGraph(..), makeFunGraph )
 import qualified Dvda.Config as Config
 
+--ghcString :: FilePath -> FilePath -> String
+--ghcString src obj = "ghc -c " ++ src ++ " -o " ++ obj
+
 
 -- | take in a pure function and symbolic inputs, return JIT compiled function
 buildHSFunctionPure :: (Show (NumT c), H.Hashable (NumT c), MkFunGraph c,

@@ -16,24 +16,6 @@ import Control.Monad(when)
 import qualified Dvda.Config as Config
 
 -- | take in name of source and future object, compile object
-callGcc :: FilePath -> FilePath -> IO ()
-callGcc srcname objname = do
-  -- compile new object
-  let compileString = Config.gccString srcname objname
-      displayString = Config.gccString (shortName srcname) (shortName objname)
-
-  -- print compilation string
-  when Config.spewGccCall $ putStrLn displayString
-  
-  -- run compilation string
-  p <- runCommand compileString
-  
-  -- check for errors
-  exitCode <- waitForProcess p
-  when (exitCode /= ExitSuccess) $ error $ "failed compiling " ++ srcname
-
-
--- | take in name of source and future object, compile object
 callGhc :: FilePath -> FilePath -> IO ()
 callGhc srcname objname = do
   -- compile new object
