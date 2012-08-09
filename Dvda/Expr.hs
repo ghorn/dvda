@@ -23,6 +23,7 @@ module Dvda.Expr ( Expr(..)
                  , getConst
                  , substitute
                  , sketchySubstitute
+                 , foldExpr
                  ) where
 
 import Control.Applicative ( (<$>), (<*>), pure )
@@ -528,6 +529,35 @@ sketchySubstitute expr subList
 
 
 ---------------------------------- utility functions -------------------------------
+-- | foldr over the constants and symbols
+foldExpr :: (Expr a -> b -> b) -> b -> Expr a -> b
+foldExpr f acc e@(ESym _)                       = f e acc
+foldExpr f acc e@(EConst _)                     = f e acc
+foldExpr f acc e@(EFractional (FromRational _)) = f e acc
+foldExpr f acc e@(ENum (FromInteger _))         = f e acc
+foldExpr f acc (ENum (Mul x y))          = foldExpr f (foldExpr f acc y) x
+foldExpr f acc (ENum (Add x y))          = foldExpr f (foldExpr f acc y) x
+foldExpr f acc (ENum (Sub x y))          = foldExpr f (foldExpr f acc y) x
+foldExpr f acc (ENum (Negate x))         = foldExpr f acc x
+foldExpr f acc (ENum (Abs x))            = foldExpr f acc x
+foldExpr f acc (ENum (Signum x))         = foldExpr f acc x
+foldExpr f acc (EFractional (Div x y))   = foldExpr f (foldExpr f acc y) x
+foldExpr f acc (EFloating (Pow x y))     = foldExpr f (foldExpr f acc y) x
+foldExpr f acc (EFloating (LogBase x y)) = foldExpr f (foldExpr f acc y) x
+foldExpr f acc (EFloating (Exp x))       = foldExpr f acc x
+foldExpr f acc (EFloating (Log x))       = foldExpr f acc x
+foldExpr f acc (EFloating (Sin x))       = foldExpr f acc x
+foldExpr f acc (EFloating (Cos x))       = foldExpr f acc x
+foldExpr f acc (EFloating (ASin x))      = foldExpr f acc x
+foldExpr f acc (EFloating (ATan x))      = foldExpr f acc x
+foldExpr f acc (EFloating (ACos x))      = foldExpr f acc x
+foldExpr f acc (EFloating (Sinh x))      = foldExpr f acc x
+foldExpr f acc (EFloating (Cosh x))      = foldExpr f acc x
+foldExpr f acc (EFloating (Tanh x))      = foldExpr f acc x
+foldExpr f acc (EFloating (ASinh x))     = foldExpr f acc x
+foldExpr f acc (EFloating (ATanh x))     = foldExpr f acc x
+foldExpr f acc (EFloating (ACosh x))     = foldExpr f acc x
+
 
 -- | symbolic scalar
 sym :: String -> Expr a
