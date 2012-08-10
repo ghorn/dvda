@@ -281,7 +281,9 @@ instance (Num a, Eq a) => Num (Expr a) where
   (-) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx - y
   (-) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx - ry)
   (-) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx - fromInteger ky)
-  (-) x (ENum (Negate y)) = x + y
+  (-) (ENum (Negate x)) (ENum (Negate y)) = y - x -- (-x) - (-y) == y - x
+  (-) x (ENum (Negate y)) = x + y -- (x) - (-y) == x + y
+  (-) (ENum (Negate x)) y = negate (x + y) -- (-x) - (y) == -(x+y)
   (-) x y
     | isVal 0 x = negate y
     | isVal 0 y = x
