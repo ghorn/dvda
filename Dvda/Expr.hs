@@ -244,6 +244,9 @@ instance (Num a, Eq a) => Num (Expr a) where
   (*) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx * y
   (*) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx * ry)
   (*) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx * fromInteger ky)
+  (*) (ENum (Negate x)) (ENum (Negate y)) = x * y
+  (*) (ENum (Negate x)) y = negate (x * y)
+  (*) x (ENum (Negate y)) = negate (x * y)
   (*) x y
     | isVal 0 x || isVal 0 y = 0
     | isVal 1 x = y
@@ -259,9 +262,13 @@ instance (Num a, Eq a) => Num (Expr a) where
   (+) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx + y
   (+) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx + ry)
   (+) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx + fromInteger ky)
+  (+) (ENum (Negate x)) (ENum (Negate y)) = negate (x + y)
+  (+) x (ENum (Negate y)) = x - y
+  (+) (ENum (Negate x)) y = y - x
   (+) x y
     | isVal 0 x = y
     | isVal 0 y = x
+    | x == negate y = 0
     | otherwise = ENum $ Add x y
 
   (-) (EConst x) (EConst y) = EConst (x-y)
@@ -273,9 +280,11 @@ instance (Num a, Eq a) => Num (Expr a) where
   (-) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx - y
   (-) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx - ry)
   (-) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx - fromInteger ky)
+  (-) x (ENum (Negate y)) = x + y
   (-) x y
     | isVal 0 x = negate y
     | isVal 0 y = x
+    | x == y = 0
     | otherwise = ENum $ Sub x y
 
   abs (EConst x) = EConst (abs x)
@@ -286,6 +295,7 @@ instance (Num a, Eq a) => Num (Expr a) where
   negate (EConst x) = EConst (negate x)
   negate (ENum (FromInteger k)) = ENum (FromInteger (negate k))
   negate (EFractional (FromRational r)) = EFractional (FromRational (negate r))
+  negate (ENum (Negate x)) = x
   negate x = ENum $ Negate x
 
   signum (EConst x) = EConst (signum x)
@@ -305,6 +315,9 @@ instance (Fractional a, Eq a) => Fractional (Expr a) where
   (/) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx / y
   (/) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx / ry)
   (/) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx / fromInteger ky)
+  (/) (ENum (Negate x)) (ENum (Negate y)) = x / y
+  (/) (ENum (Negate x)) y = negate (x / y)
+  (/) x (ENum (Negate y)) = negate (x / y)
   (/) x y
     | isVal 0 y = error "Fractional (Expr a) divide by zero"
     | isVal 0 x = 0
