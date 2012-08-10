@@ -24,6 +24,7 @@ module Dvda.Expr ( Expr(..)
                  , substitute
                  , sketchySubstitute
                  , foldExpr
+                 , fromNeg
                  ) where
 
 import Control.Applicative ( (<$>), (<*>), pure )
