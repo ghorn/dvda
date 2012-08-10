@@ -29,6 +29,7 @@ module Dvda.Expr ( Expr(..)
 import Control.Applicative ( (<$>), (<*>), pure )
 import Data.Data ( Data, Typeable, Typeable1, Typeable2 )
 import Data.Hashable ( Hashable, hash, combine )
+import Data.Ratio ( (%) )
 
 --import Test.QuickCheck -- ( Arbitrary(..) )
 
@@ -307,7 +308,7 @@ instance (Num a, Eq a) => Num (Expr a) where
 
 instance (Fractional a, Eq a) => Fractional (Expr a) where
   (/) (EConst x) (EConst y) = EConst (x/y)
---  (/) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx / ky)
+  (/) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = EFractional $ FromRational (kx % ky)
   (/) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx / ry)
   (/) (EConst x) (ENum (FromInteger ky)) = EConst $ x / fromInteger ky
   (/) (ENum (FromInteger kx)) (EConst y) = EConst $ fromInteger kx / y
