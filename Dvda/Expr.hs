@@ -235,7 +235,18 @@ instance Hashable a => Hashable (Expr a) where
 --deriving instance Enum a => Enum (Floatings a)
 --deriving instance Bounded a => Bounded (Floatings a)
 
-instance (Num a, Eq a) => Num (Expr a) where
+fromNeg :: (Num a, Ord a) => Expr a -> Maybe (Expr a)
+fromNeg (ENum (Negate x)) = Just x
+fromNeg (ENum (FromInteger k))
+  | k < 0 = Just (ENum (FromInteger (abs k)))
+fromNeg (EFractional (FromRational r))
+  | r < 0 = Just (EFractional (FromRational (abs r)))
+fromNeg (EConst c)
+  | c < 0 = Just (EConst (abs c))
+fromNeg _ = Nothing
+
+
+instance (Num a, Ord a) => Num (Expr a) where
   (*) (EConst x) (EConst y) = EConst (x*y)
   (*) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx * ky)
   (*) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx * ry)
@@ -245,14 +256,15 @@ instance (Num a, Eq a) => Num (Expr a) where
   (*) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx * y
   (*) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx * ry)
   (*) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx * fromInteger ky)
-  (*) (ENum (Negate x)) (ENum (Negate y)) = x * y
-  (*) (ENum (Negate x)) y = negate (x * y)
-  (*) x (ENum (Negate y)) = negate (x * y)
   (*) x y
     | isVal 0 x || isVal 0 y = 0
     | isVal 1 x = y
     | isVal 1 y = x
-    | otherwise = ENum $ Mul x y
+  (*) x y = case (fromNeg x, fromNeg y) of
+              (Just x', Just y') -> x' * y'
+              (Nothing, Just y') -> negate (x  * y')
+              (Just x', Nothing) -> negate (x' * y )
+              _ -> ENum $ Mul x y
 
   (+) (EConst x) (EConst y) = EConst (x+y)
   (+) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx + ky)
@@ -263,14 +275,15 @@ instance (Num a, Eq a) => Num (Expr a) where
   (+) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx + y
   (+) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx + ry)
   (+) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx + fromInteger ky)
-  (+) (ENum (Negate x)) (ENum (Negate y)) = negate (x + y)
-  (+) x (ENum (Negate y)) = x - y
-  (+) (ENum (Negate x)) y = y - x
   (+) x y
     | isVal 0 x = y
     | isVal 0 y = x
     | x == negate y = 0
-    | otherwise = ENum $ Add x y
+  (+) x y = case (fromNeg x, fromNeg y) of
+              (Just x', Just y') -> negate (x' + y')
+              (Nothing, Just y') -> x  - y'
+              (Just x', Nothing) -> y  - x'
+              _ -> ENum $ Add x y
 
   (-) (EConst x) (EConst y) = EConst (x-y)
   (-) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx - ky)
@@ -281,19 +294,21 @@ instance (Num a, Eq a) => Num (Expr a) where
   (-) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx - y
   (-) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx - ry)
   (-) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx - fromInteger ky)
-  (-) (ENum (Negate x)) (ENum (Negate y)) = y - x -- (-x) - (-y) == y - x
-  (-) x (ENum (Negate y)) = x + y -- (x) - (-y) == x + y
-  (-) (ENum (Negate x)) y = negate (x + y) -- (-x) - (y) == -(x+y)
   (-) x y
     | isVal 0 x = negate y
     | isVal 0 y = x
     | x == y = 0
-    | otherwise = ENum $ Sub x y
+  (-) x y = case (fromNeg x, fromNeg y) of
+              (Just x', Just y') -> y' - x' -- (-x) - (-y) == y - x
+              (Nothing, Just y') -> x + y' -- (x) - (-y) == x + y
+              (Just x', Nothing) -> negate (x' + y) -- (-x) - (y) == -(x+y)
+              _ -> ENum $ Sub x y
 
   abs (EConst x) = EConst (abs x)
   abs (ENum (FromInteger k)) = ENum (FromInteger (abs k))
   abs (EFractional (FromRational r)) = EFractional (FromRational (abs r))
-  abs x = ENum $ Abs x
+  abs x = case fromNeg x of Nothing -> ENum (Abs x)
+                            Just x' -> abs x'
 
   negate (EConst x) = EConst (negate x)
   negate (ENum (FromInteger k)) = ENum (FromInteger (negate k))
@@ -308,7 +323,7 @@ instance (Num a, Eq a) => Num (Expr a) where
 
   fromInteger = ENum . FromInteger
 
-instance (Fractional a, Eq a) => Fractional (Expr a) where
+instance (Fractional a, Ord a) => Fractional (Expr a) where
   (/) (EConst x) (EConst y) = EConst (x/y)
   (/) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = EFractional $ FromRational (kx % ky)
   (/) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx / ry)
@@ -318,18 +333,19 @@ instance (Fractional a, Eq a) => Fractional (Expr a) where
   (/) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx / y
   (/) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx / ry)
   (/) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx / fromInteger ky)
-  (/) (ENum (Negate x)) (ENum (Negate y)) = x / y
-  (/) (ENum (Negate x)) y = negate (x / y)
-  (/) x (ENum (Negate y)) = negate (x / y)
   (/) x y
     | isVal 0 y = error "Fractional (Expr a) divide by zero"
     | isVal 0 x = 0
     | isVal 1 y = x
-    | otherwise = EFractional $ Div x y
+  (/) x y = case (fromNeg x, fromNeg y) of
+              (Just x', Just y') -> x' / y'
+              (Nothing, Just y') -> negate (x  / y')
+              (Just x', Nothing) -> negate (x' / y )
+              _ -> EFractional $ Div x y
 
   fromRational = EFractional . FromRational
 
-instance (Floating a, Eq a) => Floating (Expr a) where
+instance (Floating a, Ord a) => Floating (Expr a) where
   pi          = EConst pi
   x ** y      = EFloating $ Pow x y
   logBase x y = EFloating $ LogBase x y
@@ -463,7 +479,7 @@ instance MuRef (Expr a) where
   mapDeRef f (EFloating (ATanh x))     = GFloating <$> (ATanh <$> (f x))
   mapDeRef f (EFloating (ACosh x))     = GFloating <$> (ACosh <$> (f x))
 
-substitute :: (Eq a, Hashable a, Show a) => Expr a -> [(Expr a, Expr a)] -> Expr a
+substitute :: (Ord a, Hashable a, Show a) => Expr a -> [(Expr a, Expr a)] -> Expr a
 substitute expr subList
   | nonSymInputs /= [] = error $ "substitute got non-ESym input: " ++ show nonSymInputs
   | otherwise = subs expr
@@ -575,7 +591,6 @@ foldExpr f acc (EFloating (ASinh x))     = foldExpr f acc x
 foldExpr f acc (EFloating (ATanh x))     = foldExpr f acc x
 foldExpr f acc (EFloating (ACosh x))     = foldExpr f acc x
 
-
 -- | symbolic scalar
 sym :: String -> Expr a
 sym = ESym . Sym
@@ -612,7 +627,7 @@ getConst _ = Nothing
 
 -- | Separate nonlinear and linear parts of an expression
 --   @extractLinearPart (fNonLin(x)+a*x) x == (fNonLin(x), a)
-extractLinearPart :: (Num a, Eq a, Show a) => Expr a -> Expr a -> (Expr a, a)
+extractLinearPart :: (Num a, Ord a, Show a) => Expr a -> Expr a -> (Expr a, a)
 extractLinearPart e@(EConst _) _ = (e,0)
 extractLinearPart e@(ENum (FromInteger _)) _ = (e,0)
 extractLinearPart e@(EFractional (FromRational _)) _ = (e,0)

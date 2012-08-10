@@ -14,7 +14,7 @@ import qualified Dvda.HashMap as HM
 --fad :: Num a => (Dual a -> [Dual a]) -> a -> [a]
 --fad f x = map dualPerturbation $ f (Dual x 1)
 
-bpBinary :: (Eq a, Num a)
+bpBinary :: (Ord a, Num a)
             => Expr a -> Expr a -> Expr a
             -> (Dual (Expr a) -> Dual (Expr a) -> Dual (Expr a))
             -> [(Expr a, Expr a)]
@@ -25,7 +25,7 @@ bpBinary sens g h binop = gsens ++ hsens
     gsens = backpropNode (sens*dfdg) g
     hsens = backpropNode (sens*dfdh) h
 
-bpUnary :: (Eq a, Num a)
+bpUnary :: (Ord a, Num a)
            => Expr a -> Expr a
            -> (Dual (Expr a) -> Dual (Expr a))
            -> [(Expr a, Expr a)]
@@ -33,7 +33,7 @@ bpUnary sens g unop = backpropNode (sens*dfdg) g
   where
     dfdg = dualPerturbation $ unop (Dual g 1)
 
-backpropNode :: (Eq a, Num a) => Expr a -> Expr a -> [(Expr a, Expr a)]
+backpropNode :: (Ord a, Num a) => Expr a -> Expr a -> [(Expr a, Expr a)]
 backpropNode sens e@(ESym (SymDependent name k dep_)) = (e,sens):(backpropNode (sens*primal') dep)
   where
     primal' = ESym (SymDependent name (k+1) dep_)
@@ -65,10 +65,10 @@ backpropNode sens (EFloating (ASinh x)) = bpUnary sens x asinh
 backpropNode sens (EFloating (ATanh x)) = bpUnary sens x atanh
 backpropNode sens (EFloating (ACosh x)) = bpUnary sens x acosh
 
-backprop :: (Num a, Eq a, Hashable a) => Expr a -> HashMap (Expr a) (Expr a)
+backprop :: (Num a, Ord a, Hashable a) => Expr a -> HashMap (Expr a) (Expr a)
 backprop x = HM.fromListWith (+) (backpropNode 1 x)
 
-rad :: (Num a, Eq a, Hashable a) => Expr a -> [Expr a] -> [Expr a]
+rad :: (Num a, Ord a, Hashable a) => Expr a -> [Expr a] -> [Expr a]
 rad x args = map (\arg -> HM.lookupDefault 0 arg sensitivities) args
   where
     sensitivities = backprop x
