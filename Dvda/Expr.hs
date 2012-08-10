@@ -312,6 +312,7 @@ instance (Num a, Ord a) => Num (Expr a) where
                             Just x' -> abs x'
 
   negate (EConst x) = EConst (negate x)
+  negate (ENum (Sub x y)) = y - x
   negate (ENum (FromInteger k)) = ENum (FromInteger (negate k))
   negate (EFractional (FromRational r)) = EFractional (FromRational (negate r))
   negate (ENum (Negate x)) = x
