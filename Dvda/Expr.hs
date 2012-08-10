@@ -44,7 +44,7 @@ commutativeAdd = True
 
 data Sym = Sym String                  -- doesn't depend on independent variable, or is an independent variable
          | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
-           deriving Eq
+           deriving (Eq, Ord)
 
 instance Show Sym where
   show (Sym name) = name
@@ -63,10 +63,10 @@ data Nums a = Mul a a
             | Negate a
             | Abs a
             | Signum a
-            | FromInteger Integer
+            | FromInteger Integer deriving Ord
 
 data Fractionals a = Div a a
-                   | FromRational Rational deriving Eq
+                   | FromRational Rational deriving (Eq, Ord)
 
 data Floatings a = Pow a a
                  | LogBase a a
@@ -82,7 +82,7 @@ data Floatings a = Pow a a
                  | Tanh a
                  | ASinh a
                  | ATanh a
-                 | ACosh a deriving Eq
+                 | ACosh a deriving (Eq, Ord)
 
 deriving instance Data Sym
 deriving instance Data a => Data (Nums a)
@@ -360,6 +360,7 @@ data GExpr a b where
   GNum :: Num a => Nums b -> GExpr a b
   GFractional :: Fractional a => Fractionals b -> GExpr a b
   GFloating :: Floating a => Floatings b -> GExpr a b
+deriving instance (Ord a, Ord b) => Ord (GExpr a b)
 
 -- you might use this to use Expr's nice Show instance
 gexprToExpr :: (b -> Expr a) -> GExpr a b -> Expr a

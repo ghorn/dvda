@@ -17,6 +17,7 @@ module Dvda.FunGraph ( FunGraph
                      , topSort
 --                     , fgGraph
                      , nodelistToFunGraph
+                     , exprsToFunGraph
                      ) where
 
 import Control.Applicative
@@ -150,3 +151,14 @@ countNodes = length . Graph.vertices . fgGraph
 
 topSort :: FunGraph a -> [Int]
 topSort fg = map ((\(_,k,_) -> k) . (fgNodeFromVertex fg)) $ Graph.topSort (fgGraph fg)
+
+-- | make a FunGraph out of outputs, automatically detecting the proper inputs
+exprsToFunGraph :: (Eq a, Show a, Hashable a) => [Expr a] -> IO (FunGraph a)
+exprsToFunGraph outputs = do
+  let getSyms :: [Expr a] -> [Sym]
+      getSyms exprs = HS.toList $ foldr (\acc expr -> foldExpr f expr acc) HS.empty exprs
+        where
+          f (ESym s) hs = HS.insert s hs
+          f _ hs = hs
+      inputs = map ESym $ getSyms outputs
+  toFunGraph inputs outputs

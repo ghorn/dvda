@@ -1,9 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language TypeOperators #-}
-{-# Language TypeFamilies #-}
-{-# Language FlexibleInstances #-}
 
 module Dvda.Vis ( previewGraph
+                , previewGraph'
                 ) where
 
 import Control.Concurrent ( threadDelay )
@@ -14,9 +12,16 @@ import qualified Data.Graph.Inductive as FGL
 import Dvda.Expr
 import Dvda.FunGraph
 
-previewGraph :: Show a => FunGraph a -> IO ()
+-- | show a nice Dot graph
+previewGraph :: (Ord a, Show a) => FunGraph a -> IO ()
 previewGraph fg = do
   preview $ toFGLGraph fg
+  threadDelay 10000
+
+-- | show a nice Dot graph with labeled edges
+previewGraph' :: (Ord a, Show a) => FunGraph a -> IO ()
+previewGraph' fg = do
+  preview $ FGL.emap (\(FGLEdge x) -> FGLEdge' x) $ toFGLGraph fg
   threadDelay 10000
 
 toFGLGraph :: FunGraph a -> FGL.Gr (FGLNode a) (FGLEdge a)
@@ -29,13 +34,20 @@ toFGLGraph fg = FGL.mkGraph fglNodes fglEdges
 
 data FGLNode a = FGLNode (Int, GExpr a Int)
 data FGLEdge a = FGLEdge (Int, Int, GExpr a Int)
-instance Eq (FGLEdge a) where
-  (==) (FGLEdge (p0,k0,_)) (FGLEdge (p1,k1,_)) = (==) (p0,k0) (p1,k1)
-instance Ord (FGLEdge a) where
-  compare (FGLEdge (p0,k0,_)) (FGLEdge (p1,k1,_)) = compare (p0,k0) (p1,k1)
+data FGLEdge' a = FGLEdge' (Int, Int, GExpr a Int)
+instance Eq a => Eq (FGLEdge a) where
+  (==) (FGLEdge (p0,k0,g0)) (FGLEdge (p1,k1,g1)) = (==) (p0,k0,g0) (p1,k1,g1)
+instance Eq a => Eq (FGLEdge' a) where
+  (==) (FGLEdge' (p0,k0,g0)) (FGLEdge' (p1,k1,g1)) = (==) (p0,k0,g0) (p1,k1,g1)
+instance Ord a => Ord (FGLEdge a) where
+  compare (FGLEdge (p0,k0,g0)) (FGLEdge (p1,k1,g1)) = compare (p0,k0,g0) (p1,k1,g1)
+instance Ord a => Ord (FGLEdge' a) where
+  compare (FGLEdge' (p0,k0,g0)) (FGLEdge' (p1,k1,g1)) = compare (p0,k0,g0) (p1,k1,g1)
 
 instance Labellable (FGLEdge a) where
   toLabelValue (FGLEdge (p,k,_)) = toLabelValue $ show p ++ " --> " ++ show k
+instance Show a => Labellable (FGLEdge' a) where
+  toLabelValue (FGLEdge' (_,_,gexpr)) = toLabelValue $ show gexpr
 
 tlv :: Int -> String -> Label
 tlv k s = toLabelValue $ show k ++ ": " ++ s
