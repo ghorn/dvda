@@ -142,7 +142,8 @@ instance Show a => Show (Floatings a) where
   showsPrec d (ACosh x) = showsUnary d 10 "acosh" x
 
 instance Show a => Show (Expr a) where
-  showsPrec _ (ESym s) = showString (show s)
+  showsPrec d (ESym s) = showParen (d > 9) $
+                         showString (show s)
   showsPrec _ (EConst x) = showString (show x)
   showsPrec d (ENum x) = showsPrec d x
   showsPrec d (EFractional x) = showsPrec d x
