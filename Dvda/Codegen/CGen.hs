@@ -1,12 +1,10 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language TypeFamilies #-}
-{-# Language FlexibleContexts #-}
+{-# Language GADTs #-}
 
-module Dvda.CGen ( showC
-                 , showMex
-                 , MatrixStorageOrder(..)
-                 ) where
-
+module Dvda.Codegen.CGen ( showC
+                         , showMex
+                         , MatrixStorageOrder(..)
+                         ) where
 
 import Data.Hashable ( Hashable )
 import Data.List ( intercalate )
@@ -31,7 +29,7 @@ makeInputMap matStorageOrder ins = HM.fromList $ concat $ zipWith writeInput [(0
         f inIdx g = (g, printf "input%d[%d]; /* %s */" inputK inIdx (show g))
     writeInput inputK (Mat gs)
       | any ((ncols /=) . length) gs =
-          error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
+          error $ "makeInputMap [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
       | otherwise = zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat gs)
       where
         nrows = length gs
@@ -48,7 +46,7 @@ writeInputPrototypes matStorageOrder ins = concat $ zipWith inputPrototype [(0::
     inputPrototype inputK (Vec gs) = ["const double input" ++ show inputK ++ "[" ++ show (length gs) ++ "]"]
     inputPrototype inputK (Mat gs)
       | any ((ncols /=) . length) gs =
-          error $ "writeInputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
+          error $ "writeInputPrototypes [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
       | otherwise = ["const double input" ++ show inputK ++ "[" ++ show fstIdx ++ "][" ++ show sndIdx ++ "]"]
       where
         nrows = length gs

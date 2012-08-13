@@ -11,7 +11,7 @@ import Data.List ( zipWith6 )
 import Data.Maybe ( fromMaybe )
 
 import Dvda.AD ( rad )
-import Dvda.CGen  ( showMex )
+import Dvda.Codegen.CGen ( showMex )
 import Dvda.CSE ( cse )
 import Dvda.Codegen.WriteFile ( writeSourceFile )
 import Dvda.Expr ( Expr(..), sym, substitute )

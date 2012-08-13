@@ -3,12 +3,14 @@
 module Dvda.Examples ( doCse
                      , showFg
                      , cgen
+                     , pygen
                      , mexgen
                      ) where
 
 import Dvda.Expr
 import Dvda.FunGraph
-import Dvda.CGen
+import Dvda.Codegen.CGen
+import Dvda.Codegen.PythonGen
 import Dvda.Vis ( previewGraph )
 import Dvda.CSE ( cse )
 import Dvda.AD ( rad )
@@ -48,6 +50,10 @@ showFg = someFunGraph >>= previewGraph
 -- | c code generation
 cgen :: IO ()
 cgen = fmap (showC RowMajor "foo") someFunGraph >>= putStrLn
+
+-- | python code generation
+pygen :: IO ()
+pygen = fmap (showPy "foo") someFunGraph >>= putStrLn
 
 -- | mex function generation
 mexgen :: IO ()

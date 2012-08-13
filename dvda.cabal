@@ -52,9 +52,10 @@ Library
                      Dvda.SparseLA
 
                      Dvda.AD
-                     Dvda.CGen
  --                    Dvda.Codegen.CPlugins
+                     Dvda.Codegen.CGen
                      Dvda.Codegen.Gcc
+                     Dvda.Codegen.PythonGen
                      Dvda.Codegen.WriteFile
                      Dvda.CSE
                      Dvda.Expr
