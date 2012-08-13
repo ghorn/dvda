@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language TemplateHaskell #-}
 {-# Language TypeFamilies #-}
 {-# Language FlexibleContexts #-}
 
@@ -11,7 +10,6 @@ module Dvda.CGen ( showC
 
 import Data.Hashable ( Hashable )
 import Data.List ( intercalate )
-import FileLocation ( err )
 import Text.Printf ( printf )
 
 import Dvda.Expr ( GExpr(..), Floatings(..), Nums(..), Fractionals(..) )
@@ -194,7 +192,7 @@ cAssignment :: (Eq a, Hashable a, Show a) => HashMap (GExpr a Int) String -> Int
 cAssignment inputMap k g@(GSym _) = case HM.lookup g inputMap of
   Nothing -> error $ "cAssignment: couldn't find " ++ show g ++ " in the input map"
   Just str -> "const double " ++ nameNode k ++ " = " ++ str
-cAssignment inputMap k gexpr = "const double " ++ nameNode k ++ " = " ++ toCOp gexpr ++ ";"
+cAssignment _ k gexpr = "const double " ++ nameNode k ++ " = " ++ toCOp gexpr ++ ";"
   where
     bin :: Int -> Int -> String -> String
     bin x y op = nameNode x ++ " " ++ op ++ " " ++ nameNode y
@@ -205,7 +203,7 @@ cAssignment inputMap k gexpr = "const double " ++ nameNode k ++ " = " ++ toCOp g
     asTypeOfG :: a -> GExpr a b -> a
     asTypeOfG x _ = x
     
-    toCOp (GSym _)                       = $(err "This should be impossible")
+    toCOp (GSym _)                       = error "toCOp (GSym _) should be impossible"
     toCOp (GConst c)                     = show c
     toCOp (GNum (Mul x y))               = bin x y "*"
     toCOp (GNum (Add x y))               = bin x y "+"
