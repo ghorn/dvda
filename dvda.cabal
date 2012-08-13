@@ -1,5 +1,5 @@
 Name:                dvda
-Version:             0.3.2.1
+Version:             0.4
 License:             BSD3
 License-file:        LICENSE
 Author:              Greg Horn
@@ -61,15 +61,11 @@ Library
                      Dvda.Expr
                      Dvda.Examples
                      Dvda.FunGraph
-                     Dvda.MultipleShooting.CoctaveTemplates
-                     Dvda.MultipleShooting.MSCoctave
-                     Dvda.MultipleShooting.MSMonad
-                     Dvda.MultipleShooting.Types
+                     Dvda.HashMap
                      Dvda.Reify
                      Dvda.ReifyGraph
                      Dvda.Vis
 
-  Other-modules:     Dvda.HashMap
 
   Build-depends:     base       >= 4     && < 5,
                      file-location >= 0.4.4 && < 0.5,
