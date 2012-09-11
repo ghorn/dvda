@@ -27,11 +27,13 @@ module Dvda ( -- * primitives
 --            , buildHSFunctionFromGraph
               -- * Heterogenous inputs/outputs
             , (:*)(..)
+            , MVS(..)
             ) where
 
 import Dvda.AD ( rad )
 import Dvda.CSE ( cse )
 import Dvda.Expr ( Expr, sym, symDependent, symDependentN )
-import Dvda.FunGraph ( toFunGraph, (:*)(..) )
+import Dvda.FunGraph ( toFunGraph )
+import Dvda.HList ( (:*)(..), MVS(..) )
 import Dvda.Vis ( previewGraph, previewGraph' )
 --import Dvda.HSBuilder

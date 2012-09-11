@@ -13,18 +13,18 @@ import Dvda.Expr
 import Dvda.FunGraph
 
 -- | show a nice Dot graph
-previewGraph :: (Ord a, Show a) => FunGraph a -> IO ()
+previewGraph :: (Ord a, Show a) => FunGraph a f g -> IO ()
 previewGraph fg = do
   preview $ toFGLGraph fg
   threadDelay 10000
 
 -- | show a nice Dot graph with labeled edges
-previewGraph' :: (Ord a, Show a) => FunGraph a -> IO ()
+previewGraph' :: (Ord a, Show a) => FunGraph a f g -> IO ()
 previewGraph' fg = do
   preview $ FGL.emap (\(FGLEdge x) -> FGLEdge' x) $ toFGLGraph fg
   threadDelay 10000
 
-toFGLGraph :: FunGraph a -> FGL.Gr (FGLNode a) (FGLEdge a)
+toFGLGraph :: FunGraph a f g -> FGL.Gr (FGLNode a) (FGLEdge a)
 toFGLGraph fg = FGL.mkGraph fglNodes fglEdges
   where
     fglNodes = map (\(k,gexpr) -> (k, FGLNode (k, gexpr))) $ fgReified fg

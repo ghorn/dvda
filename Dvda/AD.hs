@@ -68,7 +68,7 @@ backpropNode sens (EFloating (ACosh x)) = bpUnary sens x acosh
 backprop :: (Num a, Ord a, Hashable a) => Expr a -> HashMap (Expr a) (Expr a)
 backprop x = HM.fromListWith (+) (backpropNode 1 x)
 
-rad :: (Num a, Ord a, Hashable a) => Expr a -> [Expr a] -> [Expr a]
-rad x args = map (\arg -> HM.lookupDefault 0 arg sensitivities) args
+rad :: (Num a, Ord a, Hashable a, Functor f) => Expr a -> f (Expr a) -> f (Expr a)
+rad x args = fmap (\arg -> HM.lookupDefault 0 arg sensitivities) args
   where
     sensitivities = backprop x

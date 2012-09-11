@@ -62,6 +62,7 @@ Library
                      Dvda.Examples
                      Dvda.FunGraph
                      Dvda.HashMap
+                     Dvda.HList
                      Dvda.Reify
                      Dvda.ReifyGraph
                      Dvda.Vis

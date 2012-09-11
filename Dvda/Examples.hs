@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# Language TypeOperators #-}
 
 module Dvda.Examples ( doCse
                      , showFg
@@ -7,16 +8,13 @@ module Dvda.Examples ( doCse
                      , mexgen
                      ) where
 
-import Dvda.Expr
+import Dvda
 import Dvda.FunGraph
 import Dvda.Codegen.CGen
 import Dvda.Codegen.PythonGen
-import Dvda.Vis ( previewGraph )
-import Dvda.CSE ( cse )
-import Dvda.AD ( rad )
 
 -- a random function to use in different examples
-someFunGraph :: IO (FunGraph Double)
+someFunGraph :: IO (FunGraph Double (MVS :* MVS :* MVS :* MVS) (MVS :* MVS :* MVS :* MVS :* MVS))
 someFunGraph = toFunGraph inputs outputs
   where
     x = sym "x" :: Expr Double
@@ -32,8 +30,8 @@ someFunGraph = toFunGraph inputs outputs
     f1 = [f0/2, f0*y, w, 0.0, 0]
     boo = x
 
-    inputs = boo :* [y]:*[[z]] :* [w3,w1,w2,w]
-    outputs = f0:*f1:*f2:*[[f0*f0]]:*(rad f2 [x,y,z,w,w1,w2,w3])
+    inputs = Sca boo :* Vec [y]:* Mat [[z]] :* Vec [w3,w1,w2,w]
+    outputs = Sca f0 :* Vec f1:* Sca f2 :* Mat [[f0*f0]] :* Vec (rad f2 [x,y,z,w,w1,w2,w3])
 
 -- | do cse on a fungraph and count nodes
 doCse :: IO ()

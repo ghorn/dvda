@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# Language FlexibleContexts #-}
 {-# Language GADTs #-}
 
 module Dvda.Codegen.PythonGen ( showPy
@@ -9,9 +10,10 @@ import Data.List ( intercalate )
 import Text.Printf ( printf )
 
 import Dvda.Expr ( GExpr(..), Floatings(..), Nums(..), Fractionals(..) )
-import Dvda.FunGraph ( FunGraph, MVS(..), topSort, fgInputs, fgOutputs, fgLookupGExpr )
+import Dvda.FunGraph ( FunGraph, topSort, fgInputs, fgOutputs, fgLookupGExpr )
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
+import Dvda.HList ( MVS(..), MVSList(toMVSList) )
 
 -- | take a list of pair of inputs to indices which reference them
 --  create a hashmap from GSyms to strings which hold the declaration
@@ -74,12 +76,13 @@ writeOutputs ins = (concat $ zipWith writeOutput ins [0..]) ++ [retStatement]
         ncols = if nrows == 0 then 0 else length (head grefs)
 
 -- | Turns a FunGraph into a string containing a python function
-showPy :: (Eq a, Show a, Hashable a) => String -> FunGraph a -> String
+showPy :: (Eq a, Show a, Hashable a, MVSList f (GExpr a Int), MVSList g Int) =>
+         String-> FunGraph a f g -> String
 showPy functionName fg = txt
   where
-    inPrototypes = writeInputPrototypes (fgInputs fg)
-    outDecls = writeOutputs (fgOutputs fg)
-    inputMap = makeInputMap (fgInputs fg)
+    inPrototypes = writeInputPrototypes (toMVSList $ fgInputs fg)
+    outDecls = writeOutputs (toMVSList $ fgOutputs fg)
+    inputMap = makeInputMap (toMVSList $ fgInputs fg)
     mainDecls = let f k = case fgLookupGExpr fg k of
                       Just v -> pyAssignment inputMap k v
                       Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("

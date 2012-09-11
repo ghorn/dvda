@@ -4,7 +4,7 @@ module Dvda.CSE ( cse
                 ) where
 
 import Control.Monad.ST ( ST, runST )
-import Data.Foldable ( toList )
+import Data.Foldable ( Foldable, toList )
 import Data.Hashable ( Hashable )
 import Data.IntMap ( IntMap )
 import qualified Data.IntMap as IM
@@ -17,7 +17,7 @@ import qualified Data.HashTable.Class as HT
 import qualified Data.HashTable.ST.Cuckoo as C
 type HashTable s v k = C.HashTable s v k
 
-cse :: (Eq a, Hashable a) => FunGraph a -> FunGraph a
+cse :: (Eq a, Hashable a, Functor g, Foldable g) => FunGraph a f g -> FunGraph a f g
 cse fg = nodelistToFunGraph (map swap htList) (fgInputs fg) outputIndices
   where
     (htList, im) = cse' (fgLookupGExpr fg) (fgOutputs fg)
@@ -28,12 +28,11 @@ cse fg = nodelistToFunGraph (map swap htList) (fgInputs fg) outputIndices
         Nothing -> error $
                    "CSE error, in mapping old output indices to new, found an old one which was missing from" ++
                    "the old --> new Int mapping"
-      in map (fmap oldIndexToNewIndex) (fgOutputs fg)
+      in fmap oldIndexToNewIndex (fgOutputs fg)
 
-cse' ::
-  (Eq a, Hashable a)
+cse' :: (Eq a, Hashable a, Foldable g)
   => (Int -> Maybe (GExpr a Int))
-  -> [MVS Int]
+  -> g Int
   -> ([(GExpr a Int, Int)], IntMap Int)
 cse' lookupFun outputIndices = runST $ do
   ht <- HT.new
@@ -43,7 +42,7 @@ cse' lookupFun outputIndices = runST $ do
         (_,im,n) <- insertOldNode k lookupFun ht im0 n0
         f (im,n) ks
   -- outputs
-  (oldToNewIdx,_) <- f (IM.empty,0) (concatMap toList outputIndices)
+  (oldToNewIdx,_) <- f (IM.empty,0) (toList outputIndices)
   htList <- HT.toList ht
   return (htList, oldToNewIdx)
 
