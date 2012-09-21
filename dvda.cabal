@@ -49,7 +49,6 @@ Library
 --                     Dvda.OctaveSyntax
 --                     Dvda.Tests.Function
 --                     Dvda.Tests.Unary
-                     Dvda.SparseLA
 
                      Dvda.AD
  --                    Dvda.Codegen.CPlugins
