@@ -1,11 +1,12 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language GADTs #-}
-{-# Language TemplateHaskell #-}
-{-# Language TypeFamilies #-}
 {-# Language StandaloneDeriving #-}
+{-# Language GADTs #-}
+{-# Language TypeFamilies #-}
 {-# Language DeriveDataTypeable #-}
-{-# Language FlexibleInstances #-}
-{-# Language FlexibleContexts #-}
+{-# Language DeriveGeneric #-}
+--{-# Language TemplateHaskell #-}
+--{-# Language FlexibleInstances #-}
+--{-# Language FlexibleContexts #-}
 
 module Dvda.Expr ( Expr(..)
                  , GExpr(..)
@@ -29,8 +30,9 @@ module Dvda.Expr ( Expr(..)
 
 import Control.Applicative ( (<$>), (<*>), pure )
 import Data.Data ( Data, Typeable, Typeable1, Typeable2 )
-import Data.Hashable ( Hashable, hash, combine )
+import Data.Hashable ( Hashable(..), hash )
 import Data.Ratio ( (%) )
+import GHC.Generics ( Generic )
 
 --import Test.QuickCheck -- ( Arbitrary(..) )
 
@@ -45,7 +47,7 @@ commutativeAdd = True
 
 data Sym = Sym String                  -- doesn't depend on independent variable, or is an independent variable
          | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
-           deriving (Eq, Ord)
+           deriving (Eq, Ord, Generic)
 
 instance Show Sym where
   show (Sym name) = name
@@ -67,7 +69,7 @@ data Nums a = Mul a a
             | FromInteger Integer deriving Ord
 
 data Fractionals a = Div a a
-                   | FromRational Rational deriving (Eq, Ord)
+                   | FromRational Rational deriving (Eq, Ord, Generic)
 
 data Floatings a = Pow a a
                  | LogBase a a
@@ -83,7 +85,7 @@ data Floatings a = Pow a a
                  | Tanh a
                  | ASinh a
                  | ATanh a
-                 | ACosh a deriving (Eq, Ord)
+                 | ACosh a deriving (Eq, Ord, Generic)
 
 deriving instance Data Sym
 deriving instance Data a => Data (Nums a)
@@ -175,58 +177,38 @@ instance Eq a => Eq (Nums a) where
   
 
 ----------------------------- hashable instances --------------------------
-instance Hashable Sym where
-  hash (Sym name) = hash "Sym" `combine` hash name
-  hash (SymDependent name k s) = hash ("SymDependent", name, k, s)
+instance Hashable Sym
 
 instance Hashable a => Hashable (Nums a) where
-  hash (Mul x y)  = hash "Mul" `combine` hx `combine` hy
+  hashWithSalt s (Mul x y)  = s `hashWithSalt` "Mul" `hashWithSalt` hx `hashWithSalt` hy
     where
       hx' = hash x
       hy' = hash y
       (hx, hy)
         | commutativeMul = (min hx' hy', max hx' hy')
         | otherwise = (hx', hy')
-  hash (Add x y)  = hash "Add" `combine` hx `combine` hy
+  hashWithSalt s (Add x y)  = s `hashWithSalt` "Add" `hashWithSalt` hx `hashWithSalt` hy
     where
       hx' = hash x
       hy' = hash y
       (hx, hy)
         | commutativeAdd = (min hx' hy', max hx' hy')
         | otherwise = (hx', hy')
-  hash (Sub x y)  = hash "Sub" `combine` hash x `combine` hash y
-  hash (Negate x)      = hash "Negate"      `combine` hash x
-  hash (Abs x)         = hash "Abs"         `combine` hash x
-  hash (Signum x)      = hash "Signum"      `combine` hash x
-  hash (FromInteger x) = hash "FromInteger" `combine` hash x
+  hashWithSalt s (Sub x y)  = s `hashWithSalt` "Sub" `hashWithSalt` x `hashWithSalt` y
+  hashWithSalt s (Negate x)      = s `hashWithSalt` "Negate"      `hashWithSalt` x
+  hashWithSalt s (Abs x)         = s `hashWithSalt` "Abs"         `hashWithSalt` x
+  hashWithSalt s (Signum x)      = s `hashWithSalt` "Signum"      `hashWithSalt` x
+  hashWithSalt s (FromInteger x) = s `hashWithSalt` "FromInteger" `hashWithSalt` x
 
-instance Hashable a => Hashable (Fractionals a) where
-  hash (Div x y)  = hash "Div" `combine` hash x `combine` hash y
-  hash (FromRational x) = hash "FromRational" `combine` hash x
-
-instance Hashable a => Hashable (Floatings a) where
-  hash (Pow x y) = hash "Pow" `combine` hash x `combine` hash y
-  hash (LogBase x y) = hash "LogBase" `combine` hash x `combine` hash y
-  hash (Exp x)   = hash "Exp"   `combine` hash x
-  hash (Log x)   = hash "Log"   `combine` hash x
-  hash (Sin x)   = hash "Sin"   `combine` hash x
-  hash (Cos x)   = hash "Cos"   `combine` hash x
-  hash (ASin x)  = hash "ASin"  `combine` hash x
-  hash (ATan x)  = hash "ATan"  `combine` hash x
-  hash (ACos x)  = hash "ACos"  `combine` hash x
-  hash (Sinh x)  = hash "Sinh"  `combine` hash x
-  hash (Cosh x)  = hash "Cosh"  `combine` hash x
-  hash (Tanh x)  = hash "Tanh"  `combine` hash x
-  hash (ASinh x) = hash "ASinh" `combine` hash x
-  hash (ATanh x) = hash "ATanh" `combine` hash x
-  hash (ACosh x) = hash "ACosh" `combine` hash x
+instance Hashable a => Hashable (Fractionals a)
+instance Hashable a => Hashable (Floatings a)
 
 instance Hashable a => Hashable (Expr a) where
-  hash (ESym name)     = hash "ESym"        `combine` hash name
-  hash (EConst x)      = hash "EConst"      `combine` hash x
-  hash (ENum x)        = hash "ENum"        `combine` hash x
-  hash (EFractional x) = hash "EFractional" `combine` hash x
-  hash (EFloating x)   = hash "EFloating"   `combine` hash x
+  hashWithSalt s (ESym name)     = s `hashWithSalt` "ESym"        `hashWithSalt` name
+  hashWithSalt s (EConst x)      = s `hashWithSalt` "EConst"      `hashWithSalt` x
+  hashWithSalt s (ENum x)        = s `hashWithSalt` "ENum"        `hashWithSalt` x
+  hashWithSalt s (EFractional x) = s `hashWithSalt` "EFractional" `hashWithSalt` x
+  hashWithSalt s (EFloating x)   = s `hashWithSalt` "EFloating"   `hashWithSalt` x
 
 --deriving instance Enum a => Enum (Nums a)
 --deriving instance Bounded a => Bounded (Nums a)
@@ -445,11 +427,11 @@ instance (Show a, Show b) => Show (GExpr a b) where
 deriving instance (Eq a, Eq b) => Eq (GExpr a b)
 
 instance (Hashable a, Hashable b) => Hashable (GExpr a b) where
-  hash (GSym name)     = hash "GSym"        `combine` hash name
-  hash (GConst x)      = hash "GConst"      `combine` hash x
-  hash (GNum x)        = hash "GNum"        `combine` hash x
-  hash (GFractional x) = hash "GFractional" `combine` hash x
-  hash (GFloating x)   = hash "GFloating"   `combine` hash x
+  hashWithSalt s (GSym name)     = s `hashWithSalt` "GSym"        `hashWithSalt` name
+  hashWithSalt s (GConst x)      = s `hashWithSalt` "GConst"      `hashWithSalt` x
+  hashWithSalt s (GNum x)        = s `hashWithSalt` "GNum"        `hashWithSalt` x
+  hashWithSalt s (GFractional x) = s `hashWithSalt` "GFractional" `hashWithSalt` x
+  hashWithSalt s (GFloating x)   = s `hashWithSalt` "GFloating"   `hashWithSalt` x
 
 instance MuRef (Expr a) where
   type DeRef (Expr a) = GExpr a

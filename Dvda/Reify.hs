@@ -12,7 +12,7 @@ module Dvda.Reify ( MuRef(..)
 
 import Control.Concurrent.MVar ( newMVar, takeMVar, putMVar, MVar, readMVar )
 import Control.Applicative ( Applicative )
-import Data.Hashable ( Hashable, hash )
+import Data.Hashable ( Hashable(..) )
 import Data.Traversable ( Traversable )
 import qualified Data.Traversable as T
 import System.Mem.StableName ( StableName, makeStableName, hashStableName )
@@ -77,7 +77,7 @@ newUnique var = do
 data DynStableName = DynStableName (StableName ())
 
 instance Hashable DynStableName where
-  hash (DynStableName sn) = hashStableName sn
+  hashWithSalt salt (DynStableName sn) = hashWithSalt salt $ hashStableName sn
   
 instance Eq DynStableName where
 	(DynStableName sn1) == (DynStableName sn2) = sn1 == sn2
