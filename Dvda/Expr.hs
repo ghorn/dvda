@@ -50,8 +50,10 @@ data Sym = Sym String                  -- doesn't depend on independent variable
          deriving (Eq, Ord, Generic, Data, Typeable)
 
 instance Show Sym where
-  show (Sym name) = name
-  show (SymDependent name k s) = name ++ replicate k '\'' ++ "(" ++ show s ++ ")"
+  showsPrec d (Sym name) = showParen (d >= 9) $ showString name
+  showsPrec d (SymDependent name k s) =
+    showParen (d >= 9) $
+    showString $ name ++ replicate k '\'' ++ "(" ++ show s ++ ")"
 
 data Expr a where
   ESym :: Sym -> Expr a
@@ -97,13 +99,13 @@ deriving instance (Data a, Data b, Floating a) => Data (GExpr a b)
 
 ----------------------- Show instances -------------------------
 showsInfixBinary :: (Show a, Show b) => Int -> Int -> String -> a -> b -> ShowS
-showsInfixBinary d prec op u v = showParen (d > prec) $
+showsInfixBinary d prec op u v = showParen (d >= prec) $
                                  showsPrec prec u .
                                  showString op .
                                  showsPrec prec v
 
 showsUnary :: Show a => Int -> Int -> String -> a -> ShowS
-showsUnary d prec op u = showParen (d > prec) $
+showsUnary d prec op u = showParen (d >= prec) $
                          showString op .
                          showsPrec prec u
 
@@ -114,11 +116,11 @@ instance Show a => Show (Nums a) where
   showsPrec d (Negate x) = showsUnary d 7 "-" x
   showsPrec d (Abs x) = showsUnary d 10 "abs" x
   showsPrec d (Signum x) = showsUnary d 10 "signum" x
-  showsPrec _ (FromInteger k) = showString (show k)
+  showsPrec d (FromInteger k) = showParen (d >= 9) $ showString (show k)
 
 instance Show a => Show (Fractionals a) where
   showsPrec d (Div x y) = showsInfixBinary d 7 " / " x y
-  showsPrec _ (FromRational r) = showString $ show (fromRational r :: Double)
+  showsPrec d (FromRational r) = showParen (d >= 9) $ showString $ show (fromRational r :: Double)
 
 instance Show a => Show (Floatings a) where
   showsPrec d (Pow x y) = showsInfixBinary d 8 " ** " x y
@@ -140,7 +142,7 @@ instance Show a => Show (Floatings a) where
 instance Show a => Show (Expr a) where
   showsPrec d (ESym s) = showParen (d > 9) $
                          showString (show s)
-  showsPrec _ (EConst x) = showString (show x)
+  showsPrec d (EConst x) = showParen (d >= 9) $ showString (show x)
   showsPrec d (ENum x) = showsPrec d x
   showsPrec d (EFractional x) = showsPrec d x
   showsPrec d (EFloating x) = showsPrec d x
