@@ -2,8 +2,8 @@
 {-# Language StandaloneDeriving #-}
 {-# Language GADTs #-}
 {-# Language TypeFamilies #-}
-{-# Language DeriveDataTypeable #-}
 {-# Language DeriveGeneric #-}
+{-# Language DeriveDataTypeable #-}
 --{-# Language TemplateHaskell #-}
 --{-# Language FlexibleInstances #-}
 --{-# Language FlexibleContexts #-}
@@ -29,7 +29,7 @@ module Dvda.Expr ( Expr(..)
                  ) where
 
 import Control.Applicative ( (<$>), (<*>), pure )
-import Data.Data ( Data, Typeable, Typeable1, Typeable2 )
+import Data.Data ( Data, Typeable )
 import Data.Hashable ( Hashable(..), hash )
 import Data.Ratio ( (%) )
 import GHC.Generics ( Generic )
@@ -47,7 +47,7 @@ commutativeAdd = True
 
 data Sym = Sym String                  -- doesn't depend on independent variable, or is an independent variable
          | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
-           deriving (Eq, Ord, Generic)
+         deriving (Eq, Ord, Generic, Data, Typeable)
 
 instance Show Sym where
   show (Sym name) = name
@@ -59,6 +59,7 @@ data Expr a where
   ENum :: Num a => Nums (Expr a) -> Expr a
   EFractional :: Fractional a => Fractionals (Expr a) -> Expr a
   EFloating :: Floating a => Floatings (Expr a) -> Expr a
+  deriving Typeable
 
 data Nums a = Mul a a
             | Add a a
@@ -66,10 +67,12 @@ data Nums a = Mul a a
             | Negate a
             | Abs a
             | Signum a
-            | FromInteger Integer deriving Ord
+            | FromInteger Integer
+            deriving (Ord, Data, Typeable, Generic)
 
 data Fractionals a = Div a a
-                   | FromRational Rational deriving (Eq, Ord, Generic)
+                   | FromRational Rational
+                   deriving (Eq, Ord, Generic, Typeable, Data)
 
 data Floatings a = Pow a a
                  | LogBase a a
@@ -85,21 +88,12 @@ data Floatings a = Pow a a
                  | Tanh a
                  | ASinh a
                  | ATanh a
-                 | ACosh a deriving (Eq, Ord, Generic)
+                 | ACosh a
+                 deriving (Eq, Ord, Generic, Data, Typeable)
 
-deriving instance Data Sym
-deriving instance Data a => Data (Nums a)
-deriving instance Data a => Data (Fractionals a)
-deriving instance Data a => Data (Floatings a)
 deriving instance (Data a, Floating a) => Data (Expr a)
 deriving instance (Data a, Data b, Floating a) => Data (GExpr a b)
 
-deriving instance Typeable Sym
-deriving instance Typeable1 Nums
-deriving instance Typeable1 Fractionals
-deriving instance Typeable1 Floatings
-deriving instance Typeable1 Expr
-deriving instance Typeable2 GExpr
 
 ----------------------- Show instances -------------------------
 showsInfixBinary :: (Show a, Show b) => Int -> Int -> String -> a -> b -> ShowS
@@ -210,15 +204,6 @@ instance Hashable a => Hashable (Expr a) where
   hashWithSalt s (EFractional x) = s `hashWithSalt` "EFractional" `hashWithSalt` x
   hashWithSalt s (EFloating x)   = s `hashWithSalt` "EFloating"   `hashWithSalt` x
 
---deriving instance Enum a => Enum (Nums a)
---deriving instance Bounded a => Bounded (Nums a)
-
---deriving instance Enum a => Enum (Fractionals a)
---deriving instance Bounded a => Bounded (Fractionals a)
-
---deriving instance Enum a => Enum (Floatings a)
---deriving instance Bounded a => Bounded (Floatings a)
-
 fromNeg :: (Num a, Ord a) => Expr a -> Maybe (Expr a)
 fromNeg (ENum (Negate x)) = Just x
 fromNeg (ENum (FromInteger k))
@@ -228,7 +213,6 @@ fromNeg (EFractional (FromRational r))
 fromNeg (EConst c)
   | c < 0 = Just (EConst (abs c))
 fromNeg _ = Nothing
-
 
 instance (Num a, Ord a) => Num (Expr a) where
   (*) (EConst x) (EConst y) = EConst (x*y)
@@ -361,6 +345,7 @@ data GExpr a b where
   GNum :: Num a => Nums b -> GExpr a b
   GFractional :: Fractional a => Fractionals b -> GExpr a b
   GFloating :: Floating a => Floatings b -> GExpr a b
+  deriving Typeable
 deriving instance (Ord a, Ord b) => Ord (GExpr a b)
 
 -- you might use this to use Expr's nice Show instance
