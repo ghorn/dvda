@@ -4,9 +4,6 @@
 {-# Language TypeFamilies #-}
 {-# Language DeriveGeneric #-}
 {-# Language DeriveDataTypeable #-}
---{-# Language TemplateHaskell #-}
---{-# Language FlexibleInstances #-}
---{-# Language FlexibleContexts #-}
 
 module Dvda.Expr ( Expr(..)
                  , GExpr(..)
@@ -34,8 +31,6 @@ import Data.Hashable ( Hashable(..), hash )
 import Data.Ratio ( (%) )
 import GHC.Generics ( Generic )
 
---import Test.QuickCheck -- ( Arbitrary(..) )
-
 import qualified Dvda.HashMap as HM
 import Dvda.Reify ( MuRef(..) )
 
@@ -45,9 +40,10 @@ commutativeMul = True
 commutativeAdd :: Bool
 commutativeAdd = True
 
-data Sym = Sym String                  -- doesn't depend on independent variable, or is an independent variable
-         | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
-         deriving (Eq, Ord, Generic, Data, Typeable)
+data Sym =
+    Sym String -- doesn't depend on independent variable, or is an independent variable
+  | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
+  deriving (Eq, Ord, Generic, Data, Typeable)
 
 instance Show Sym where
   showsPrec d (Sym name) = showParen (d >= 9) $ showString name
@@ -491,7 +487,8 @@ substitute expr subList
     subs (EFloating (ATanh x))     = atanh (subs x)
     subs (EFloating (ACosh x))     = acosh (subs x)
 
--- | this substitute is sketchy because it doesn't perform simplifications that are often assumed to be done
+-- | this substitute is sketchy because it doesn't perform simplifications
+--   that are often assumed to be done
 sketchySubstitute :: (Eq a, Hashable a, Show a) => Expr a -> [(Expr a, Expr a)] -> Expr a
 sketchySubstitute expr subList
   | nonSymInputs /= [] = error $ "substitute got non-ESym input: " ++ show nonSymInputs
