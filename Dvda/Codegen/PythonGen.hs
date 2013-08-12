@@ -6,48 +6,32 @@ module Dvda.Codegen.PythonGen ( showPy
                               ) where
 
 import Data.Hashable ( Hashable )
+import qualified Data.Foldable as F
 import Data.List ( intercalate )
+import qualified Data.Vector as V
 import Text.Printf ( printf )
 
 import Dvda.Expr ( GExpr(..), Floatings(..), Nums(..), Fractionals(..) )
 import Dvda.FunGraph ( FunGraph, topSort, fgInputs, fgOutputs, fgLookupGExpr )
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
-import Dvda.HList ( MVS(..), MVSList(toMVSList) )
 
 -- | take a list of pair of inputs to indices which reference them
 --  create a hashmap from GSyms to strings which hold the declaration
 makeInputMap :: (Eq a, Hashable a, Show a)
-                => [MVS (GExpr a Int)] -> HashMap (GExpr a Int) String
+                => [V.Vector (GExpr a Int)] -> HashMap (GExpr a Int) String
 makeInputMap ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] ins
   where
-    writeInput inputK (Sca g) = [(g, printf "input%d # %s" inputK (show g))]
-    writeInput inputK (Vec gs) = zipWith f [(0::Int)..] gs
+    writeInput inputK gs = zipWith f [(0::Int)..] (V.toList gs)
       where
         f inIdx g = (g, printf "input%d[%d] # %s" inputK inIdx (show g))
-    writeInput inputK (Mat gs)
-      | any ((ncols /=) . length) gs =
-          error $ "makeInputMap [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
-      | otherwise = zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat gs)
-      where
-        nrows = length gs
-        ncols = if nrows == 0 then 0 else length (head gs)
-        f (rowIdx,colIdx) g = (g,printf "input%d[%d][%d] # %s" inputK rowIdx colIdx (show g))
 
-writeInputPrototypes :: [MVS a] -> [String]
+writeInputPrototypes :: [V.Vector a] -> [String]
 writeInputPrototypes ins = concat $ zipWith inputPrototype [(0::Int)..] ins
   where
-    inputPrototype inputK (Sca _) = ["input" ++ show inputK]
-    inputPrototype inputK (Vec _) = ["input" ++ show inputK]
-    inputPrototype inputK (Mat gs)
-      | any ((ncols /=) . length) gs =
-          error $ "writeInputPrototypes [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
-      | otherwise = ["input" ++ show inputK]
-      where
-        nrows = length gs
-        ncols = if nrows == 0 then 0 else length (head gs)
+    inputPrototype inputK _ = ["input" ++ show inputK]
 
-writeOutputs :: [MVS Int] -> [String]
+writeOutputs :: [V.Vector Int] -> [String]
 writeOutputs ins = (concat $ zipWith writeOutput ins [0..]) ++ [retStatement]
   where
     retStatement =
@@ -55,34 +39,22 @@ writeOutputs ins = (concat $ zipWith writeOutput ins [0..]) ++ [retStatement]
     
     writeGrefList grefs = '[':(intercalate ", " (map nameNode grefs))++"]"
     
-    writeOutput :: MVS Int -> Int -> [String]
-    writeOutput (Sca gref) outputK = 
+    writeOutput :: V.Vector Int -> Int -> [String]
+    writeOutput grefs outputK =
       [ printf "# output %d" outputK
-      , printf "output%d = %s\n" outputK (nameNode gref)
+      , printf "output%d = %s\n" outputK (writeGrefList (V.toList grefs))
       ]
-    writeOutput (Vec grefs) outputK =
-      [ printf "# output %d" outputK
-      , printf "output%d = %s\n" outputK (writeGrefList grefs)
-      ]
-    writeOutput (Mat grefs) outputK
-      | any ((ncols /=) . length) grefs =
-          error $ "writeOutputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length grefs)
-      | otherwise =
-          [ printf "# output %d" outputK
-          , printf "output%d = %s\n" outputK ('[':(intercalate ", " (map writeGrefList grefs))++"]")
-          ]
-      where
-        nrows = length grefs
-        ncols = if nrows == 0 then 0 else length (head grefs)
 
 -- | Turns a FunGraph into a string containing a python function
-showPy :: (Eq a, Show a, Hashable a, MVSList f (GExpr a Int), MVSList g Int) =>
+showPy :: (Eq a, Show a, Hashable a, F.Foldable f, F.Foldable g) =>
          String-> FunGraph a f g -> String
 showPy functionName fg = txt
   where
-    inPrototypes = writeInputPrototypes (toMVSList $ fgInputs fg)
-    outDecls = writeOutputs (toMVSList $ fgOutputs fg)
-    inputMap = makeInputMap (toMVSList $ fgInputs fg)
+    inputs = [V.fromList $ F.toList $ fgInputs fg]
+    outputs = [V.fromList $ F.toList $ fgOutputs fg]
+    inPrototypes = writeInputPrototypes inputs
+    outDecls = writeOutputs outputs
+    inputMap = makeInputMap inputs
     mainDecls = let f k = case fgLookupGExpr fg k of
                       Just v -> pyAssignment inputMap k v
                       Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("

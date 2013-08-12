@@ -4,139 +4,64 @@
 
 module Dvda.Codegen.CGen ( showC
                          , showMex
-                         , MatrixStorageOrder(..)
                          ) where
 
 import Data.Hashable ( Hashable )
+import qualified Data.Foldable as F
 import Data.List ( intercalate )
+import qualified Data.Vector as V
 import Text.Printf ( printf )
 
 import Dvda.Expr ( GExpr(..), Floatings(..), Nums(..), Fractionals(..) )
 import Dvda.FunGraph ( FunGraph, topSort, fgInputs, fgOutputs, fgLookupGExpr )
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
-import Dvda.HList ( MVS(..), MVSList(..) )
-
-data MatrixStorageOrder = RowMajor | ColMajor
 
 -- | take a list of pair of inputs to indices which reference them
 --  create a hashmap from GSyms to strings which hold the declaration
 makeInputMap :: (Eq a, Hashable a, Show a)
-                => MatrixStorageOrder -> [MVS (GExpr a Int)] -> HashMap (GExpr a Int) String
-makeInputMap matStorageOrder ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] ins
+                => [V.Vector (GExpr a Int)] -> HashMap (GExpr a Int) String
+makeInputMap ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] ins
   where
-    writeInput inputK (Sca g) = [(g, printf "*input%d; /* %s */" inputK (show g))]
-    writeInput inputK (Vec gs) = zipWith f [(0::Int)..] gs
+    writeInput inputK gs = zipWith f [(0::Int)..] (V.toList gs)
       where
         f inIdx g = (g, printf "input%d[%d]; /* %s */" inputK inIdx (show g))
-    writeInput inputK (Mat gs)
-      | any ((ncols /=) . length) gs =
-          error $ "makeInputMap [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
-      | otherwise = zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat gs)
-      where
-        nrows = length gs
-        ncols = if nrows == 0 then 0 else length (head gs)
-        f (rowIdx,colIdx) g = (g,printf "input%d[%d][%d]; /* %s */" inputK fstIdx sndIdx (show g))
-          where
-            (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (rowIdx,colIdx)
-                                                      ColMajor -> (colIdx,rowIdx)
 
-writeInputPrototypes :: MatrixStorageOrder -> [MVS a] -> [String]
-writeInputPrototypes matStorageOrder ins = concat $ zipWith inputPrototype [(0::Int)..] ins
+writeInputPrototypes :: [V.Vector a] -> [String]
+writeInputPrototypes ins = concat $ zipWith inputPrototype [(0::Int)..] ins
   where
-    inputPrototype inputK (Sca _) = ["const double * input" ++ show inputK]
-    inputPrototype inputK (Vec gs) = ["const double input" ++ show inputK ++ "[" ++ show (length gs) ++ "]"]
-    inputPrototype inputK (Mat gs)
-      | any ((ncols /=) . length) gs =
-          error $ "writeInputPrototypes [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length gs)
-      | otherwise = ["const double input" ++ show inputK ++ "[" ++ show fstIdx ++ "][" ++ show sndIdx ++ "]"]
-      where
-        nrows = length gs
-        ncols = if nrows == 0 then 0 else length (head gs)
-        (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (nrows,ncols)
-                                                  ColMajor -> (ncols,nrows)
+    inputPrototype inputK gs =
+      ["const double input" ++ show inputK ++ "[" ++ show (V.length gs) ++ "]"]
 
-writeOutputs :: MatrixStorageOrder -> [MVS Int] -> ([String], [String])
-writeOutputs matStorageOrder ins = (concatMap fst dcs, concatMap snd dcs)
+writeOutputs :: [V.Vector Int] -> ([String], [String])
+writeOutputs ins = (concatMap fst dcs, concatMap snd dcs)
   where
     dcs :: [([String],[String])]
     dcs = zipWith writeOutput ins [0..]
 
-    writeOutput :: MVS Int -> Int -> ([String], [String])
-    writeOutput (Sca gref) outputK = (decls, prototype)
+    writeOutput :: V.Vector Int -> Int -> ([String], [String])
+    writeOutput grefs outputK = (decls, prototype)
       where
-        decls = [printf "/* output %d */" outputK, printf "(*output%d) = %s;" outputK (nameNode gref)]
-        prototype = ["double * const output" ++ show outputK]
-    writeOutput (Vec grefs) outputK = (decls, prototype)
-      where
-        prototype = ["double output" ++ show outputK ++ "[" ++ show (length grefs) ++ "]"]
+        prototype = ["double output" ++ show outputK ++ "[" ++ show (V.length grefs) ++ "]"]
         decls = (printf "/* output %d */" outputK):
-                zipWith f [(0::Int)..] grefs
+                zipWith f [(0::Int)..] (V.toList grefs)
           where
             f outIdx gref = printf "output%d[%d] = %s;" outputK outIdx (nameNode gref)
-    writeOutput (Mat grefs) outputK
-      | any ((ncols /=) . length) grefs =
-          error $ "writeOutputs [[GraphRef]] matrix got inconsistent column dimensions: "++ show (map length grefs)
-      | otherwise = (decls, prototype)
-      where
-        nrows = length grefs
-        ncols = if nrows == 0 then 0 else length (head grefs)
-        prototype = ["double output" ++ show outputK ++ "[" ++ show fstIdx ++ "][" ++ show sndIdx ++ "]"]
-          where
-            (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (nrows,ncols)
-                                                      ColMajor -> (ncols,nrows)
-        decls = (printf "/* output %d */" outputK):
-                zipWith f [(r,c) | r <- [0..(nrows-1)], c <- [0..(ncols-1)]] (concat grefs)
-          where
-            f (rowIdx,colIdx) gref = printf "output%d[%d][%d] = %s;" outputK fstIdx sndIdx (nameNode gref)
-              where
-                (fstIdx,sndIdx) = case matStorageOrder of RowMajor -> (rowIdx,colIdx)
-                                                          ColMajor -> (colIdx,rowIdx)
 
-
-createMxOutputs :: [MVS Int] -> [String]
+createMxOutputs :: [V.Vector Int] -> [String]
 createMxOutputs xs = concat $ zipWith createMxOutput xs [0..]
   where
-    createMxOutput :: MVS Int -> Int -> [String]
-    createMxOutput (Sca _) outputK =
+    createMxOutput :: V.Vector Int -> Int -> [String]
+    createMxOutput grefs outputK =
       [ "    if ( " ++ show outputK ++ " < nlhs ) {"
-      , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleScalar( 0 );"
+      , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show (V.length grefs) ++ ", 1, mxREAL );"
       , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
       , "    } else"
-      , "        outputs[" ++ show outputK ++ "] = (double*)malloc( sizeof(double) );"
+      , "        outputs[" ++ show outputK ++ "] = (double*)malloc( " ++ show (V.length grefs) ++ "*sizeof(double) );"
       ]
-    createMxOutput (Vec grefs) outputK =
-      [ "    if ( " ++ show outputK ++ " < nlhs ) {"
-      , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show (length grefs) ++ ", 1, mxREAL );"
-      , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
-      , "    } else"
-      , "        outputs[" ++ show outputK ++ "] = (double*)malloc( " ++ show (length grefs) ++ "*sizeof(double) );"
-      ]
-    createMxOutput (Mat grefs) outputK =
-      [ "    if ( " ++ show outputK ++ " < nlhs ) {"
-      , "        plhs[" ++ show outputK ++ "] = mxCreateDoubleMatrix( " ++ show nrows++ ", " ++ show ncols ++ ", mxREAL );"
-      , "        outputs[" ++ show outputK ++ "] = mxGetPr( plhs[" ++ show outputK ++ "] );"
-      , "    } else"
-      , "        outputs[" ++ show outputK ++ "] = (double*)malloc( " ++ show (nrows*ncols) ++ "*sizeof(double) );"
-      ]
-      where
-        nrows = length grefs
-        ncols = if nrows == 0 then 0 else length (head grefs)
 
-
-checkMxInputDims :: MVS a -> String -> Int -> [String]
-checkMxInputDims (Sca _) functionName inputK =
-  [ "    if ( 1 != mxGetM( prhs[" ++ show inputK ++ "] ) || 1 != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
-  , "        char errMsg[200];"
-  , "        sprintf(errMsg,"
-  , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
-  , "                \"expected dimensions: (1, 1) but got (%zu, %zu)\","
-  , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
-  , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
-  , "        mexErrMsgTxt(errMsg);"
-  , "    }"
-  ]
-checkMxInputDims (Vec grefs) functionName inputK =
+checkMxInputDims :: V.Vector a -> String -> Int -> [String]
+checkMxInputDims grefs functionName inputK =
   [ "    if ( !( " ++ show nrows ++ " == mxGetM( prhs[" ++ show inputK ++ "] ) && 1 == mxGetN( prhs[" ++ show inputK ++ "] ) ) && !( " ++ show nrows ++ " == mxGetN( prhs[" ++ show inputK ++ "] ) && 1 == mxGetM( prhs[" ++ show inputK ++ "] ) ) ) {"
   , "        char errMsg[200];"
   , "        sprintf(errMsg,"
@@ -148,30 +73,18 @@ checkMxInputDims (Vec grefs) functionName inputK =
   , "    }"
   ]
   where
-    nrows = length grefs
-checkMxInputDims (Mat grefs) functionName inputK =
-  [ "    if ( " ++ show nrows ++ " != mxGetM( prhs[" ++ show inputK ++ "] ) || " ++ show ncols ++ " != mxGetN( prhs[" ++ show inputK ++ "] ) ) {"
-  , "        char errMsg[200];"
-  , "        sprintf(errMsg,"
-  , "                \"mex function '" ++ functionName ++ "' got incorrect dimensions for input " ++ show (1+inputK) ++ "\\n\""
-  , "                \"expected dimensions: (" ++ show nrows ++ ", " ++ show ncols ++ ") but got (%zu, %zu)\","
-  , "                mxGetM( prhs[" ++ show inputK ++ "] ),"
-  , "                mxGetN( prhs[" ++ show inputK ++ "] ) );"
-  , "        mexErrMsgTxt(errMsg);"
-  , "    }"
-  ]
-  where
-    nrows = length grefs
-    ncols = if nrows == 0 then 0 else length (head grefs)
+    nrows = V.length grefs
 
 -- | Turns a FunGraph into a string containing C code
-showC :: (Eq a, Show a, Hashable a, MVSList f (GExpr a Int), MVSList g Int) =>
-         MatrixStorageOrder -> String-> FunGraph a f g -> String
-showC matStorageOrder functionName fg = txt
+showC :: (Eq a, Show a, Hashable a, F.Foldable f, F.Foldable g) =>
+         String-> FunGraph a f g -> String
+showC functionName fg = txt
   where
-    inPrototypes = writeInputPrototypes matStorageOrder (toMVSList $ fgInputs fg)
-    (outDecls, outPrototypes) = writeOutputs matStorageOrder (toMVSList $ fgOutputs fg)
-    inputMap = makeInputMap matStorageOrder (toMVSList $ fgInputs fg)
+    inputs = [V.fromList $ F.toList (fgInputs fg)]
+    outputs = [V.fromList $ F.toList (fgOutputs fg)]
+    inPrototypes = writeInputPrototypes inputs
+    (outDecls, outPrototypes) = writeOutputs outputs
+    inputMap = makeInputMap inputs
     mainDecls = let f k = case fgLookupGExpr fg k of
                       Just v -> cAssignment inputMap k v
                       Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("
@@ -231,13 +144,13 @@ cAssignment _ k gexpr = "const double " ++ nameNode k ++ " = " ++ toCOp gexpr ++
     toCOp (GFloating (ACosh _))          = error "C generation doesn't support ACosh"
 
 
-showMex :: (Eq a, Show a, Hashable a, MVSList f (GExpr a Int), MVSList g Int)
+showMex :: (Eq a, Show a, Hashable a, F.Foldable f, F.Foldable g)
            => String -> FunGraph a f g -> String
-showMex functionName fg = cText ++ "\n\n\n" ++ mexFun functionName (toMVSList $ fgInputs fg) (toMVSList $ fgOutputs fg)
+showMex functionName fg = cText ++ "\n\n\n" ++ mexFun functionName [V.fromList $ F.toList $ fgInputs fg] [V.fromList $ F.toList $ fgOutputs fg]
   where
-    cText = showC ColMajor functionName fg -- matlab is column major >_<
+    cText = showC functionName fg -- matlab is column major >_<
 
-mexFun :: String -> [MVS a] -> [MVS Int] -> String
+mexFun :: String -> [V.Vector a] -> [V.Vector Int] -> String
 mexFun functionName ins outs =
   unlines $
   [ "#include \"mex.h\""
@@ -283,12 +196,5 @@ mexFun functionName ins outs =
   where
     nlhs = length outs
     nrhs = length ins
-    inputPtrs  = zipWith (\i k -> cast i "const " ++ "mxGetPr(prhs[" ++ show k ++ "])") ins  [(0::Int)..]
-    outputPtrs = zipWith (\o k -> cast o    ""    ++ "(outputs[" ++ show k ++ "])")     outs [(0::Int)..]
-
-    cast :: MVS a -> String -> String
-    cast (Sca _) _ = ""
-    cast (Vec _) _ = ""
-    cast (Mat xs) cnst = "(" ++ cnst ++ "double (*)[" ++ show nrows ++ "])" -- column major order
-      where
-        nrows = length xs
+    inputPtrs  = map (\k -> "const " ++ "mxGetPr(prhs[" ++ show k ++ "])") [(0::Int)..]
+    outputPtrs = map (\k ->    ""    ++ "(outputs[" ++ show k ++ "])")     [(0::Int)..]

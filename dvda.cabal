@@ -58,10 +58,9 @@ Library
                      Dvda.Codegen.WriteFile
                      Dvda.CSE
                      Dvda.Expr
-                     Dvda.Examples
+--                     Dvda.Examples
                      Dvda.FunGraph
                      Dvda.HashMap
-                     Dvda.HList
                      Dvda.Reify
                      Dvda.ReifyGraph
                      Dvda.Vis
@@ -80,7 +79,8 @@ Library
                      QuickCheck == 2.5.*,
                      test-framework-quickcheck2,
                      test-framework,
-                     process >= 1.1 && < 1.2
+                     process >= 1.1 && < 1.2,
+                     vector >= 0.10
 --                     text >= 0.11 && < 0.12,
 --                     plugins >= 1.5 && < 1.6,
 --                     unix
