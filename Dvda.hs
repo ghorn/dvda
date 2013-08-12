@@ -19,8 +19,8 @@ module Dvda ( -- * primitives
             , toFunGraph
             , cse
               -- * show/summarize FunGraphs
-            , previewGraph
-            , previewGraph'
+--            , previewGraph
+--            , previewGraph'
               -- * compile and link function
 --            , buildHSFunction
 --            , buildHSFunctionPure
@@ -31,5 +31,5 @@ import Dvda.AD ( rad )
 import Dvda.CSE ( cse )
 import Dvda.Expr ( Expr, sym, symDependent, symDependentN )
 import Dvda.FunGraph ( toFunGraph )
-import Dvda.Vis ( previewGraph, previewGraph' )
+--import Dvda.Vis ( previewGraph, previewGraph' )
 --import Dvda.HSBuilder

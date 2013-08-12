@@ -53,9 +53,9 @@ Library
                      Dvda.AD
  --                    Dvda.Codegen.CPlugins
                      Dvda.Codegen.CGen
-                     Dvda.Codegen.Gcc
+--                     Dvda.Codegen.Gcc
                      Dvda.Codegen.PythonGen
-                     Dvda.Codegen.WriteFile
+--                     Dvda.Codegen.WriteFile
                      Dvda.CSE
                      Dvda.Expr
 --                     Dvda.Examples
@@ -63,28 +63,28 @@ Library
                      Dvda.HashMap
                      Dvda.Reify
                      Dvda.ReifyGraph
-                     Dvda.Vis
+--                     Dvda.Vis
 
   Other-modules:     Dvda.ShowExprTests
   Build-depends:     base       >= 4     && < 5,
-                     file-location >= 0.4.5 && < 0.5,
                      hashable  >= 1.2 && < 1.3,
-                     containers >= 0.5 && < 0.6,
-                     unordered-containers  >= 0.2 && < 0.3,
+                     vector >= 0.10,
                      hashtables  >= 1.1.0 && < 1.2,
-                     graphviz >= 2999.15 && < 2999.17,
-                     fgl >= 5.4 && < 5.5,
-                     mtl >= 2.1 && < 2.2,
-                     directory >= 1.2 && < 1.3,
-                     QuickCheck == 2.5.*,
-                     test-framework-quickcheck2,
-                     test-framework,
-                     process >= 1.1 && < 1.2,
-                     vector >= 0.10
---                     text >= 0.11 && < 0.12,
---                     plugins >= 1.5 && < 1.6,
+                     containers >= 0.5 && < 0.6,
+                     unordered-containers  >= 0.2 && < 0.3
+--                     file-location >= 0.4.5 && < 0.5
+--                     graphviz >= 2999.15 && < 2999.17
+--                     fgl >= 5.4 && < 5.5
+--                     mtl >= 2.1 && < 2.2
+--                     directory >= 1.2 && < 1.3
+--                     QuickCheck == 2.5.*
+--                     test-framework-quickcheck2
+--                     test-framework
+--                     process >= 1.1 && < 1.2
+--                     text >= 0.11 && < 0.12
+--                     plugins >= 1.5 && < 1.6
 --                     unix
---                     text,
+--                     text
 
   Ghc-options:       -Wall -O2
   GHC-Prof-Options:  -Wall -O2 -prof -fprof-auto -fprof-cafs -rtsopts
