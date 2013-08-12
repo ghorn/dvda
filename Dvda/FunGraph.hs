@@ -70,7 +70,7 @@ toFunGraph :: (Functor f, Foldable f, Traversable g, Eq a, Hashable a, Show a) =
               f (Expr a) -> g (Expr a) -> IO (FunGraph a f g)
 toFunGraph inputExprs outputExprs = do
   -- reify the outputs
-  (ReifyGraph rgr, [outputIndices]) <- reifyGraphs [outputExprs]
+  (ReifyGraph rgr, outputIndices) <- reifyGraphs outputExprs
   let fg = nodelistToFunGraph rgr inputGExprs outputIndices
       inputGExprs = fmap f inputExprs
         where
