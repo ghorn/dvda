@@ -1,9 +1,11 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language RankNTypes #-}
-{-# Language TemplateHaskell #-}
+{-# Language BangPatterns #-}
 {-# Language TypeFamilies #-}
 
--- this file is a modified version from Andy Gill's data-reify package
+-- This file is a modified version from Andy Gill's data-reify package
+-- It is modified to use Data.HashTable.IO, which gives a speed improvement
+-- at the expense of portability.
 
 module Dvda.Reify ( MuRef(..)
                   , ReifyGraph(..)
@@ -37,6 +39,13 @@ reifyGraphs m = do
   stableNameMap <- H.new >>= newMVar
   graph <- newMVar []
   uVar <- newMVar 0
+
+  let newUnique = do
+        v <- takeMVar uVar
+        let v' = succ v
+        putMVar uVar v'
+        return v'
+  
   roots <- T.mapM (findNodes stableNameMap graph newUnique) m
   pairs <- readMVar graph
   return (ReifyGraph pairs, roots)
@@ -44,10 +53,10 @@ reifyGraphs m = do
 findNodes :: MuRef s
           => MVar (HashTable DynStableName Int)
           -> MVar [(Int,DeRef s Int)]
-          -> MVar Int
+          -> IO Int
           -> s
           -> IO Int
-findNodes stableNameMap graph uVar j | j `seq` True = do
+findNodes stableNameMap graph newUnique !j = do
   st <- makeDynStableName j
   tab <- takeMVar stableNameMap
   amIHere <- H.lookup tab st
@@ -56,33 +65,25 @@ findNodes stableNameMap graph uVar j | j `seq` True = do
     Just var -> do putMVar stableNameMap tab
                    return var
     -- if j's StableName is not yet in the table, recursively call findNodes
-    Nothing -> do var <- newUnique uVar
+    Nothing -> do var <- newUnique
                   H.insert tab st var
                   putMVar stableNameMap tab
-                  res <- mapDeRef (findNodes stableNameMap graph uVar) j
+                  res <- mapDeRef (findNodes stableNameMap graph newUnique) j
                   tab' <- takeMVar graph
                   putMVar graph $ (var,res) : tab'
                   return var
-findNodes _ _ _ _ = error "findNodes: strictness seq function failed to return True"
 
-newUnique :: MVar Int -> IO Int
-newUnique var = do
-  v <- takeMVar var
-  let v' = succ v
-  putMVar var v'
-  return v'
-  
 -- Stable names that not use phantom types.
 -- As suggested by Ganesh Sittampalam.
-data DynStableName = DynStableName (StableName ())
+newtype DynStableName = DynStableName (StableName ())
 
 instance Hashable DynStableName where
   hashWithSalt salt (DynStableName sn) = hashWithSalt salt $ hashStableName sn
   
 instance Eq DynStableName where
-	(DynStableName sn1) == (DynStableName sn2) = sn1 == sn2
+  (DynStableName sn1) == (DynStableName sn2) = sn1 == sn2
 
 makeDynStableName :: a -> IO DynStableName
 makeDynStableName a = do
-	st <- makeStableName a
-	return $ DynStableName (unsafeCoerce st)
+  st <- makeStableName a
+  return $ DynStableName (unsafeCoerce st)

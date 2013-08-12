@@ -61,10 +61,11 @@ findConflictingInputs exprs = HS.toList redundant
 
 
 -- | Take inputs and outputs and traverse the outputs reifying all expressions
---   and creating a hashmap of StableNames (stable pointers).
---   Once the hashmap is created, lookup the provided inputs and return a FunGraph which contains an
---   expression graph, input/output indices, and other useful functions. StableNames may be non-deterministic
---   so this function may return graphs with more or fewer CSE's eliminated.
+--   and creating a hashmap of StableNames. Once the hashmap is created,
+--   lookup the provided inputs and return a FunGraph which contains an
+--   expression graph, input/output indices, and other useful functions.
+--   StableNames may be non-deterministic so this function may return graphs
+--   with greater or fewer CSE's eliminated.
 --   If CSE is then performed on the graph, the result is deterministic.
 toFunGraph :: (Functor f, Foldable f, Traversable g, Eq a, Hashable a, Show a) =>
               f (Expr a) -> g (Expr a) -> IO (FunGraph a f g)

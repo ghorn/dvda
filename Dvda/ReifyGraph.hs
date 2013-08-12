@@ -3,6 +3,7 @@
 {-# Language UndecidableInstances #-}
 
 -- this file is a modified version from Andy Gill's data-reify package
+-- this small module is separated from Dvda.Reify to contain -XUndecidableInstances
 
 module Dvda.ReifyGraph ( ReifyGraph(..)
                        ) where
