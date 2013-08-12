@@ -27,7 +27,7 @@ exampleFunGraph = do
       z = msym (3,5) "Z"
   inputs_ (x :* y :* z)
   
-  z1 <- node $ (scale x z)**3
+  z1 <- node $ scale x z ** 3
 --  z2 <- node $ (dot z y)**2
   z2 <- node $ y**2
   z3 <- node $ diff ((x*x/2)**x) x
@@ -37,7 +37,7 @@ exampleFunGraph = do
 pureFun :: Exprs (DIM0 :* DIM1 :* DIM2) Double -> Exprs (DIM2 :* DIM1 :* DIM0) Double
 pureFun (x :* y :* z) = z1 :* z2 :* z3
   where
-    z1 = (scale x z)**3
+    z1 = scale x z ** 3
 --    z2 = (dot z y)**2
     z2 = y**2
     z3 = diff ((x*x/2)**x) x
@@ -71,7 +71,7 @@ run' = do
 
 run :: IO ()
 run = do
-  let gr@( FunGraph _ _ _ _) = runFunGraph $ do
+  let gr@(FunGraph {}) = runFunGraph $ do
         let x = sym "x" :: Expr DIM0 Double
             y = sym "y"
             z1 = x + x / y + 3
@@ -123,7 +123,7 @@ smallGraph = makeFunGraph (x :* y :* z) (f0 :* f1)
 runCallNative :: Exprs (Z :* Z) Double
 runCallNative = toNative smallGraph (f 1 :* f 2 :* f 3)
   where
-    f = EConst . (CSingleton Z)
+    f = EConst . CSingleton Z
 
 showoff :: IO ()
 showoff = do

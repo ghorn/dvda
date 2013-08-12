@@ -22,7 +22,7 @@ writeSourceFile source functionDir sourceName = do
       
   -- if the source already exists, make sure it matches the old source
   srcExists <- doesFileExist sourcePath
-  when srcExists $ do
+  when srcExists $
     putStrLn $ "file \"" ++ sourcePath ++ "\" already exists, overwriting"
   
   -- write  source

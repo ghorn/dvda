@@ -32,12 +32,12 @@ writeInputPrototypes ins = concat $ zipWith inputPrototype [(0::Int)..] ins
     inputPrototype inputK _ = ["input" ++ show inputK]
 
 writeOutputs :: [V.Vector Int] -> [String]
-writeOutputs ins = (concat $ zipWith writeOutput ins [0..]) ++ [retStatement]
+writeOutputs ins = concat (zipWith writeOutput ins [0..]) ++ [retStatement]
   where
     retStatement =
-      "return [" ++ (intercalate ", " (map (("output"++) . show) [0..(length ins - 1)])) ++ "]"
+      "return [" ++ intercalate ", " (map (("output"++) . show) [0..(length ins - 1)]) ++ "]"
     
-    writeGrefList grefs = '[':(intercalate ", " (map nameNode grefs))++"]"
+    writeGrefList grefs = '[': intercalate ", " (map nameNode grefs) ++"]"
     
     writeOutput :: V.Vector Int -> Int -> [String]
     writeOutput grefs outputK =
@@ -64,7 +64,7 @@ showPy functionName fg = txt
            mainDecls ++ [""] ++
            outDecls
   
-    txt = "def " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes)) ++ " ):\n" ++
+    txt = "def " ++ functionName ++ " ( " ++ intercalate ", " inPrototypes ++ " ):\n" ++
           body
 
 nameNode :: Int -> String

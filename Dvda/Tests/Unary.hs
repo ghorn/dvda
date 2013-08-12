@@ -55,7 +55,7 @@ acosProp, asinProp, atanProp, sqrtProp :: (Floating a, Num (Vector a), Ord a, Sh
 acosProp x = (x >= 0 && x <= 1) ==> abs (acos x - nativeRun acos x) < 1e-12
 asinProp x = (x >= 0 && x <= 1) ==> asin x == nativeRun asin x
 atanProp x = (x >= 0 && x <= 1) ==> atan x == nativeRun atan x
-sqrtProp x = (x >= 0) ==> abs ((sqrt x) - (nativeRun sqrt x)) < 1e-13
+sqrtProp x = (x >= 0) ==> abs (sqrt x - nativeRun sqrt x) < 1e-13
 
 prop'Names :: [String]
 prop'Names = ["acos", "asin", "atan", "sqrt"]
@@ -67,7 +67,7 @@ mkUnaryTest :: Testable a => (String, a) -> Test
 mkUnaryTest (n, t) = testProperty ("unary_" ++ n) t
 
 uts :: [Test]
-uts = (map mkUnaryTest (zip propNames props)) ++ (map mkUnaryTest (zip prop'Names props'))
+uts = zipWith (curry mkUnaryTest) propNames props ++ zipWith (curry mkUnaryTest) prop'Names props'
 
 unaryTests :: Test
 unaryTests = testGroup "Unary functions 1" uts

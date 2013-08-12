@@ -4,6 +4,7 @@ module Dvda.CSE ( cse
                 ) where
 
 import Control.Monad.ST ( ST, runST )
+import Data.Maybe ( fromMaybe )
 import Data.Foldable ( Foldable, toList )
 import Data.Hashable ( Hashable )
 import Data.IntMap ( IntMap )
@@ -23,11 +24,9 @@ cse fg = nodelistToFunGraph (map swap htList) (fgInputs fg) outputIndices
     (htList, im) = cse' (fgLookupGExpr fg) (fgOutputs fg)
     -- since the fgInputs are all symbolic (GSym _) there is no need for mapping old inputs to new inputs
     outputIndices = let
-      oldIndexToNewIndex k = case IM.lookup k im of
-        Just k' -> k'
-        Nothing -> error $
-                   "CSE error, in mapping old output indices to new, found an old one which was missing from" ++
-                   "the old --> new Int mapping"
+      errmsg = "CSE error, in mapping old output indices to new, "++
+               "found an old one which was missing from the old --> new Int mapping"
+      oldIndexToNewIndex k = fromMaybe (error errmsg) (IM.lookup k im)
       in fmap oldIndexToNewIndex (fgOutputs fg)
 
 cse' :: (Eq a, Hashable a, Foldable g)

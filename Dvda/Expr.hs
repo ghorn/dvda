@@ -349,7 +349,7 @@ deriving instance (Ord a, Ord b) => Ord (GExpr a b)
 -- you might use this to use Expr's nice Show instance
 gexprToExpr :: (b -> Expr a) -> GExpr a b -> Expr a
 gexprToExpr _ (GSym s@(Sym _)) = ESym s
-gexprToExpr _ (GSym sd@(SymDependent _ _ _)) = ESym sd
+gexprToExpr _ (GSym sd@(SymDependent {})) = ESym sd
 gexprToExpr _ (GConst c) = EConst c
 gexprToExpr f (GNum (Mul x y))               = ENum (Mul (f x) (f y))
 gexprToExpr f (GNum (Add x y))               = ENum (Add (f x) (f y))
@@ -405,7 +405,7 @@ getParents (GFloating (ATanh x))          = [x]
 getParents (GFloating (ACosh x))          = [x]
 
 instance (Show a, Show b) => Show (GExpr a b) where
-  show = show . (gexprToExpr (\x -> ESym (Sym ("{" ++ show x ++ "}"))))
+  show = show . gexprToExpr (\x -> ESym (Sym ("{" ++ show x ++ "}")))
   
 deriving instance (Eq a, Eq b) => Eq (GExpr a b)
 
@@ -420,32 +420,32 @@ instance MuRef (Expr a) where
   type DeRef (Expr a) = GExpr a
   mapDeRef _ (ESym name) = pure (GSym name)
   mapDeRef _ (EConst c)  = pure (GConst c)
-  mapDeRef f (ENum (Mul x y)) = GNum <$> (Mul <$> (f x) <*> (f y))
-  mapDeRef f (ENum (Add x y)) = GNum <$> (Add <$> (f x) <*> (f y))
-  mapDeRef f (ENum (Sub x y)) = GNum <$> (Sub <$> (f x) <*> (f y))
-  mapDeRef f (ENum (Negate x)) = GNum <$> (Negate <$> (f x))
-  mapDeRef f (ENum (Abs x)) = GNum <$> (Negate <$> (f x))
-  mapDeRef f (ENum (Signum x)) = GNum <$> (Signum <$> (f x))
+  mapDeRef f (ENum (Mul x y)) = GNum <$> (Mul <$> f x <*> f y)
+  mapDeRef f (ENum (Add x y)) = GNum <$> (Add <$> f x <*> f y)
+  mapDeRef f (ENum (Sub x y)) = GNum <$> (Sub <$> f x <*> f y)
+  mapDeRef f (ENum (Negate x)) = GNum <$> (Negate <$> f x)
+  mapDeRef f (ENum (Abs x)) = GNum <$> (Negate <$> f x)
+  mapDeRef f (ENum (Signum x)) = GNum <$> (Signum <$> f x)
   mapDeRef _ (ENum (FromInteger k)) = pure $ GNum (FromInteger k)
 
-  mapDeRef f (EFractional (Div x y)) = GFractional <$> (Div <$> (f x) <*> (f y))
+  mapDeRef f (EFractional (Div x y)) = GFractional <$> (Div <$> f x <*> f y)
   mapDeRef _ (EFractional (FromRational x)) = pure $ GFractional (FromRational x)
 
-  mapDeRef f (EFloating (Pow x y))     = GFloating <$> (Pow <$> (f x) <*> (f y))
-  mapDeRef f (EFloating (LogBase x y)) = GFloating <$> (LogBase <$> (f x) <*> (f y))
-  mapDeRef f (EFloating (Exp   x))     = GFloating <$> (Exp   <$> (f x))
-  mapDeRef f (EFloating (Log   x))     = GFloating <$> (Log   <$> (f x))
-  mapDeRef f (EFloating (Sin   x))     = GFloating <$> (Sin   <$> (f x))
-  mapDeRef f (EFloating (Cos   x))     = GFloating <$> (Cos   <$> (f x))
-  mapDeRef f (EFloating (ASin  x))     = GFloating <$> (ASin  <$> (f x))
-  mapDeRef f (EFloating (ATan  x))     = GFloating <$> (ATan  <$> (f x))
-  mapDeRef f (EFloating (ACos  x))     = GFloating <$> (ACos  <$> (f x))
-  mapDeRef f (EFloating (Sinh  x))     = GFloating <$> (Sinh  <$> (f x))
-  mapDeRef f (EFloating (Cosh  x))     = GFloating <$> (Cosh  <$> (f x))
-  mapDeRef f (EFloating (Tanh  x))     = GFloating <$> (Tanh  <$> (f x))
-  mapDeRef f (EFloating (ASinh x))     = GFloating <$> (ASinh <$> (f x))
-  mapDeRef f (EFloating (ATanh x))     = GFloating <$> (ATanh <$> (f x))
-  mapDeRef f (EFloating (ACosh x))     = GFloating <$> (ACosh <$> (f x))
+  mapDeRef f (EFloating (Pow x y))     = GFloating <$> (Pow <$> f x <*> f y)
+  mapDeRef f (EFloating (LogBase x y)) = GFloating <$> (LogBase <$> f x <*> f y)
+  mapDeRef f (EFloating (Exp   x))     = GFloating <$> (Exp   <$> f x)
+  mapDeRef f (EFloating (Log   x))     = GFloating <$> (Log   <$> f x)
+  mapDeRef f (EFloating (Sin   x))     = GFloating <$> (Sin   <$> f x)
+  mapDeRef f (EFloating (Cos   x))     = GFloating <$> (Cos   <$> f x)
+  mapDeRef f (EFloating (ASin  x))     = GFloating <$> (ASin  <$> f x)
+  mapDeRef f (EFloating (ATan  x))     = GFloating <$> (ATan  <$> f x)
+  mapDeRef f (EFloating (ACos  x))     = GFloating <$> (ACos  <$> f x)
+  mapDeRef f (EFloating (Sinh  x))     = GFloating <$> (Sinh  <$> f x)
+  mapDeRef f (EFloating (Cosh  x))     = GFloating <$> (Cosh  <$> f x)
+  mapDeRef f (EFloating (Tanh  x))     = GFloating <$> (Tanh  <$> f x)
+  mapDeRef f (EFloating (ASinh x))     = GFloating <$> (ASinh <$> f x)
+  mapDeRef f (EFloating (ATanh x))     = GFloating <$> (ATanh <$> f x)
+  mapDeRef f (EFloating (ACosh x))     = GFloating <$> (ACosh <$> f x)
 
 substitute :: (Ord a, Hashable a, Show a) => Expr a -> [(Expr a, Expr a)] -> Expr a
 substitute expr subList
@@ -462,16 +462,16 @@ substitute expr subList
     subs e@(EConst _) = e
     subs e@(ENum (FromInteger _)) = e
     subs e@(EFractional (FromRational _)) = e
-    subs (ENum (Mul x y)) = (subs x) * (subs y)
-    subs (ENum (Add x y)) = (subs x) + (subs y)
-    subs (ENum (Sub x y)) = (subs x) - (subs y)
+    subs (ENum (Mul x y)) = subs x * subs y
+    subs (ENum (Add x y)) = subs x + subs y
+    subs (ENum (Sub x y)) = subs x - subs y
     subs (ENum (Negate x)) = negate (subs x)
     subs (ENum (Abs x))    = abs (subs x)
     subs (ENum (Signum x)) = signum (subs x)
     
-    subs (EFractional (Div x y)) = (subs x) / (subs y)
+    subs (EFractional (Div x y)) = subs x / subs y
     
-    subs (EFloating (Pow x y))     = (subs x) ** (subs y)
+    subs (EFloating (Pow x y))     = subs x ** subs y
     subs (EFloating (LogBase x y)) = logBase (subs x) (subs y)
     subs (EFloating (Exp   x))     = exp   (subs x)
     subs (EFloating (Log   x))     = log   (subs x)
@@ -616,13 +616,13 @@ extractLinearPart (ENum (Negate x)) arg = (-xNonlin, -xLin)
     (xNonlin,xLin) = extractLinearPart x arg
 extractLinearPart e@(ENum (Mul x y)) arg = case (getConst x, getConst y) of
   (Nothing,Nothing) -> (e,0)
-  (Just cx, Nothing) -> let (yNl,yL) = extractLinearPart y arg in ((EConst cx)*yNl,cx*yL)
-  (Nothing, Just cy) -> let (xNl,xL) = extractLinearPart x arg in (xNl*(EConst cy),xL*cy)
+  (Just cx, Nothing) -> let (yNl,yL) = extractLinearPart y arg in (EConst cx * yNl,cx*yL)
+  (Nothing, Just cy) -> let (xNl,xL) = extractLinearPart x arg in (xNl * EConst cy,xL*cy)
   _ -> error $ "extractLinearPart got ENum (Mul x y) where x and y are both constants\n"++
        "x: " ++ show x ++ "\ny: " ++ show y
 extractLinearPart e@(EFractional (Div x y)) arg = case getConst y of
   Nothing -> (e,0)
-  Just cy -> let (xNl,xL) = extractLinearPart x arg in (xNl/(EConst cy),xL/cy)
+  Just cy -> let (xNl,xL) = extractLinearPart x arg in (xNl/EConst cy,xL/cy)
 extractLinearPart e@(ENum (Abs _))    _ = (e,0)
 extractLinearPart e@(ENum (Signum _)) _ = (e,0)
 extractLinearPart e@(EFloating (Pow _ _)) _ = (e,0)

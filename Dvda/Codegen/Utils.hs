@@ -3,7 +3,6 @@
 {-# Language FlexibleContexts #-}
 {-# Language TypeOperators #-}
 {-# Language TypeFamilies #-}
-{-# Language ForeignFunctionInterface #-}
 
 module Dvda.Codegen.Utils ( callGcc
                           , callGhc

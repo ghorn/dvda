@@ -34,7 +34,7 @@ bpUnary sens g unop = backpropNode (sens*dfdg) g
     dfdg = dualPerturbation $ unop (Dual g 1)
 
 backpropNode :: (Ord a, Num a) => Expr a -> Expr a -> [(Expr a, Expr a)]
-backpropNode sens e@(ESym (SymDependent name k dep_)) = (e,sens):(backpropNode (sens*primal') dep)
+backpropNode sens e@(ESym (SymDependent name k dep_)) = (e,sens):backpropNode (sens*primal') dep
   where
     primal' = ESym (SymDependent name (k+1) dep_)
     dep = ESym dep_
@@ -69,6 +69,6 @@ backprop :: (Num a, Ord a, Hashable a) => Expr a -> HashMap (Expr a) (Expr a)
 backprop x = HM.fromListWith (+) (backpropNode 1 x)
 
 rad :: (Num a, Ord a, Hashable a, Functor f) => Expr a -> f (Expr a) -> f (Expr a)
-rad x args = fmap (\arg -> HM.lookupDefault 0 arg sensitivities) args
+rad x = fmap (\arg -> HM.lookupDefault 0 arg sensitivities)
   where
     sensitivities = backprop x

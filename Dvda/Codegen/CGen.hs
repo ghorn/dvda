@@ -43,7 +43,7 @@ writeOutputs ins = (concatMap fst dcs, concatMap snd dcs)
     writeOutput grefs outputK = (decls, prototype)
       where
         prototype = ["double output" ++ show outputK ++ "[" ++ show (V.length grefs) ++ "]"]
-        decls = (printf "/* output %d */" outputK):
+        decls = printf "/* output %d */" outputK :
                 zipWith f [(0::Int)..] (V.toList grefs)
           where
             f outIdx gref = printf "output%d[%d] = %s;" outputK outIdx (nameNode gref)
@@ -95,7 +95,7 @@ showC functionName fg = txt
            outDecls
   
     txt = "#include <math.h>\n\n" ++
-          "void " ++ functionName ++ " ( " ++ (intercalate ", " (inPrototypes++outPrototypes)) ++ " )\n{\n" ++
+          "void " ++ functionName ++ " ( " ++ intercalate ", " (inPrototypes++outPrototypes) ++ " )\n{\n" ++
           body ++ "}\n"
 
 nameNode :: Int -> String
@@ -168,7 +168,7 @@ mexFun functionName ins outs =
   , "    }"
   , []
   , "    /* check the dimensions of the input arrays */"
-  ] ++ concat (zipWith (\x -> checkMxInputDims x functionName) ins [0..]) ++
+  ] ++ concat (zipWith (`checkMxInputDims` functionName) ins [0..]) ++
   [ []
   , "    /* check number of outputs  */"
   , "    if ( " ++ show nlhs ++ " < nlhs ) {"

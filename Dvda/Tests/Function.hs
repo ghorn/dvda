@@ -27,7 +27,7 @@ import Dvda.CallNative
 data Pair a = Pair a (Expr Z a)
 
 evalScalar :: (Eq a, Show a, Hashable a, Floating a) => Expr Z a -> a
-evalScalar expr = getVal $ head $ nativeCall (\_ -> [expr]) (error "don't need any inputs in evalScalar")
+evalScalar expr = getVal $ head $ nativeCall (const [expr]) (error "don't need any inputs in evalScalar")
   where
     getVal (EConst (CSingleton _ x)) = x
     getVal (EDimensionless x) = trace "test got EDimensionless" x
@@ -48,7 +48,7 @@ instance (Arbitrary a, RealFloat a) => Arbitrary (Pair a) where
     let (Pair x ex) = fx
         (Pair y ey) = fy
 
-    frequency $
+    frequency
       [ (24, return $! Pair sourceNum (EConst (CSingleton Z sourceNum)))
       , (5, return $! Pair (x * y) (ex * ey))
       , (5, return $! Pair (x + y) (ex + ey))
@@ -88,7 +88,7 @@ instance (Arbitrary a, RealFloat a) => Arbitrary (Pair a) where
 
 
 buildAndEvaluate :: (Show a, Hashable a, RealFloat a) => Pair a -> Bool
-buildAndEvaluate (Pair x ex) = (x == evalScalar ex)
+buildAndEvaluate (Pair x ex) = x == evalScalar ex
 
 --evaluateEqualsCallNative :: RealFloat a => Expr Z a -> Bool
 --evaluateEqualsCallNative expr = unsafePerformIO $ do

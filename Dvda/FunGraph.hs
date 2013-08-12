@@ -40,11 +40,11 @@ data FunGraph a f g = FunGraph { fgGraph :: Graph.Graph
 detectMissingInputs :: (Foldable f, Eq a, Hashable a, Show a) => f (Expr a) -> [(Int,GExpr a Int)] -> [GExpr a Int]
 detectMissingInputs exprs gr = HS.toList $ HS.difference allGraphInputs allUserInputs
   where
-    allUserInputs = let f (ESym name) acc = (GSym name):acc
+    allUserInputs = let f (ESym name) acc = GSym name : acc
                         f _ e = error $ "detectMissingInputs given non-ESym input \"" ++ show e ++ "\""
                     in HS.fromList $ F.foldr f [] exprs
 
-    allGraphInputs = let f (_,(GSym name)) acc = (GSym name):acc
+    allGraphInputs = let f (_, GSym name) acc = GSym name : acc
                          f _ acc = acc
                      in HS.fromList $ foldr f [] gr
 
@@ -75,7 +75,7 @@ toFunGraph inputExprs outputExprs = do
   let fg = nodelistToFunGraph rgr inputGExprs outputIndices
       inputGExprs = fmap f inputExprs
         where
-          f (ESym name) = (GSym name)
+          f (ESym name) = GSym name
           f x = error $ "ERROR: toFunGraph given non-ESym input \"" ++ show x ++ "\""
   return $ case (detectMissingInputs inputExprs rgr, findConflictingInputs inputExprs) of
     ([],[]) -> fg
@@ -103,13 +103,13 @@ countNodes :: FunGraph a f g -> Int
 countNodes = length . Graph.vertices . fgGraph
 
 topSort :: FunGraph a f g -> [Int]
-topSort fg = map ((\(_,k,_) -> k) . (fgNodeFromVertex fg)) $ Graph.topSort (fgGraph fg)
+topSort fg = map ((\(_,k,_) -> k) . fgNodeFromVertex fg) $ Graph.topSort (fgGraph fg)
 
 -- | make a FunGraph out of outputs, automatically detecting the proper inputs
 exprsToFunGraph :: (Eq a, Show a, Hashable a, Traversable g) => g (Expr a) -> IO (FunGraph a [] g)
 exprsToFunGraph outputs = do
   let getSyms :: [Expr a] -> [Sym]
-      getSyms exprs = HS.toList $ foldr (\acc expr -> foldExpr f expr acc) HS.empty exprs
+      getSyms exprs = HS.toList $ foldr (flip (foldExpr f)) HS.empty exprs
         where
           f (ESym s) hs = HS.insert s hs
           f _ hs = hs

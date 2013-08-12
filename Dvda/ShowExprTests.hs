@@ -3,7 +3,7 @@
 module Dvda.ShowExprTests ( runTests
                           ) where
 
-import Data.Maybe ( catMaybes )
+import Data.Maybe ( mapMaybe )
 
 import Dvda.Expr
 
@@ -17,7 +17,7 @@ someShows = [ ("x * y", x * y)
             , ("sin(cos(x))", sin (cos x))
             , ("sin(x ** y)", sin (x ** y))
             , ("sin(x + y)", sin (x + y))
-            , ("x ** sin(y)", x ** (sin y))
+            , ("x ** sin(y)", x ** sin y)
             , ("(x + y) * z", (x + y)*z)
             , ("10 * x", 10*x)
             ]
@@ -27,7 +27,7 @@ someShows = [ ("x * y", x * y)
     z = sym "z"
 
 testShows :: [(String, Expr Double)] -> IO ()
-testShows = putStrLn . unlines . map betterShow . catMaybes . map testShow
+testShows = putStrLn . unlines . map betterShow . mapMaybe testShow
   where
     betterShow (x,y) = x ++ " =/= " ++ y
     testShow (str,expr)

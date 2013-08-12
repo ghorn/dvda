@@ -21,7 +21,7 @@ foreign import ccall "dynamic" mkFun :: FunPtr a -> CallFunction
 callCFunction :: (Real a, Fractional a) => [Int] -> FunPtr a -> [[a]] -> [[a]]
 callCFunction numOutputs c_fun inputs = unsafePerformIO $ do
   -- set up inputs
-  inputArray <- mapM newArray (map (map realToFrac) inputs) >>= newArray
+  inputArray <- mapM (newArray . map realToFrac) inputs >>= newArray
 --  listOfPtrs <- mapM newArray (map (map realToFrac) inputs)
 --  inputArray <- newArray listOfPtrs
   

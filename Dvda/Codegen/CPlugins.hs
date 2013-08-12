@@ -33,11 +33,11 @@ loadC :: FilePath -- ^ object file
 loadC objPath symName indims outdims = do
   dl <- dlopen objPath [RTLD_NOW]
   funptr <- dlsym dl symName
-  return $ CFunction { funInputDims  = indims
-                     , funOutputDims = outdims
-                     , funName    = symName
-                     , funCFunPtr = funptr
-                     }
+  return CFunction { funInputDims  = indims
+                   , funOutputDims = outdims
+                   , funName    = symName
+                   , funCFunPtr = funptr
+                   }
 
 ---- | Call a function using generated C code with `Numeric.Dvda.Expr.Expr` inputs and outputs
 --callC :: (Floating a, Real a) => Function a -> [Expr a] -> [Expr a]
