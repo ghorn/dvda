@@ -405,7 +405,7 @@ getParents (GFloating (ATanh x))          = [x]
 getParents (GFloating (ACosh x))          = [x]
 
 instance (Show a, Show b) => Show (GExpr a b) where
-  show = show . gexprToExpr (\x -> ESym (Sym ("{" ++ show x ++ "}")))
+  show = show . gexprToExpr (\x -> ESym (Sym ("@" ++ show x)))
   
 deriving instance (Eq a, Eq b) => Eq (GExpr a b)
 

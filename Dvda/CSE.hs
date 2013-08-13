@@ -45,9 +45,9 @@ cse' lookupFun outputIndices = runST $ do
   htList <- HT.toList ht
   return (htList, oldToNewIdx)
 
-  
----- | take in an Int that represents a node in the original graph
----- see if that int has been inserted in the new graph
+
+-- | take in an Int that represents a node in the original graph
+-- see if that int has been inserted in the new graph
 insertOldNode ::
   (Eq a, Hashable a)
   => Int -- ^ Int to be inserted
@@ -148,4 +148,3 @@ cseInsert gexpr ht oldNodeToNewNode0 nextFreeInt0 = do
     Nothing -> do
       HT.insert ht gexpr nextFreeInt0
       return (nextFreeInt0, oldNodeToNewNode0, nextFreeInt0+1)
-        

@@ -12,7 +12,7 @@ import qualified Data.Vector as V
 import Text.Printf ( printf )
 
 import Dvda.Expr ( GExpr(..), Floatings(..), Nums(..), Fractionals(..) )
-import Dvda.FunGraph ( FunGraph, topSort, fgInputs, fgOutputs, fgLookupGExpr )
+import Dvda.FunGraph ( FunGraph, fgTopSort, fgInputs, fgOutputs, fgLookupGExpr )
 import Dvda.HashMap ( HashMap )
 import qualified Dvda.HashMap as HM
 
@@ -58,7 +58,7 @@ showPy functionName fg = txt
     mainDecls = let f k = case fgLookupGExpr fg k of
                       Just v -> pyAssignment inputMap k v
                       Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("
-                in map f $ reverse $ topSort fg
+                in map f $ fgTopSort fg
   
     body = unlines $ map ("    "++) $
            mainDecls ++ [""] ++

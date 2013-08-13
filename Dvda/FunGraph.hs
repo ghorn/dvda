@@ -7,8 +7,7 @@ module Dvda.FunGraph ( FunGraph
                      , fgOutputs
                      , fgLookupGExpr
                      , fgReified
-                     , topSort
---                     , fgGraph
+                     , fgTopSort
                      , nodelistToFunGraph
                      , exprsToFunGraph
                      ) where
@@ -29,12 +28,8 @@ data FunGraph a f g = FunGraph { fgGraph :: Graph.Graph
                                , fgOutputs :: g Int
                                , fgReified :: [(Int, GExpr a Int)]
                                , fgLookupGExpr :: Int -> Maybe (GExpr a Int)
-                               , fgVertexFromKey :: Int -> Maybe Int
-                               , fgNodeFromVertex :: Int -> (GExpr a Int, Int, [Int])
+                               , fgTopSort :: [Int]
                                }
-
---instance (Show a) => Show (FunGraph a f g) where
---  show fg = "FunGraph\ninputs:\n" ++ show (fgInputs fg) ++ "\noutputs:\n" ++ show (fgOutputs fg) ++ "\ngraph:\n" ++ show (fgGraph fg)
 
 -- | find any symbols which are parents of outputs, but are not supplied by the user
 detectMissingInputs :: (Foldable f, Eq a, Hashable a, Show a) => f (Expr a) -> [(Int,GExpr a Int)] -> [GExpr a Int]
@@ -89,21 +84,19 @@ nodelistToFunGraph rgr inputIndices outputIndices =
            , fgOutputs = outputIndices
            , fgLookupGExpr = lookupG
            , fgReified = rgr
-           , fgVertexFromKey = lookupKey
-           , fgNodeFromVertex = lookupVertex
+           , fgTopSort = topSort
            }
   where
     -- make sure all the inputs are symbolic, and find their indices in the Expr graph
     (gr, lookupVertex, lookupKey) = Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, getParents gexpr)) rgr
     lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
 
+    topSort :: [Int]
+    topSort = reverse $ map ((\(_,k,_) -> k) . lookupVertex) $ Graph.topSort gr
 
 ---------------------------------- utilities -----------------------------
 countNodes :: FunGraph a f g -> Int
 countNodes = length . Graph.vertices . fgGraph
-
-topSort :: FunGraph a f g -> [Int]
-topSort fg = map ((\(_,k,_) -> k) . fgNodeFromVertex fg) $ Graph.topSort (fgGraph fg)
 
 -- | make a FunGraph out of outputs, automatically detecting the proper inputs
 exprsToFunGraph :: (Eq a, Show a, Hashable a, Traversable g) => g (Expr a) -> IO (FunGraph a [] g)
