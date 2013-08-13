@@ -12,7 +12,7 @@ module Dvda.Reify ( MuRef(..)
                   , reifyGraphs
                   ) where
 
-import Control.Concurrent.MVar ( newMVar, takeMVar, putMVar, MVar, readMVar )
+import Control.Concurrent.MVar ( newMVar, takeMVar, putMVar, MVar, readMVar, modifyMVar_ )
 import Control.Applicative ( Applicative )
 import Data.Hashable ( Hashable(..) )
 import Data.Traversable ( Traversable )
@@ -38,42 +38,35 @@ class MuRef a where
 -- the dereferenced nodes, with their children as 'Int' rather than recursive values.
 reifyGraphs :: (MuRef s, Traversable t) => t s -> IO (ReifyGraph (DeRef s), t Unique)
 reifyGraphs m = do
-  stableNameMap <- H.new >>= newMVar
-  graph <- newMVar []
+  stableNameMap <- H.new :: IO (HashTable DynStableName Unique)
   uVar <- newMVar 0
 
-  let newUnique = do
+  let newUnique :: IO Int
+      newUnique = do
         v <- takeMVar uVar
-        let v' = succ v
-        putMVar uVar v'
-        return v'
+        putMVar uVar (succ v)
+        return v
 
-  roots <- T.mapM (findNodes stableNameMap graph newUnique) m
-  pairs <- readMVar graph
+      findNodes :: MuRef s => MVar [(Unique,DeRef s Unique)] -> s -> IO Unique
+      findNodes graph !j = do
+        stableName <- makeDynStableName j
+        amIHere <- H.lookup stableNameMap stableName
+        case amIHere of
+          -- if the j's StableName is already in the table, return the element
+          Just unique -> return unique
+          -- if j's StableName is not yet in the table, recursively call findNodes
+          Nothing -> do
+            unique <- newUnique
+            H.insert stableNameMap stableName unique
+            res <- mapDeRef (findNodes graph) j
+            modifyMVar_ graph (return . ((unique,res):))
+            return unique
+
+  graph0 <- newMVar []
+  roots <- T.mapM (findNodes graph0) m
+  pairs <- readMVar graph0
   return (ReifyGraph pairs, roots)
 
-findNodes :: MuRef s
-          => MVar (HashTable DynStableName Unique)
-          -> MVar [(Unique,DeRef s Unique)]
-          -> IO Unique
-          -> s
-          -> IO Unique
-findNodes stableNameMap graph newUnique !j = do
-  st <- makeDynStableName j
-  tab <- takeMVar stableNameMap
-  amIHere <- H.lookup tab st
-  case amIHere of
-    -- if the j's StableName is already in the table, return the element
-    Just var -> do putMVar stableNameMap tab
-                   return var
-    -- if j's StableName is not yet in the table, recursively call findNodes
-    Nothing -> do var <- newUnique
-                  H.insert tab st var
-                  putMVar stableNameMap tab
-                  res <- mapDeRef (findNodes stableNameMap graph newUnique) j
-                  tab' <- takeMVar graph
-                  putMVar graph $ (var,res) : tab'
-                  return var
 
 -- Stable names that not use phantom types.
 -- As suggested by Ganesh Sittampalam.
