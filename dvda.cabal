@@ -62,7 +62,6 @@ Library
                      Dvda.FunGraph
                      Dvda.HashMap
                      Dvda.Reify
-                     Dvda.ReifyGraph
 --                     Dvda.Vis
 
   Other-modules:     Dvda.ShowExprTests

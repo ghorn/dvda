@@ -20,10 +20,12 @@ import qualified Data.Traversable as T
 import System.Mem.StableName ( StableName, makeStableName, hashStableName )
 import Unsafe.Coerce ( unsafeCoerce )
 
-import Dvda.ReifyGraph ( ReifyGraph(..) )
-
 import qualified Data.HashTable.IO as H
 type HashTable k v = H.CuckooHashTable k v
+
+type Unique = Int
+
+data ReifyGraph e = ReifyGraph [(Unique,e Unique)]
 
 class MuRef a where
   type DeRef a :: * -> *
@@ -34,7 +36,7 @@ class MuRef a where
 
 -- | 'reifyGraph' takes a data structure that admits 'MuRef', and returns a 'ReifyGraph' that contains
 -- the dereferenced nodes, with their children as 'Int' rather than recursive values.
-reifyGraphs :: (MuRef s, Traversable t) => t s -> IO (ReifyGraph (DeRef s), t Int)
+reifyGraphs :: (MuRef s, Traversable t) => t s -> IO (ReifyGraph (DeRef s), t Unique)
 reifyGraphs m = do
   stableNameMap <- H.new >>= newMVar
   graph <- newMVar []
@@ -45,17 +47,17 @@ reifyGraphs m = do
         let v' = succ v
         putMVar uVar v'
         return v'
-  
+
   roots <- T.mapM (findNodes stableNameMap graph newUnique) m
   pairs <- readMVar graph
   return (ReifyGraph pairs, roots)
 
 findNodes :: MuRef s
-          => MVar (HashTable DynStableName Int)
-          -> MVar [(Int,DeRef s Int)]
-          -> IO Int
+          => MVar (HashTable DynStableName Unique)
+          -> MVar [(Unique,DeRef s Unique)]
+          -> IO Unique
           -> s
-          -> IO Int
+          -> IO Unique
 findNodes stableNameMap graph newUnique !j = do
   st <- makeDynStableName j
   tab <- takeMVar stableNameMap
@@ -79,7 +81,7 @@ newtype DynStableName = DynStableName (StableName ())
 
 instance Hashable DynStableName where
   hashWithSalt salt (DynStableName sn) = hashWithSalt salt $ hashStableName sn
-  
+
 instance Eq DynStableName where
   (DynStableName sn1) == (DynStableName sn2) = sn1 == sn2
 
