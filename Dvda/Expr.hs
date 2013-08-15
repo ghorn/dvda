@@ -424,7 +424,7 @@ instance MuRef (Expr a) where
   mapDeRef f (ENum (Add x y)) = GNum <$> (Add <$> f x <*> f y)
   mapDeRef f (ENum (Sub x y)) = GNum <$> (Sub <$> f x <*> f y)
   mapDeRef f (ENum (Negate x)) = GNum <$> (Negate <$> f x)
-  mapDeRef f (ENum (Abs x)) = GNum <$> (Negate <$> f x)
+  mapDeRef f (ENum (Abs x)) = GNum <$> (Abs <$> f x)
   mapDeRef f (ENum (Signum x)) = GNum <$> (Signum <$> f x)
   mapDeRef _ (ENum (FromInteger k)) = pure $ GNum (FromInteger k)
 
