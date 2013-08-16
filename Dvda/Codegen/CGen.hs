@@ -77,7 +77,7 @@ checkMxInputDims grefs functionName inputK =
 
 -- | Turns a FunGraph into a string containing C code
 showC :: (Eq a, Show a, Hashable a, F.Foldable f, F.Foldable g) =>
-         String-> FunGraph a f g -> String
+         String-> FunGraph f g a -> String
 showC functionName fg = txt
   where
     inputs = [V.fromList $ F.toList (fgInputs fg)]
@@ -145,7 +145,7 @@ cAssignment _ k gexpr = "const double " ++ nameNode k ++ " = " ++ toCOp gexpr ++
 
 
 showMex :: (Eq a, Show a, Hashable a, F.Foldable f, F.Foldable g)
-           => String -> FunGraph a f g -> String
+           => String -> FunGraph f g a -> String
 showMex functionName fg = cText ++ "\n\n\n" ++ mexFun functionName [V.fromList $ F.toList $ fgInputs fg] [V.fromList $ F.toList $ fgOutputs fg]
   where
     cText = showC functionName fg -- matlab is column major >_<

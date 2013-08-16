@@ -47,7 +47,7 @@ writeOutputs ins = concat (zipWith writeOutput ins [0..]) ++ [retStatement]
 
 -- | Turns a FunGraph into a string containing a python function
 showPy :: (Eq a, Show a, Hashable a, F.Foldable f, F.Foldable g) =>
-         String-> FunGraph a f g -> String
+         String-> FunGraph f g a -> String
 showPy functionName fg = txt
   where
     inputs = [V.fromList $ F.toList $ fgInputs fg]

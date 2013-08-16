@@ -18,7 +18,7 @@ import qualified Data.HashTable.Class as HT
 import qualified Data.HashTable.ST.Cuckoo as C
 type HashTable s v k = C.HashTable s v k
 
-cse :: (Eq a, Hashable a, Functor g, Foldable g) => FunGraph a f g -> FunGraph a f g
+cse :: (Eq a, Hashable a, Functor g, Foldable g) => FunGraph f g a -> FunGraph f g a
 cse fg = nodelistToFunGraph (map swap htList) (fgInputs fg) outputIndices
   where
     (htList, im) = cse' (fgLookupGExpr fg) (fgOutputs fg)

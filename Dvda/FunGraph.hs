@@ -23,7 +23,7 @@ import Data.Traversable ( Traversable )
 import Dvda.Expr
 import Dvda.Reify ( ReifyGraph(..), reifyGraphs )
 
-data FunGraph a f g = FunGraph { fgGraph :: Graph.Graph
+data FunGraph f g a = FunGraph { fgGraph :: Graph.Graph
                                , fgInputs :: f (GExpr a Int)
                                , fgOutputs :: g Int
                                , fgReified :: [(Int, GExpr a Int)]
@@ -63,7 +63,7 @@ findConflictingInputs exprs = HS.toList redundant
 --   with greater or fewer CSE's eliminated.
 --   If CSE is then performed on the graph, the result is deterministic.
 toFunGraph :: (Functor f, Foldable f, Traversable g, Eq a, Hashable a, Show a) =>
-              f (Expr a) -> g (Expr a) -> IO (FunGraph a f g)
+              f (Expr a) -> g (Expr a) -> IO (FunGraph f g a)
 toFunGraph inputExprs outputExprs = do
   -- reify the outputs
   (ReifyGraph rgr, outputIndices) <- reifyGraphs outputExprs
@@ -77,7 +77,7 @@ toFunGraph inputExprs outputExprs = do
     (xs,[]) -> error $ "toFunGraph found inputs that were not provided by the user: " ++ show xs
     ( _,xs) -> error $ "toFunGraph found idential inputs set more than once: " ++ show xs
 
-nodelistToFunGraph :: [(Int,GExpr a Int)] -> f (GExpr a Int) -> g Int -> FunGraph a f g
+nodelistToFunGraph :: [(Int,GExpr a Int)] -> f (GExpr a Int) -> g Int -> FunGraph f g a
 nodelistToFunGraph rgr inputIndices outputIndices =
   FunGraph { fgGraph = gr
            , fgInputs = inputIndices
@@ -99,7 +99,7 @@ countNodes :: FunGraph a f g -> Int
 countNodes = length . Graph.vertices . fgGraph
 
 -- | make a FunGraph out of outputs, automatically detecting the proper inputs
-exprsToFunGraph :: (Eq a, Show a, Hashable a, Traversable g) => g (Expr a) -> IO (FunGraph a [] g)
+exprsToFunGraph :: (Eq a, Show a, Hashable a, Traversable g) => g (Expr a) -> IO (FunGraph [] g a)
 exprsToFunGraph outputs = do
   let getSyms :: [Expr a] -> [Sym]
       getSyms exprs = HS.toList $ foldr (flip (foldExpr f)) HS.empty exprs
