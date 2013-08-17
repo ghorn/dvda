@@ -23,8 +23,7 @@ import Data.Traversable ( Traversable )
 import Dvda.Expr
 import Dvda.Reify ( ReifyGraph(..), reifyGraphs )
 
-data FunGraph f g a = FunGraph { fgGraph :: Graph.Graph
-                               , fgInputs :: f (GExpr a Int)
+data FunGraph f g a = FunGraph { fgInputs :: f (GExpr a Int)
                                , fgOutputs :: g Int
                                , fgReified :: [(Int, GExpr a Int)]
                                , fgLookupGExpr :: Int -> Maybe (GExpr a Int)
@@ -79,8 +78,7 @@ toFunGraph inputExprs outputExprs = do
 
 nodelistToFunGraph :: [(Int,GExpr a Int)] -> f (GExpr a Int) -> g Int -> FunGraph f g a
 nodelistToFunGraph rgr inputIndices outputIndices =
-  FunGraph { fgGraph = gr
-           , fgInputs = inputIndices
+  FunGraph { fgInputs = inputIndices
            , fgOutputs = outputIndices
            , fgLookupGExpr = lookupG
            , fgReified = rgr
@@ -96,7 +94,7 @@ nodelistToFunGraph rgr inputIndices outputIndices =
 
 ---------------------------------- utilities -----------------------------
 countNodes :: FunGraph a f g -> Int
-countNodes = length . Graph.vertices . fgGraph
+countNodes = length . fgTopSort
 
 -- | make a FunGraph out of outputs, automatically detecting the proper inputs
 exprsToFunGraph :: (Eq a, Show a, Hashable a, Traversable g) => g (Expr a) -> IO (FunGraph [] g a)
