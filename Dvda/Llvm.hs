@@ -73,20 +73,22 @@ allIntrinsics = [ unIntrinsic "exp"
     unIntrinsic :: String -> Definition
     unIntrinsic = intrinsic doubleType 1
 
-newtype VList a = VList {mkVList :: V.Vector a} deriving (Functor, F.Foldable, Traversable)
+newtype VList a = VList {mkVList :: V.Vector (V.Vector a)} deriving (Functor, F.Foldable, Traversable)
 
 toLlvmFun :: String -> FunGraph VList VList Double -> Global
 toLlvmFun functionName fg = mainFun
   where
     mainFun = Function External Default C [] (IntegerType 32) (Name functionName)
-              ([ Parameter (PointerType doubleType (AddrSpace 0)) (Name "input_0") []
-               , Parameter (PointerType doubleType (AddrSpace 0)) (Name "output_0") []
-               ], False)
+              ( map toParameter $ ["input_"  ++ show k | k <- take nInputs  [(0::Int)..]] ++
+                                  ["output_" ++ show k | k <- take nOutputs [(0::Int)..]]
+              , False)
               [] Nothing 0 [bb]
-    inputs = [V.fromList $ F.toList $ fgInputs fg]
-    outputs = [V.fromList $ F.toList $ fgOutputs fg]
-    outDecls = writeOutputs outputs
-    inputMap = makeInputMap inputs
+    toParameter name = Parameter (PointerType doubleType (AddrSpace 0)) (Name name) []
+
+    nInputs  = V.length $ mkVList (fgInputs  fg)
+    nOutputs = V.length $ mkVList (fgOutputs fg)
+    inputMap = makeInputMap $ mkVList (fgInputs  fg)
+    outDecls = writeOutputs $ mkVList (fgOutputs fg)
     bb = BasicBlock (Name "entry") (instructions++outDecls)
          (Do $ Ret (Just (ConstantOperand (C.Int 32 0))) [])
     instructions = let f k = case fgLookupGExpr fg k of
@@ -94,11 +96,12 @@ toLlvmFun functionName fg = mainFun
                          Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("
                    in concatMap f $ fgTopSort fg
 
-foreign import ccall "dynamic" mkIOStub ::
-  FunPtr (Ptr Double -> Ptr Double -> IO Word32) -> Ptr Double -> Ptr Double -> IO Word32
+--foreign import ccall "dynamic" mkIOStub ::
+--  FunPtr (Ptr Double -> Ptr Double -> IO Word32) -> Ptr Double -> Ptr Double -> IO Word32
 
-runJIT :: ((Ptr Double -> Ptr Double -> IO Word32) -> IO a) -> AST.Module
-       -> IO (Either String a)
+--runJIT :: ((V.Vector (Ptr Double) -> V.Vector (Ptr Double) -> IO Word32) -> IO a) -> AST.Module
+--       -> IO (Either String a)
+runJIT :: (FunPtr () -> IO a) -> Module -> IO (Either String a)
 runJIT userFun mAST = do
   let --withEE = \c -> withMCJIT c Nothing Nothing Nothing Nothing
       withEE = flip withJIT 2
@@ -106,12 +109,12 @@ runJIT userFun mAST = do
     runErrorT $ withModuleFromAST context mAST $ \m ->
       withModuleInEngine executionEngine m $ \em -> do
         Just p <- getFunction em (Name "my_function")
-        let f = mkIOStub (castFunPtr p)
-        userFun f
+--        let f = mkIOStub (castFunPtr p)
+        userFun p
 
-withLlvmJit :: FunGraph VList VList Double
-            -> ((Ptr Double -> Ptr Double -> IO Word32) -> IO a)
-            -> IO (Either String a)
+-- | you're on your own for making sure the FunPtr has the right number of inputs/outputs
+--   until I can figure out a polyvariadic foreign import "dynamic"
+withLlvmJit :: FunGraph VList VList Double -> (FunPtr () -> IO a) -> IO (Either String a)
 withLlvmJit fg userfun = do
   let fundef = toLlvmFun "my_function" fg
       myModule = defaultModule { moduleName = "come_on_lets_compile"
@@ -150,15 +153,15 @@ toLlvmAsm fg = do
 -- | take a list of pair of inputs to indices which reference them
 --  create a hashmap from GSyms to strings which hold the declaration
 makeInputMap :: (Eq a, Hashable a, Show a)
-                => [V.Vector (GExpr a Int)] -> HashMap (GExpr a Int) (Name,Word32)
-makeInputMap ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] ins
+                => V.Vector (V.Vector (GExpr a Int)) -> HashMap (GExpr a Int) (Name,Word32)
+makeInputMap ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] (V.toList ins)
   where
     writeInput inputK gs = zipWith f [(0::Int)..] (V.toList gs)
       where
         f inIdx g = (g, (Name ("input_" ++ show inputK), fromIntegral inIdx))
 
-writeOutputs :: [V.Vector Int] -> [Named Instruction]
-writeOutputs ins = concat $ zipWith outputInstructions [(0::Int)..] ins
+writeOutputs :: V.Vector (V.Vector Int) -> [Named Instruction]
+writeOutputs ins = concat $ zipWith outputInstructions [(0::Int)..] (V.toList ins)
   where
     outputInstructions outputK outputKvec =
       concat $ zipWith (outputInstruction outputK) [(0::Int)..] (V.toList outputKvec)
