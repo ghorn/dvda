@@ -60,7 +60,6 @@ Library
                      Dvda.Expr
 --                     Dvda.Examples
                      Dvda.FunGraph
-                     Dvda.Llvm
                      Dvda.HashMap
                      Dvda.Reify
 --                     Dvda.Vis
@@ -71,10 +70,7 @@ Library
                      vector >= 0.10,
                      hashtables  >= 1.1.0 && < 1.2,
                      containers >= 0.5 && < 0.6,
-                     unordered-containers  >= 0.2 && < 0.3,
-                     llvm-general-pure >= 3.3.7.2,
-                     llvm-general >= 3.3.7.2,
-                     transformers >= 0.3.0
+                     unordered-containers  >= 0.2 && < 0.3
 --                     file-location >= 0.4.5 && < 0.5
 --                     graphviz >= 2999.15 && < 2999.17
 --                     fgl >= 5.4 && < 5.5
