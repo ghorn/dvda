@@ -166,7 +166,7 @@ instance Eq a => Eq (Nums a) where
   (Signum x) == (Signum y) = x == y
   (FromInteger x) == (FromInteger y) = x == y
   _ == _ = False
-  
+
 
 ----------------------------- hashable instances --------------------------
 instance Hashable Sym
@@ -406,7 +406,7 @@ getParents (GFloating (ACosh x))          = [x]
 
 instance (Show a, Show b) => Show (GExpr a b) where
   show = show . gexprToExpr (\x -> ESym (Sym ("@" ++ show x)))
-  
+
 deriving instance (Eq a, Eq b) => Eq (GExpr a b)
 
 instance (Hashable a, Hashable b) => Hashable (GExpr a b) where
@@ -457,7 +457,7 @@ substitute expr subList
     nonSymInputs = filter (not . isSym . fst) subList
     lookup' e = let hm = HM.fromList subList in
       HM.lookupDefault e e hm
-    
+
     subs e@(ESym _) = lookup' e
     subs e@(EConst _) = e
     subs e@(ENum (FromInteger _)) = e
@@ -468,9 +468,9 @@ substitute expr subList
     subs (ENum (Negate x)) = negate (subs x)
     subs (ENum (Abs x))    = abs (subs x)
     subs (ENum (Signum x)) = signum (subs x)
-    
+
     subs (EFractional (Div x y)) = subs x / subs y
-    
+
     subs (EFloating (Pow x y))     = subs x ** subs y
     subs (EFloating (LogBase x y)) = logBase (subs x) (subs y)
     subs (EFloating (Exp   x))     = exp   (subs x)
@@ -499,7 +499,7 @@ sketchySubstitute expr subList
     nonSymInputs = filter (not . isSym . fst) subList
     lookup' e = let hm = HM.fromList subList in
       HM.lookupDefault e e hm
-    
+
     subs e@(ESym _) = lookup' e
     subs e@(EConst _)  = e
     subs e@(ENum (FromInteger _)) = e
@@ -510,9 +510,9 @@ sketchySubstitute expr subList
     subs (ENum (Negate x)) = ENum (Negate (subs x))
     subs (ENum (Abs x)) = ENum (Negate (subs x))
     subs (ENum (Signum x)) = ENum (Signum (subs x))
-  
+
     subs (EFractional (Div x y)) = EFractional (Div (subs x) (subs y))
-  
+
     subs (EFloating (Pow x y))     = EFloating (Pow (subs x) (subs y))
     subs (EFloating (LogBase x y)) = EFloating (LogBase (subs x) (subs y))
     subs (EFloating (Exp   x))     = EFloating (Exp   (subs x))
@@ -652,7 +652,7 @@ extractLinearPart e@(EFloating (ACosh _)) _ = (e,0)
 --            | Abs a
 --            | Signum a
 --            | FromInteger Integer
-  
+
 --instance Arbitrary a => Arbitrary (Expr a) where
 --   arbitrary = oneof [arbConst, arbUnary, arbBinary]
 --
