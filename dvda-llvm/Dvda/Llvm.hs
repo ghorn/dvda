@@ -16,7 +16,7 @@ import qualified Data.Foldable as F
 import Data.Traversable ( Traversable )
 import qualified Data.Vector as V
 import Data.Word ( Word32 )
-import Foreign.Ptr ( Ptr, FunPtr, castFunPtr )
+import Foreign.Ptr ( FunPtr ) -- Ptr, castFunPtr )
 
 import LLVM.General ( withModuleFromAST, moduleString )
 import LLVM.General.Analysis ( verify )
@@ -24,7 +24,7 @@ import LLVM.General.Context ( withContext )
 import LLVM.General.ExecutionEngine ( withJIT, withModuleInEngine, getFunction )
 import LLVM.General.PassManager ( defaultCuratedPassSetSpec, runPassManager, withPassManager )
 
-import qualified LLVM.General.AST as AST
+--import qualified LLVM.General.AST as AST
 import qualified LLVM.General.AST.Global as G
 import qualified LLVM.General.AST.Constant as C
 import LLVM.General.AST hiding ( Mul, Add, Sub )
@@ -92,7 +92,7 @@ toLlvmFun functionName fg = mainFun
     bb = BasicBlock (Name "entry") (instructions++outDecls)
          (Do $ Ret (Just (ConstantOperand (C.Int 32 0))) [])
     instructions = let f k = case fgLookupGExpr fg k of
-                         Just v -> toInstruction inputMap k v
+                         Just v -> toInstruction (flip HM.lookup inputMap) k v
                          Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("
                    in concatMap f $ fgTopSort fg
 
@@ -187,9 +187,9 @@ writeOutputs ins = concat $ zipWith outputInstructions [(0::Int)..] (V.toList in
 nameNode :: Int -> String
 nameNode k = 'w' : show k
 
-toInstruction :: HashMap (GExpr Double Int) (Name,Word32) ->
+toInstruction :: (GExpr Double Int -> Maybe (Name,Word32)) ->
                  Int -> GExpr Double Int -> [Named Instruction]
-toInstruction inputMap k gexpr = instruction gexpr
+toInstruction lookupInput k gexpr = instruction gexpr
   where
     bin x y op =
       [Name (nameNode k) :=
@@ -199,7 +199,7 @@ toInstruction inputMap k gexpr = instruction gexpr
       [Name (nameNode k) :=
        FAdd (ConstantOperand (Float (Double c))) (ConstantOperand (Float (Double 0))) []]
 
-    instruction (GSym _) = case HM.lookup gexpr inputMap of
+    instruction (GSym _) = case lookupInput gexpr of
       Nothing -> error $ "toInstruction: couldn't find " ++ show gexpr ++ " in the input map"
       Just (inputK,inputElem) ->
         [ Name ("tmp_input_" ++ nameNode k) :=
