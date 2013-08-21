@@ -51,12 +51,13 @@ Library
 --                     Dvda.Tests.Unary
 
                      Dvda.AD
+                     Dvda.Alg
  --                    Dvda.Codegen.CPlugins
-                     Dvda.Codegen.CGen
+--                     Dvda.Codegen.CGen
 --                     Dvda.Codegen.Gcc
-                     Dvda.Codegen.PythonGen
+--                     Dvda.Codegen.PythonGen
 --                     Dvda.Codegen.WriteFile
-                     Dvda.CSE
+--                     Dvda.CSE
                      Dvda.Expr
 --                     Dvda.Examples
                      Dvda.FunGraph

@@ -17,7 +17,7 @@ module Dvda ( -- * primitives
             , Expr
               -- * construct FunGraphs
             , toFunGraph
-            , cse
+--            , cse
               -- * show/summarize FunGraphs
 --            , previewGraph
 --            , previewGraph'
@@ -28,7 +28,7 @@ module Dvda ( -- * primitives
             ) where
 
 import Dvda.AD ( rad )
-import Dvda.CSE ( cse )
+--import Dvda.CSE ( cse )
 import Dvda.Expr ( Expr, sym, symDependent, symDependentN )
 import Dvda.FunGraph ( toFunGraph )
 --import Dvda.Vis ( previewGraph, previewGraph' )

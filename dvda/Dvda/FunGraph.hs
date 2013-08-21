@@ -5,53 +5,50 @@ module Dvda.FunGraph ( FunGraph
                      , countNodes
                      , fgInputs
                      , fgOutputs
-                     , fgLookupGExpr
                      , fgReified
                      , fgTopSort
-                     , nodelistToFunGraph
-                     , exprsToFunGraph
                      ) where
 
-import Control.Applicative
+import Control.Applicative ( (<$>) )
 import Data.Foldable ( Foldable )
 import qualified Data.Foldable as F
 import qualified Data.Graph as Graph
-import Data.Hashable ( Hashable )
 import qualified Data.HashSet as HS
 import Data.Traversable ( Traversable )
+import Data.Hashable ( Hashable(..) )
 
 import Dvda.Expr
 import Dvda.Reify ( ReifyGraph(..), reifyGraphs )
 
-data FunGraph f g a = FunGraph { fgInputs :: f (GExpr a Int)
+data FunGraph f g a = FunGraph { fgInputs :: f Sym
                                , fgOutputs :: g Int
                                , fgReified :: [(Int, GExpr a Int)]
-                               , fgLookupGExpr :: Int -> Maybe (GExpr a Int)
-                               , fgTopSort :: [Int]
+                               , fgTopSort :: [(Int,GExpr a Int)]
                                }
 
 -- | find any symbols which are parents of outputs, but are not supplied by the user
 detectMissingInputs :: (Foldable f, Eq a, Hashable a, Show a) => f (Expr a) -> [(Int,GExpr a Int)] -> [GExpr a Int]
 detectMissingInputs exprs gr = HS.toList $ HS.difference allGraphInputs allUserInputs
   where
-    allUserInputs = let f (ESym name) acc = GSym name : acc
-                        f _ e = error $ "detectMissingInputs given non-ESym input \"" ++ show e ++ "\""
-                    in HS.fromList $ F.foldr f [] exprs
+    allUserInputs =
+      let f (ESym name) acc = GSym name : acc
+          f _ e = error $ "detectMissingInputs given non-ESym input \"" ++ show e ++ "\""
+      in HS.fromList $ F.foldr f [] exprs
 
-    allGraphInputs = let f (_, GSym name) acc = GSym name : acc
-                         f _ acc = acc
-                     in HS.fromList $ foldr f [] gr
+    allGraphInputs =
+      let f (_, GSym name) acc = GSym name : acc
+          f _ acc = acc
+      in HS.fromList $ foldr f [] gr
 
 -- | if the same input symbol (like ESym "x") is given at two different places throw an exception
-findConflictingInputs :: (Foldable f, Eq a, Hashable a, Show a) => f (Expr a) -> [Expr a]
-findConflictingInputs exprs = HS.toList redundant
+findConflictingInputs :: Foldable f => f Sym -> [Sym]
+findConflictingInputs syms = HS.toList redundant
   where
-    redundant = snd $ F.foldl f (HS.empty, HS.empty) exprs
+    redundant = snd $ F.foldl f (HS.empty, HS.empty) syms
       where
-        f (knownExprs, redundantExprs) expr@(ESym _)
-          | HS.member expr knownExprs = (knownExprs, HS.insert expr redundantExprs)
-          | otherwise = (HS.insert expr knownExprs, redundantExprs)
-        f _ e = error $ "findConflictingInputs saw non-ESym input \"" ++ show e ++ "\""
+        f (knownExprs, redundantExprs) s
+          | HS.member s knownExprs = (knownExprs, HS.insert s redundantExprs)
+          | otherwise = (HS.insert s knownExprs, redundantExprs)
 
 
 -- | Take inputs and outputs and traverse the outputs reifying all expressions
@@ -66,43 +63,33 @@ toFunGraph :: (Functor f, Foldable f, Traversable g, Eq a, Hashable a, Show a) =
 toFunGraph inputExprs outputExprs = do
   -- reify the outputs
   (ReifyGraph rgr, outputIndices) <- reifyGraphs outputExprs
-  let fg = nodelistToFunGraph rgr inputGExprs outputIndices
-      inputGExprs = fmap f inputExprs
+  let userInputSyms = fmap f inputExprs
         where
-          f (ESym name) = GSym name
+          f (ESym s) = s
           f x = error $ "ERROR: toFunGraph given non-ESym input \"" ++ show x ++ "\""
-  return $ case (detectMissingInputs inputExprs rgr, findConflictingInputs inputExprs) of
+
+      fg = FunGraph { fgInputs = userInputSyms
+                    , fgOutputs = outputIndices
+                    , fgReified = reverse rgr
+                    , fgTopSort = topSort
+                    }
+
+      -- make sure all the inputs are symbolic, and find their indices in the Expr graph
+      (gr, lookupVertex, lookupKey) = Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, getParents gexpr)) rgr
+      lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
+    
+      topSort = map lookup' $ reverse $ map ((\(_,k,_) -> k) . lookupVertex) $ Graph.topSort gr
+        where
+          lookup' k = case lookupG k of
+            Nothing -> error "DVDA internal error"
+            (Just g) -> (k,g)
+  
+  return $ case (detectMissingInputs inputExprs rgr, findConflictingInputs userInputSyms) of
     ([],[]) -> fg
     (xs,[]) -> error $ "toFunGraph found inputs that were not provided by the user: " ++ show xs
     ( _,xs) -> error $ "toFunGraph found idential inputs set more than once: " ++ show xs
 
-nodelistToFunGraph :: [(Int,GExpr a Int)] -> f (GExpr a Int) -> g Int -> FunGraph f g a
-nodelistToFunGraph rgr inputIndices outputIndices =
-  FunGraph { fgInputs = inputIndices
-           , fgOutputs = outputIndices
-           , fgLookupGExpr = lookupG
-           , fgReified = rgr
-           , fgTopSort = topSort
-           }
-  where
-    -- make sure all the inputs are symbolic, and find their indices in the Expr graph
-    (gr, lookupVertex, lookupKey) = Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, getParents gexpr)) rgr
-    lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
-
-    topSort :: [Int]
-    topSort = reverse $ map ((\(_,k,_) -> k) . lookupVertex) $ Graph.topSort gr
 
 ---------------------------------- utilities -----------------------------
 countNodes :: FunGraph a f g -> Int
 countNodes = length . fgTopSort
-
--- | make a FunGraph out of outputs, automatically detecting the proper inputs
-exprsToFunGraph :: (Eq a, Show a, Hashable a, Traversable g) => g (Expr a) -> IO (FunGraph [] g a)
-exprsToFunGraph outputs = do
-  let getSyms :: [Expr a] -> [Sym]
-      getSyms exprs = HS.toList $ foldr (flip (foldExpr f)) HS.empty exprs
-        where
-          f (ESym s) hs = HS.insert s hs
-          f _ hs = hs
-      inputs = map ESym $ getSyms (F.toList outputs)
-  toFunGraph inputs outputs

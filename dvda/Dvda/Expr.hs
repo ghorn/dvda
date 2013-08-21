@@ -345,36 +345,7 @@ data GExpr a b where
   GFloating :: Floating a => Floatings b -> GExpr a b
   deriving Typeable
 deriving instance (Ord a, Ord b) => Ord (GExpr a b)
-
--- you might use this to use Expr's nice Show instance
-gexprToExpr :: (b -> Expr a) -> GExpr a b -> Expr a
-gexprToExpr _ (GSym s@(Sym _)) = ESym s
-gexprToExpr _ (GSym sd@(SymDependent {})) = ESym sd
-gexprToExpr _ (GConst c) = EConst c
-gexprToExpr f (GNum (Mul x y))               = ENum (Mul (f x) (f y))
-gexprToExpr f (GNum (Add x y))               = ENum (Add (f x) (f y))
-gexprToExpr f (GNum (Sub x y))               = ENum (Sub (f x) (f y))
-gexprToExpr f (GNum (Negate x))              = ENum (Negate (f x))
-gexprToExpr f (GNum (Abs x))                 = ENum (Abs (f x))
-gexprToExpr f (GNum (Signum x))              = ENum (Signum (f x))
-gexprToExpr _ (GNum (FromInteger x))         = ENum (FromInteger x)
-gexprToExpr f (GFractional (Div x y))        = EFractional (Div (f x) (f y))
-gexprToExpr _ (GFractional (FromRational x)) = EFractional (FromRational x)
-gexprToExpr f (GFloating (Pow x y))          = EFloating (Pow (f x) (f y))
-gexprToExpr f (GFloating (LogBase x y))      = EFloating (LogBase (f x) (f y))
-gexprToExpr f (GFloating (Exp x))            = EFloating (Exp   (f x))
-gexprToExpr f (GFloating (Log x))            = EFloating (Log   (f x))
-gexprToExpr f (GFloating (Sin x))            = EFloating (Sin   (f x))
-gexprToExpr f (GFloating (Cos x))            = EFloating (Cos   (f x))
-gexprToExpr f (GFloating (ASin x))           = EFloating (ASin  (f x))
-gexprToExpr f (GFloating (ATan x))           = EFloating (ATan  (f x))
-gexprToExpr f (GFloating (ACos x))           = EFloating (ACos  (f x))
-gexprToExpr f (GFloating (Sinh x))           = EFloating (Sinh  (f x))
-gexprToExpr f (GFloating (Cosh x))           = EFloating (Cosh  (f x))
-gexprToExpr f (GFloating (Tanh x))           = EFloating (Tanh  (f x))
-gexprToExpr f (GFloating (ASinh x))          = EFloating (ASinh (f x))
-gexprToExpr f (GFloating (ATanh x))          = EFloating (ATanh (f x))
-gexprToExpr f (GFloating (ACosh x))          = EFloating (ACosh (f x))
+deriving instance (Show a, Show b) => Show (GExpr a b)
 
 getParents :: GExpr a b -> [b]
 getParents (GSym _)                       = []
@@ -403,9 +374,6 @@ getParents (GFloating (Tanh x))           = [x]
 getParents (GFloating (ASinh x))          = [x]
 getParents (GFloating (ATanh x))          = [x]
 getParents (GFloating (ACosh x))          = [x]
-
-instance (Show a, Show b) => Show (GExpr a b) where
-  show = show . gexprToExpr (\x -> ESym (Sym ("@" ++ show x)))
 
 deriving instance (Eq a, Eq b) => Eq (GExpr a b)
 
