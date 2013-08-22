@@ -19,7 +19,6 @@ module Dvda.Expr ( Expr(..)
                  , symDependent
                  , symDependentN
                  , const'
-                 , getParents
                  , extractLinearPart
                  , getConst
                  , substitute
@@ -352,34 +351,6 @@ data GExpr a b where
   deriving Typeable
 deriving instance (Ord a, Ord b) => Ord (GExpr a b)
 deriving instance (Show a, Show b) => Show (GExpr a b)
-
-getParents :: GExpr a b -> [b]
-getParents (GSym _)                       = []
-getParents (GConst _)                     = []
-getParents (GNum (Mul x y))               = [x,y]
-getParents (GNum (Add x y))               = [x,y]
-getParents (GNum (Sub x y))               = [x,y]
-getParents (GNum (Negate x))              = [x]
-getParents (GNum (Abs x))                 = [x]
-getParents (GNum (Signum x))              = [x]
-getParents (GNum (FromInteger _))         = []
-getParents (GFractional (Div x y))        = [x,y]
-getParents (GFractional (FromRational _)) = []
-getParents (GFloating (Pow x y))          = [x,y]
-getParents (GFloating (LogBase x y))      = [x,y]
-getParents (GFloating (Exp x))            = [x]
-getParents (GFloating (Log x))            = [x]
-getParents (GFloating (Sin x))            = [x]
-getParents (GFloating (Cos x))            = [x]
-getParents (GFloating (ASin x))           = [x]
-getParents (GFloating (ATan x))           = [x]
-getParents (GFloating (ACos x))           = [x]
-getParents (GFloating (Sinh x))           = [x]
-getParents (GFloating (Cosh x))           = [x]
-getParents (GFloating (Tanh x))           = [x]
-getParents (GFloating (ASinh x))          = [x]
-getParents (GFloating (ATanh x))          = [x]
-getParents (GFloating (ACosh x))          = [x]
 instance Functor (GExpr a) where
   fmap _ (GSym s) = GSym s
   fmap _ (GConst c) = GConst c
@@ -406,7 +377,6 @@ instance T.Traversable (GExpr a) where
   traverse f (GNum nums) = GNum <$> T.traverse f nums
   traverse f (GFractional fracs) = GFractional <$> T.traverse f fracs
   traverse f (GFloating floatings) = GFloating <$> T.traverse f floatings
-
 
 deriving instance (Eq a, Eq b) => Eq (GExpr a b)
 

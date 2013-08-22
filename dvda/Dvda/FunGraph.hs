@@ -77,7 +77,8 @@ toFunGraph inputExprs outputExprs = do
                     }
 
       -- make sure all the inputs are symbolic, and find their indices in the Expr graph
-      (gr, lookupVertex, lookupKey) = Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, getParents gexpr)) rgr
+      (gr, lookupVertex, lookupKey) =
+        Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, F.toList gexpr)) rgr
       lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
 
       topSort = map lookup' $ reverse $ map ((\(_,k,_) -> k) . lookupVertex) $ Graph.topSort gr
