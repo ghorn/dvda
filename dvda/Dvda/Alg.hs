@@ -2,6 +2,7 @@
 
 module Dvda.Alg ( Algorithm(..)
                 , AlgOp(..)
+                , Node(..)
                 , InputIdx(..)
                 , OutputIdx(..)
                 , toAlg

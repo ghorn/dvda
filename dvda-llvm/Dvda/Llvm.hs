@@ -11,11 +11,9 @@ module Dvda.Llvm ( VList(..)
 
 import Control.Monad ( unless )
 import Control.Monad.Trans.Error
-import Data.Hashable ( Hashable )
 import qualified Data.Foldable as F
 import Data.Traversable ( Traversable )
 import qualified Data.Vector as V
-import Data.Word ( Word32 )
 import Foreign.Ptr ( FunPtr ) -- Ptr, castFunPtr )
 
 import LLVM.General ( withModuleFromAST, moduleString )
@@ -36,9 +34,7 @@ import LLVM.General.AST.Float (  SomeFloat ( Double ) )
 import LLVM.General.AST.Visibility ( Visibility( Default ) )
 
 import Dvda.Expr ( GExpr(..), Floatings(..), Nums(..), Fractionals(..) )
-import Dvda.FunGraph ( FunGraph, fgTopSort, fgInputs, fgOutputs, fgLookupGExpr )
-import Dvda.HashMap ( HashMap )
-import qualified Dvda.HashMap as HM
+import Dvda.Alg
 
 doubleType :: Type
 doubleType = FloatingPointType 64 IEEE
@@ -75,8 +71,8 @@ allIntrinsics = [ unIntrinsic "exp"
 
 newtype VList a = VList {mkVList :: V.Vector (V.Vector a)} deriving (Functor, F.Foldable, Traversable)
 
-toLlvmFun :: String -> FunGraph VList VList Double -> Global
-toLlvmFun functionName fg = mainFun
+toLlvmFun :: String -> Algorithm Double -> Global
+toLlvmFun functionName alg = mainFun
   where
     mainFun = Function External Default C [] (IntegerType 32) (Name functionName)
               ( map toParameter $ ["input_"  ++ show k | k <- take nInputs  [(0::Int)..]] ++
@@ -85,16 +81,11 @@ toLlvmFun functionName fg = mainFun
               [] Nothing 0 [bb]
     toParameter name = Parameter (PointerType doubleType (AddrSpace 0)) (Name name) []
 
-    nInputs  = V.length $ mkVList (fgInputs  fg)
-    nOutputs = V.length $ mkVList (fgOutputs fg)
-    inputMap = makeInputMap $ mkVList (fgInputs  fg)
-    outDecls = writeOutputs $ mkVList (fgOutputs fg)
-    bb = BasicBlock (Name "entry") (instructions++outDecls)
+    nInputs  = 1
+    nOutputs = 1
+
+    bb = BasicBlock (Name "entry") (concatMap toInstruction (algOps alg))
          (Do $ Ret (Just (ConstantOperand (C.Int 32 0))) [])
-    instructions = let f k = case fgLookupGExpr fg k of
-                         Just v -> toInstruction (flip HM.lookup inputMap) k v
-                         Nothing -> error $ "couldn't find node " ++ show k ++ " in fungraph :("
-                   in concatMap f $ fgTopSort fg
 
 --foreign import ccall "dynamic" mkIOStub ::
 --  FunPtr (Ptr Double -> Ptr Double -> IO Word32) -> Ptr Double -> Ptr Double -> IO Word32
@@ -114,7 +105,7 @@ runJIT userFun mAST = do
 
 -- | you're on your own for making sure the FunPtr has the right number of inputs/outputs
 --   until I can figure out a polyvariadic foreign import "dynamic"
-withLlvmJit :: FunGraph VList VList Double -> (FunPtr () -> IO a) -> IO (Either String a)
+withLlvmJit :: Algorithm Double -> (FunPtr () -> IO a) -> IO (Either String a)
 withLlvmJit fg userfun = do
   let fundef = toLlvmFun "my_function" fg
       myModule = defaultModule { moduleName = "come_on_lets_compile"
@@ -123,7 +114,7 @@ withLlvmJit fg userfun = do
   runJIT userfun myModule
 
 
-toLlvmAsm :: FunGraph VList VList Double -> IO ()
+toLlvmAsm :: Algorithm Double -> IO ()
 toLlvmAsm fg = do
   let fundef = toLlvmFun "my_function" fg
       myModule = defaultModule { moduleName = "come_on_lets_compile"
@@ -150,101 +141,86 @@ toLlvmAsm fg = do
     (Right (Just x)) -> x ++ "\n\n------- everything seems to have worked -----"
 
 
--- | take a list of pair of inputs to indices which reference them
---  create a hashmap from GSyms to strings which hold the declaration
-makeInputMap :: (Eq a, Hashable a, Show a)
-                => V.Vector (V.Vector (GExpr a Int)) -> HashMap (GExpr a Int) (Name,Word32)
-makeInputMap ins = HM.fromList $ concat $ zipWith writeInput [(0::Int)..] (V.toList ins)
-  where
-    writeInput inputK gs = zipWith f [(0::Int)..] (V.toList gs)
-      where
-        f inIdx g = (g, (Name ("input_" ++ show inputK), fromIntegral inIdx))
+nameNode :: Node -> String
+nameNode (Node k) = 'w' : show k
 
-writeOutputs :: V.Vector (V.Vector Int) -> [Named Instruction]
-writeOutputs ins = concat $ zipWith outputInstructions [(0::Int)..] (V.toList ins)
+toInstruction :: AlgOp Double -> [Named Instruction]
+toInstruction algOp = instruction algOp
   where
-    outputInstructions outputK outputKvec =
-      concat $ zipWith (outputInstruction outputK) [(0::Int)..] (V.toList outputKvec)
-    outputInstruction outputK elemK node =
+    bin k x y op =
+      [Name (nameNode k) :=
+       op (LocalReference (Name (nameNode x))) (LocalReference (Name (nameNode y))) []]
+
+    makeDouble k c =
+      [Name (nameNode k) :=
+       FAdd (ConstantOperand (Float (Double c))) (ConstantOperand (Float (Double 0))) []]
+
+    instruction (InputOp k (InputIdx idx)) =
       [ nm :=
         GetElementPtr { inBounds = True
-                      , address = LocalReference (Name ("output_"++show outputK))
-                      , indices = [ConstantOperand (C.Int 64 (fromIntegral elemK))]
+                      , address = LocalReference (Name "input_0")
+                      , indices = [ConstantOperand (C.Int 64 (fromIntegral idx))]
+                      , metadata = []
+                      }
+      , Name (nameNode k) :=
+        Load { volatile = False
+             , address = LocalReference nm
+             , maybeAtomicity = Nothing
+             , alignment = 0
+             , metadata = []
+             }
+      ]
+      where
+        nm = Name $ "tmp_input_" ++ nameNode k
+    instruction (OutputOp k (OutputIdx idx)) =
+      [ nm :=
+        GetElementPtr { inBounds = True
+                      , address = LocalReference (Name ("output_0"))
+                      , indices = [ConstantOperand (C.Int 64 (fromIntegral idx))]
                       , metadata = []
                       }
       , Name "" :=
         Store { volatile = False
               , address = LocalReference nm
-              , value = LocalReference (Name (nameNode node))
+              , value = LocalReference (Name (nameNode k))
               , maybeAtomicity =  Nothing
               , alignment = 0
               , metadata = []
               }
       ]
       where
-        nm = Name $ "tmp_output_" ++ show outputK ++ "_" ++ show elemK ++ "_" ++ show node
+        nm = Name $ "tmp_output_" ++ nameNode k
 
-nameNode :: Int -> String
-nameNode k = 'w' : show k
+    instruction (NormalOp k (GConst c)) = makeDouble k c
+    instruction (NormalOp k (GNum (Mul x y))) = bin k x y FMul
+    instruction (NormalOp k (GNum (Add x y))) = bin k x y FAdd
+    instruction (NormalOp k (GNum (Sub x y))) = bin k x y FSub
+    instruction (NormalOp k (GNum (Negate x))) = [Name (nameNode k) := FSub (ConstantOperand (Float (Double 0))) (LocalReference (Name (nameNode x))) []]
+    instruction (NormalOp k (GNum (FromInteger x))) = makeDouble k (fromIntegral x)
+    instruction (NormalOp k (GFractional (Div x y))) = bin k x y FDiv
+    instruction (NormalOp k (GFractional (FromRational x))) = makeDouble k (fromRational x)
 
-toInstruction :: (GExpr Double Int -> Maybe (Name,Word32)) ->
-                 Int -> GExpr Double Int -> [Named Instruction]
-toInstruction lookupInput k gexpr = instruction gexpr
-  where
-    bin x y op =
-      [Name (nameNode k) :=
-       op (LocalReference (Name (nameNode x))) (LocalReference (Name (nameNode y))) []]
+    instruction (NormalOp k (GNum (Abs x)))    = callUn k x "fabs"
+    instruction (NormalOp _ (GNum (Signum _))) = error "llvm backend doesn't yet support signum"
+    instruction (NormalOp k (GFloating (Pow x y))) = callBin k x y "pow"
+    instruction (NormalOp _ (GFloating (LogBase _ _))) = error "llvm backend doesn't yet support logbase"
+    instruction (NormalOp k (GFloating (Exp x))) = callUn k x "exp"
+    instruction (NormalOp k (GFloating (Log x))) = callUn k x "log"
+    instruction (NormalOp k (GFloating (Sin x))) = callUn k x "sin"
+    instruction (NormalOp k (GFloating (Cos x))) = callUn k x "cos"
+    instruction (NormalOp _ (GFloating (ASin _)))  = error "llvm backend doesn't yet support asin"
+    instruction (NormalOp _ (GFloating (ATan _)))  = error "llvm backend doesn't yet support atan"
+    instruction (NormalOp _ (GFloating (ACos _)))  = error "llvm backend doesn't yet support acos"
+    instruction (NormalOp _ (GFloating (Sinh _)))  = error "llvm backend doesn't yet support sinh"
+    instruction (NormalOp _ (GFloating (Cosh _)))  = error "llvm backend doesn't yet support cosh"
+    instruction (NormalOp _ (GFloating (Tanh _)))  = error "llvm backend doesn't yet support tanh"
+    instruction (NormalOp _ (GFloating (ASinh _))) = error "llvm backend doesn't yet support ASinh"
+    instruction (NormalOp _ (GFloating (ATanh _))) = error "llvm backend doesn't yet support ATanh"
+    instruction (NormalOp _ (GFloating (ACosh _))) = error "llvm backend doesn't yet support ACosh"
+    instruction (NormalOp _ (GSym _)) = error "dvda internal error: GSym found in algorithm"
 
-    makeDouble c =
-      [Name (nameNode k) :=
-       FAdd (ConstantOperand (Float (Double c))) (ConstantOperand (Float (Double 0))) []]
-
-    instruction (GSym _) = case lookupInput gexpr of
-      Nothing -> error $ "toInstruction: couldn't find " ++ show gexpr ++ " in the input map"
-      Just (inputK,inputElem) ->
-        [ Name ("tmp_input_" ++ nameNode k) :=
-          GetElementPtr { inBounds = True
-                        , address = LocalReference inputK
-                        , indices = [ConstantOperand (C.Int 64 (fromIntegral inputElem))]
-                        , metadata = []
-                        }
-        , Name (nameNode k) :=
-          Load { volatile = False
-               , address = LocalReference (Name ("tmp_input_" ++ nameNode k))
-               , maybeAtomicity = Nothing
-               , alignment = 0
-               , metadata = []
-               }
-        ]
-    instruction (GConst c)                     = makeDouble c
-    instruction (GNum (Mul x y))               = bin x y FMul
-    instruction (GNum (Add x y))               = bin x y FAdd
-    instruction (GNum (Sub x y))               = bin x y FSub
-    instruction (GNum (Negate x))              = [Name (nameNode k) := FSub (ConstantOperand (Float (Double 0))) (LocalReference (Name (nameNode x))) []]
-    instruction (GNum (FromInteger x))         = makeDouble (fromIntegral x)
-    instruction (GFractional (Div x y))        = bin x y FDiv
-    instruction (GFractional (FromRational x)) = makeDouble (fromRational x)
-
-    instruction (GNum (Abs x))                = callUn x "fabs"
-    instruction (GNum (Signum _x))             = error "pls implement sign"
-    instruction (GFloating (Pow x y))          = callBin x y "pow"
-    instruction (GFloating (LogBase _x _y))    = error "pls implement log( "
-    instruction (GFloating (Exp x))            = callUn x "exp"
-    instruction (GFloating (Log x))            = callUn x "log"
-    instruction (GFloating (Sin x))            = callUn x "sin"
-    instruction (GFloating (Cos x))            = callUn x "cos"
-    instruction (GFloating (ASin _x))          = error "pls implement asin"
-    instruction (GFloating (ATan _x))          = error "pls implement atan"
-    instruction (GFloating (ACos _x))          = error "pls implement acos"
-    instruction (GFloating (Sinh _x))          = error "pls implement sinh"
-    instruction (GFloating (Cosh _x))          = error "pls implement cosh"
-    instruction (GFloating (Tanh _x))          = error "pls implement tanh"
-    instruction (GFloating (ASinh _))          = error "pls implement ASinh"
-    instruction (GFloating (ATanh _))          = error "pls implement ATanh"
-    instruction (GFloating (ACosh _))          = error "pls implement ACosh"
-
-    callUn :: Int -> String -> [Named Instruction]
-    callUn x name =
+    callUn :: Node -> Node -> String -> [Named Instruction]
+    callUn k x name =
       [Name (nameNode k) := Call
       { isTailCall = False
       , callingConvention = C
@@ -255,8 +231,8 @@ toInstruction lookupInput k gexpr = instruction gexpr
       , metadata = []
       }]
 
-    callBin :: Int -> Int -> String -> [Named Instruction]
-    callBin x y name =
+    callBin :: Node -> Node -> Node -> String -> [Named Instruction]
+    callBin k x y name =
       [Name (nameNode k) := Call
       { isTailCall = False
       , callingConvention = C
