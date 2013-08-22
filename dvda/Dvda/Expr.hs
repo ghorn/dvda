@@ -4,6 +4,9 @@
 {-# Language TypeFamilies #-}
 {-# Language DeriveGeneric #-}
 {-# Language DeriveDataTypeable #-}
+{-# Language DeriveFunctor #-}
+{-# Language DeriveFoldable #-}
+{-# Language DeriveTraversable #-}
 
 module Dvda.Expr ( Expr(..)
                  , GExpr(..)
@@ -30,6 +33,9 @@ import Data.Data ( Data, Typeable )
 import Data.Hashable ( Hashable(..), hash )
 import Data.Ratio ( (%) )
 import GHC.Generics ( Generic )
+import Data.Monoid ( mempty )
+import qualified Data.Foldable as F
+import qualified Data.Traversable as T
 
 import qualified Dvda.HashMap as HM
 import Dvda.Reify ( MuRef(..) )
@@ -66,11 +72,11 @@ data Nums a = Mul a a
             | Abs a
             | Signum a
             | FromInteger Integer
-            deriving (Ord, Data, Typeable, Generic)
+            deriving (Ord, Data, Typeable, Generic, Functor, F.Foldable, T.Traversable)
 
 data Fractionals a = Div a a
                    | FromRational Rational
-                   deriving (Eq, Ord, Generic, Typeable, Data)
+                   deriving (Eq, Ord, Generic, Typeable, Data, Functor, F.Foldable, T.Traversable)
 
 data Floatings a = Pow a a
                  | LogBase a a
@@ -87,7 +93,7 @@ data Floatings a = Pow a a
                  | ASinh a
                  | ATanh a
                  | ACosh a
-                 deriving (Eq, Ord, Generic, Data, Typeable)
+                 deriving (Eq, Ord, Generic, Data, Typeable, Functor, F.Foldable, T.Traversable)
 
 deriving instance (Data a, Floating a) => Data (Expr a)
 deriving instance (Data a, Data b, Floating a) => Data (GExpr a b)
@@ -374,6 +380,33 @@ getParents (GFloating (Tanh x))           = [x]
 getParents (GFloating (ASinh x))          = [x]
 getParents (GFloating (ATanh x))          = [x]
 getParents (GFloating (ACosh x))          = [x]
+instance Functor (GExpr a) where
+  fmap _ (GSym s) = GSym s
+  fmap _ (GConst c) = GConst c
+  fmap f (GNum nums) = GNum (fmap f nums)
+  fmap f (GFractional fracs) = GFractional (fmap f fracs)
+  fmap f (GFloating floatings) = GFloating (fmap f floatings)
+
+instance F.Foldable (GExpr a) where
+  foldMap _ (GSym _) = mempty
+  foldMap _ (GConst _) = mempty
+  foldMap f (GNum nums) = F.foldMap f nums
+  foldMap f (GFractional fracs) = F.foldMap f fracs
+  foldMap f (GFloating floatings) = F.foldMap f floatings
+
+  foldr _ z (GSym _) = z
+  foldr _ z (GConst _) = z
+  foldr f z (GNum nums) = F.foldr f z nums
+  foldr f z (GFractional fracs) = F.foldr f z fracs
+  foldr f z (GFloating floatings) = F.foldr f z floatings
+
+instance T.Traversable (GExpr a) where
+  traverse _ (GSym s) = pure (GSym s)
+  traverse _ (GConst c) = pure (GConst c)
+  traverse f (GNum nums) = GNum <$> T.traverse f nums
+  traverse f (GFractional fracs) = GFractional <$> T.traverse f fracs
+  traverse f (GFloating floatings) = GFloating <$> T.traverse f floatings
+
 
 deriving instance (Eq a, Eq b) => Eq (GExpr a b)
 
