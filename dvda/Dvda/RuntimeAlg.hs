@@ -3,6 +3,7 @@
 {-# Language FlexibleContexts #-}
 
 module Dvda.RuntimeAlg ( runAlg
+                       , squashIsSame
                        ) where
 
 import Control.Monad.ST ( ST, runST )
@@ -11,7 +12,7 @@ import qualified Data.Vector.Generic as G
 import qualified Data.Vector.Generic.Mutable as GM
 
 import Dvda.Expr
-import Dvda.Alg ( Algorithm(..), AlgOp(..), InputIdx(..), OutputIdx(..) )
+import Dvda.Alg ( Algorithm(..), AlgOp(..), InputIdx(..), OutputIdx(..), squashWorkVec )
 import Dvda.FunGraph ( Node(..) )
 
 newtype RtOp v a = RtOp (forall s. (G.Mutable v) s a -> v a -> (G.Mutable v) s a -> ST s ())
@@ -73,3 +74,7 @@ toRtOp (NormalOp k (GFloating (ASinh x)))     = un k x asinh
 toRtOp (NormalOp k (GFloating (ATanh x)))     = un k x atanh
 toRtOp (NormalOp k (GFloating (ACosh x)))     = un k x acosh
 toRtOp (NormalOp _ (GSym _)) = error "runAlg: there's symbol in my algorithm"
+
+
+squashIsSame :: (Eq (v a), G.Vector v a) => v a -> Algorithm a -> Bool
+squashIsSame x alg = runAlg alg x == runAlg (squashWorkVec alg) x

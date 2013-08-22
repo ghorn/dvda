@@ -6,12 +6,9 @@ module Dvda.Alg ( Algorithm(..)
                 , InputIdx(..)
                 , OutputIdx(..)
                 , toAlg
-                , runAlg
                 , squashWorkVec
-                , squashIsSame
                 ) where
 
-import Control.Monad.ST ( runST )
 import qualified Data.Foldable as F
 import Data.Maybe ( fromMaybe )
 import qualified Data.Traversable as T
@@ -19,9 +16,6 @@ import qualified Data.IntMap as IM
 import qualified Data.Vector as V
 import qualified Data.HashMap.Lazy as HM
 import Data.Hashable ( Hashable(..) )
-import Data.Vector.Generic ( (!) )
-import qualified Data.Vector.Generic as G
-import qualified Data.Vector.Generic.Mutable as GM
 
 import Dvda.Expr
 import Dvda.FunGraph ( FunGraph(..), Node(..), toFunGraph )
@@ -152,57 +146,3 @@ toAlg inputVecs outputVecs = do
                    , algOps = ops
                    , algWorkSize = workVectorSize ops
                    }
-
-runAlg ::  G.Vector v a => Algorithm a -> v a -> v a
-runAlg alg vIns
-  | G.length vIns /= algInDims alg = error "runAlg: input dimension mismatch"
-  | otherwise = runST $ do
-    let asTypeOf' :: G.Vector v a => v a -> m ((G.Mutable v) s a) -> m ((G.Mutable v) s a)
-        asTypeOf' _ x = x
-    work <- asTypeOf' vIns $ GM.new (algWorkSize alg)
-    vOuts <- GM.new (algOutDims alg)
-
-    let bin (Node k) (Node kx) (Node ky) f = do
-          x <- GM.read work kx
-          y <- GM.read work ky
-          GM.write work k (f x y)
-        un (Node k) (Node kx) f = do
-          x <- GM.read work kx
-          GM.write work k (f x)
-        runMe (InputOp (Node k) (InputIdx i)) = GM.write work k (vIns ! i)
-        runMe (OutputOp (Node k) (OutputIdx i)) = do
-          x <- GM.read work k
-          GM.write vOuts i x
-        runMe (NormalOp (Node k) (GConst c))        = GM.write work k c
-        runMe (NormalOp (Node k) (GNum (FromInteger x))) = GM.write work k (fromIntegral x)
-        runMe (NormalOp (Node k) (GFractional (FromRational x))) = GM.write work k (fromRational x)
-
-        runMe (NormalOp k (GNum (Mul x y)))  = bin k x y (*)
-        runMe (NormalOp k (GNum (Add x y)))  = bin k x y (+)
-        runMe (NormalOp k (GNum (Sub x y)))  = bin k x y (-)
-        runMe (NormalOp k (GNum (Negate x))) = un k x negate
-        runMe (NormalOp k (GFractional (Div x y)))   = bin k x y (/)
-
-        runMe (NormalOp k (GNum (Abs x)))            = un k x abs
-        runMe (NormalOp k (GNum (Signum x)))         = un k x signum
-        runMe (NormalOp k (GFloating (Pow x y)))     = bin k x y (**)
-        runMe (NormalOp k (GFloating (LogBase x y))) = bin k x y logBase
-        runMe (NormalOp k (GFloating (Exp x)))       = un k x exp
-        runMe (NormalOp k (GFloating (Log x)))       = un k x log
-        runMe (NormalOp k (GFloating (Sin x)))       = un k x sin
-        runMe (NormalOp k (GFloating (Cos x)))       = un k x cos
-        runMe (NormalOp k (GFloating (ASin x)))      = un k x asin
-        runMe (NormalOp k (GFloating (ATan x)))      = un k x atan
-        runMe (NormalOp k (GFloating (ACos x)))      = un k x acos
-        runMe (NormalOp k (GFloating (Sinh x)))      = un k x sinh
-        runMe (NormalOp k (GFloating (Cosh x)))      = un k x cosh
-        runMe (NormalOp k (GFloating (Tanh x)))      = un k x tanh
-        runMe (NormalOp k (GFloating (ASinh x)))     = un k x asinh
-        runMe (NormalOp k (GFloating (ATanh x)))     = un k x atanh
-        runMe (NormalOp k (GFloating (ACosh x)))     = un k x acosh
-        runMe (NormalOp _ (GSym _)) = error "runAlg: there's symbol in my algorithm"
-    mapM_ runMe (algOps alg)
-    G.freeze vOuts
-
-squashIsSame :: (Eq (v a), G.Vector v a) => v a -> Algorithm a -> Bool
-squashIsSame x alg = runAlg alg x == runAlg (squashWorkVec alg) x
