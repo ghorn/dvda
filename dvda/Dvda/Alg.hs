@@ -16,9 +16,9 @@ import qualified Data.IntMap as IM
 import qualified Data.Vector as V
 import qualified Data.HashMap.Lazy as HM
 import Data.Hashable ( Hashable(..) )
-import Data.Vector.Unboxed ( (!) )
-import qualified Data.Vector.Unboxed as U
-import qualified Data.Vector.Unboxed.Mutable as UM
+import Data.Vector.Generic ( (!) )
+import qualified Data.Vector.Generic as G
+import qualified Data.Vector.Generic.Mutable as GM
 
 import Dvda.Expr
 import Dvda.FunGraph ( FunGraph(..), Node(..), toFunGraph )
@@ -51,8 +51,7 @@ nmLookup (Node k) (NodeMap im) = IM.lookup k im
 nmInsert :: Node -> a -> NodeMap a -> NodeMap a
 nmInsert (Node k) val (NodeMap im) = NodeMap $ IM.insert k val im
 
-
-squashWorkVec' :: Show a => NodeMap Int -> NodeMap LiveNode -> [LiveNode] -> [AlgOp a] -> [AlgOp a]
+squashWorkVec' :: NodeMap Int -> NodeMap LiveNode -> [LiveNode] -> [AlgOp a] -> [AlgOp a]
 squashWorkVec' accessMap liveMap0 (LiveNode pool0:pools) (InputOp k inIdx:xs) =
   InputOp (Node pool0) inIdx : squashWorkVec' accessMap liveMap pools xs
   where
@@ -91,7 +90,7 @@ squashWorkVec' _ _ _ [] = []
 squashWorkVec' _ _ [] _ = error "squashWorkVec': empty pool"
 
 
-squashWorkVec :: Show a => Algorithm a -> Algorithm a
+squashWorkVec :: Algorithm a -> Algorithm a
 squashWorkVec alg = Algorithm { algOps = newAlgOps
                               , algInDims = algInDims alg
                               , algOutDims = algOutDims alg
@@ -151,27 +150,29 @@ toAlg inputVecs outputVecs = do
                    , algWorkSize = workVectorSize ops
                    }
 
-runAlg :: Algorithm Double -> U.Vector Double -> U.Vector Double
+runAlg ::  G.Vector v a => Algorithm a -> v a -> v a
 runAlg alg vIns
-  | U.length vIns /= algInDims alg = error "runAlg: input dimension mismatch"
+  | G.length vIns /= algInDims alg = error "runAlg: input dimension mismatch"
   | otherwise = runST $ do
-    work <- UM.new (algWorkSize alg)
-    vOuts <- UM.new (algOutDims alg)
+    let asTypeOf' :: G.Vector v a => v a -> m ((G.Mutable v) s a) -> m ((G.Mutable v) s a)
+        asTypeOf' _ x = x
+    work <- asTypeOf' vIns $ GM.new (algWorkSize alg)
+    vOuts <- GM.new (algOutDims alg)
 
     let bin (Node k) (Node kx) (Node ky) f = do
-          x <- UM.read work kx
-          y <- UM.read work ky
-          UM.write work k (f x y)
+          x <- GM.read work kx
+          y <- GM.read work ky
+          GM.write work k (f x y)
         un (Node k) (Node kx) f = do
-          x <- UM.read work kx
-          UM.write work k (f x)
-        runMe (InputOp (Node k) (InputIdx i)) = UM.write work k (vIns ! i)
+          x <- GM.read work kx
+          GM.write work k (f x)
+        runMe (InputOp (Node k) (InputIdx i)) = GM.write work k (vIns ! i)
         runMe (OutputOp (Node k) (OutputIdx i)) = do
-          x <- UM.read work k
-          UM.write vOuts i x
-        runMe (NormalOp (Node k) (GConst c))        = UM.write work k c
-        runMe (NormalOp (Node k) (GNum (FromInteger x))) = UM.write work k (fromIntegral x)
-        runMe (NormalOp (Node k) (GFractional (FromRational x))) = UM.write work k (fromRational x)
+          x <- GM.read work k
+          GM.write vOuts i x
+        runMe (NormalOp (Node k) (GConst c))        = GM.write work k c
+        runMe (NormalOp (Node k) (GNum (FromInteger x))) = GM.write work k (fromIntegral x)
+        runMe (NormalOp (Node k) (GFractional (FromRational x))) = GM.write work k (fromRational x)
 
         runMe (NormalOp k (GNum (Mul x y)))  = bin k x y (*)
         runMe (NormalOp k (GNum (Add x y)))  = bin k x y (+)
@@ -198,28 +199,7 @@ runAlg alg vIns
         runMe (NormalOp k (GFloating (ACosh x)))     = un k x acosh
         runMe (NormalOp _ (GSym _)) = error "runAlg: there's symbol in my algorithm"
     mapM_ runMe (algOps alg)
-    U.freeze vOuts
+    G.freeze vOuts
 
-squashIsSame :: U.Vector Double -> Algorithm Double -> Bool
+squashIsSame :: (Eq (v a), G.Vector v a) => v a -> Algorithm a -> Bool
 squashIsSame x alg = runAlg alg x == runAlg (squashWorkVec alg) x
-
-go :: IO ()
-go = do
-  let x = sym "x" :: Expr Double
-      y = sym "y" :: Expr Double
-      z = sym "z" :: Expr Double
-      ins :: V.Vector (Expr Double)
-      ins = V.fromList [x,y,z]
-      outs :: V.Vector (Expr Double)
-      outs = V.fromList [x*2, y*x - 6, 0, x]
-
-  alg <- toAlg ins outs
-  mapM_ print (algOps alg)
-  let f = runAlg alg
-      inputs = U.fromList [1,2,3]
-  putStrLn ""
-  print (f inputs)
-  putStrLn ""
-  let newAlg = squashWorkVec alg
-  mapM_ print (algOps newAlg)
-  print (squashIsSame inputs alg)
