@@ -3,6 +3,7 @@
 {-# Language FlexibleContexts #-}
 
 module Dvda.RuntimeAlg ( runAlg
+                       , runAlg'
                        , squashIsSame
                        ) where
 
@@ -17,18 +18,32 @@ import Dvda.FunGraph ( Node(..) )
 
 newtype RtOp v a = RtOp (forall s. (G.Mutable v) s a -> v a -> (G.Mutable v) s a -> ST s ())
 
+-- | purely run an algoritm
 runAlg :: G.Vector v a => Algorithm a -> v a -> v a
-runAlg alg = runAlg' (algInDims alg) (algOutDims alg) (algWorkSize alg)
-             (map toRtOp (algOps alg))
+runAlg alg =
+  runAlg'' (algInDims alg) (algOutDims alg) (algWorkSize alg) (map toRtOp (algOps alg))
+  where
+    runAlg'' :: G.Vector v a => Int -> Int -> Int -> [RtOp v a] -> v a -> v a
+    runAlg'' inSize outSize workSize ops inputVec
+      | G.length inputVec /= inSize = error "runAlg: input dimension mismatch"
+      | otherwise = runST $ do
+        workVec <- GM.new workSize
+        outputVec <- GM.new outSize
+        mapM_ (\(RtOp op) -> op workVec inputVec outputVec) ops
+        G.freeze outputVec
 
-runAlg' :: G.Vector v a => Int -> Int -> Int -> [RtOp v a] -> v a -> v a
-runAlg' inSize outSize workSize ops inputVec
-  | G.length inputVec /= inSize = error "runAlg: input dimension mismatch"
-  | otherwise = runST $ do
-    workVec <- GM.new workSize
-    outputVec <- GM.new outSize
-    mapM_ (\(RtOp op) -> op workVec inputVec outputVec) ops
-    G.freeze outputVec
+-- | run an algoritm in the ST monad, mutating a user-provided output vector
+runAlg' :: G.Vector v a => Algorithm a -> v a -> G.Mutable v s a -> ST s ()
+runAlg' alg =
+  runAlg'' (algInDims alg) (algOutDims alg) (algWorkSize alg) (map toRtOp (algOps alg))
+  where
+    runAlg'' :: G.Vector v a => Int -> Int -> Int -> [RtOp v a] -> v a -> G.Mutable v s a -> ST s ()
+    runAlg'' inSize outSize workSize ops inputVec outputVec
+      | G.length inputVec /= inSize = error "runAlg': input dimension mismatch"
+      | GM.length outputVec /= outSize = error "runAlg': output dimension mismatch"
+      | otherwise = do
+        workVec <- GM.new workSize
+        mapM_ (\(RtOp op) -> op workVec inputVec outputVec) ops
 
 bin :: GM.MVector (G.Mutable v) a => Node -> Node -> Node -> (a -> a -> a) -> RtOp v a
 bin (Node k) (Node kx) (Node ky) f = RtOp $ \work _ _ -> do
