@@ -7,7 +7,8 @@
 {-# Language DeriveFoldable #-}
 {-# Language DeriveTraversable #-}
 
-module Dvda.Alg ( AlgOp(..)
+module Dvda.Alg ( Algorithm(..)
+                , AlgOp(..)
                 , toAlg
                 ) where
 
@@ -15,9 +16,9 @@ import Control.Monad.ST ( runST )
 import qualified Data.Foldable as F
 import qualified Data.IntMap as IM
 import qualified Data.Vector as V
-import Data.Vector.Unboxed ( (!) )
 import qualified Data.HashMap.Lazy as HM
 import Data.Hashable ( Hashable(..) )
+import Data.Vector.Unboxed ( (!) )
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as UM
 
@@ -38,20 +39,21 @@ data Algorithm a = Algorithm { algInDims :: Int
                              , algWorkSize :: Int
                              }
 
-insertInputsOutputs :: [(Node,GExpr a Node)] -> V.Vector (Sym,InputIdx) -> V.Vector (Node,OutputIdx)
-                       -> [AlgOp a]
-insertInputsOutputs rgr0 inSyms outIdxs = f rgr0
+graphToAlg :: [(Node,GExpr a Node)] -> V.Vector (Sym,InputIdx) -> V.Vector (Node,OutputIdx)
+              -> [AlgOp a]
+graphToAlg rgr0 inSyms outIdxs = f rgr0
   where
-    inSymSet = HM.fromList $ (F.toList inSyms :: [(Sym,InputIdx)])
-    outIdxSet = IM.fromList $ map (\(Node k, x) -> (k, x)) $ (F.toList outIdxs :: [(Node,OutputIdx)])
-    f ((k@(Node k'),GSym s):xs) = case HM.lookup s inSymSet of
+    inSymMap = HM.fromList $ (F.toList inSyms :: [(Sym,InputIdx)])
+    outIdxMap = IM.fromList $ map (\(Node k, x) -> (k, x)) $ (F.toList outIdxs :: [(Node,OutputIdx)])
+
+    f ((k@(Node k'),GSym s):xs) = case HM.lookup s inSymMap of
       Nothing -> error "toAlg: symbolic is not in inputs"
-      Just inIdx -> case IM.lookup k' outIdxSet of
+      Just inIdx -> case IM.lookup k' outIdxMap of
         -- sym is an input
         Nothing -> InputOp k inIdx : f xs
         -- sym is an input and an output
         Just outIdx -> InputOp k inIdx : OutputOp k outIdx : f xs
-    f ((k@(Node k'),x):xs) = case IM.lookup k' outIdxSet of
+    f ((k@(Node k'),x):xs) = case IM.lookup k' outIdxMap of
       -- no input or output
       Nothing -> NormalOp k x : f xs
       -- output only
@@ -67,34 +69,34 @@ toAlg inputVecs outputVecs = do
       workVectorSize n ((InputOp  (Node m) _):xs) = workVectorSize (max n m) xs
       workVectorSize n ((OutputOp (Node m) _):xs) = workVectorSize (max n m) xs
       workVectorSize n [] = n+1
-      ops = insertInputsOutputs (fgReified fg) inputIdxs outputIdxs
+      ops = graphToAlg (fgReified fg) inputIdxs outputIdxs
   return $ Algorithm { algInDims  = V.length inputIdxs
-                     , algOutDims = V.length outputIdxs
-                     , algOps = ops
-                     , algWorkSize = workVectorSize (-1) ops
-                     }
+                        , algOutDims = V.length outputIdxs
+                        , algOps = ops
+                        , algWorkSize = workVectorSize (-1) ops
+                        }
 
 runAlg :: Algorithm Double -> U.Vector Double -> U.Vector Double
 runAlg alg vIns
   | U.length vIns /= algInDims alg = error "runAlg: input dimension mismatch"
   | otherwise = runST $ do
-    v <- UM.new (algWorkSize alg)
+    work <- UM.new (algWorkSize alg)
     vOuts <- UM.new (algOutDims alg)
 
     let bin (Node k) (Node kx) (Node ky) f = do
-          x <- UM.read v kx
-          y <- UM.read v ky
-          UM.write v k (f x y)
+          x <- UM.read work kx
+          y <- UM.read work ky
+          UM.write work k (f x y)
         un (Node k) (Node kx) f = do
-          x <- UM.read v kx
-          UM.write v k (f x)
-        runMe (InputOp (Node k) (InputIdx i)) = UM.write v k (vIns ! i)
+          x <- UM.read work kx
+          UM.write work k (f x)
+        runMe (InputOp (Node k) (InputIdx i)) = UM.write work k (vIns ! i)
         runMe (OutputOp (Node k) (OutputIdx i)) = do
-          x <- UM.read v k
+          x <- UM.read work k
           UM.write vOuts i x
-        runMe (NormalOp (Node k) (GConst c))        = UM.write v k c
-        runMe (NormalOp (Node k) (GNum (FromInteger x))) = UM.write v k (fromIntegral x)
-        runMe (NormalOp (Node k) (GFractional (FromRational x))) = UM.write v k (fromRational x)
+        runMe (NormalOp (Node k) (GConst c))        = UM.write work k c
+        runMe (NormalOp (Node k) (GNum (FromInteger x))) = UM.write work k (fromIntegral x)
+        runMe (NormalOp (Node k) (GFractional (FromRational x))) = UM.write work k (fromRational x)
 
         runMe (NormalOp k (GNum (Mul x y)))  = bin k x y (*)
         runMe (NormalOp k (GNum (Add x y)))  = bin k x y (+)
@@ -122,10 +124,6 @@ runAlg alg vIns
         runMe (NormalOp _ (GSym _)) = error "runAlg: there's symbol in my algorithm"
     mapM_ runMe (algOps alg)
     U.freeze vOuts
-
----------------------------------- utilities -----------------------------
---    mapM_ runMe (algOps alg)
---    return (Vecs vOuts
 
 go :: IO ()
 go = do
