@@ -1,11 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language StandaloneDeriving #-}
-{-# Language GADTs #-}
-{-# Language TypeFamilies #-}
-{-# Language DeriveDataTypeable #-}
-{-# Language DeriveFunctor #-}
-{-# Language DeriveFoldable #-}
-{-# Language DeriveTraversable #-}
 
 module Dvda.Alg ( Algorithm(..)
                 , AlgOp(..)
@@ -61,7 +54,7 @@ nmInsert (Node k) val (NodeMap im) = NodeMap $ IM.insert k val im
 
 squashWorkVec' :: Show a => NodeMap Int -> NodeMap LiveNode -> [LiveNode] -> [AlgOp a] -> [AlgOp a]
 squashWorkVec' accessMap liveMap0 (LiveNode pool0:pools) (InputOp k inIdx:xs) =
-  (InputOp (Node pool0) inIdx):squashWorkVec' accessMap liveMap pools xs
+  InputOp (Node pool0) inIdx : squashWorkVec' accessMap liveMap pools xs
   where
     -- input to the the first element of the live pool
     -- update the liveMap to reflect this
@@ -69,7 +62,7 @@ squashWorkVec' accessMap liveMap0 (LiveNode pool0:pools) (InputOp k inIdx:xs) =
     liveMap = nmInsertWith err k (LiveNode pool0) liveMap0
     err = error "SSA node written to more than once"
 squashWorkVec' accessMap0 liveMap0 pool0 (OutputOp k outIdx:xs) =
-  (OutputOp (Node lk) outIdx):squashWorkVec' accessMap liveMap0 pool xs
+  OutputOp (Node lk) outIdx : squashWorkVec' accessMap liveMap0 pool xs
   where
     -- output from node looked up from live variables
     (LiveNode lk) = fromMaybe noLiveErr (nmLookup k liveMap0)
@@ -81,7 +74,7 @@ squashWorkVec' accessMap0 liveMap0 pool0 (OutputOp k outIdx:xs) =
       Just n -> (nmInsert k (n-1) accessMap0, pool0)
       Nothing -> error "squashWorkVec': node not in access map"
 squashWorkVec' accessMap0 liveMap0 pool0 (NormalOp k gexpr0:xs) =
-  (NormalOp (Node retLiveK) gexpr):squashWorkVec' accessMap liveMap pool xs
+  NormalOp (Node retLiveK) gexpr : squashWorkVec' accessMap liveMap pool xs
   where
     decrement (am0, p0) depk = case nmLookup depk am0 of
       Just 0 -> error "squashWorkVec': accessed something with 0 references"
@@ -105,10 +98,10 @@ squashWorkVec alg = Algorithm { algOps = newAlgOps
                               , algWorkSize = workVectorSize newAlgOps
                               }
   where
-    addOne k am = nmInsertWith (+) k (1::Int) am
-    countAccesses accMap ((InputOp _ _):xs) = countAccesses accMap xs
-    countAccesses accMap ((OutputOp k _):xs) = countAccesses (addOne k accMap) xs
-    countAccesses accMap0 ((NormalOp _ gexpr):xs) = countAccesses accMap xs
+    addOne k = nmInsertWith (+) k (1::Int)
+    countAccesses accMap  (InputOp _ _:xs) = countAccesses accMap xs
+    countAccesses accMap  (OutputOp k _:xs) = countAccesses (addOne k accMap) xs
+    countAccesses accMap0 (NormalOp _ gexpr:xs) = countAccesses accMap xs
       where
         deps = getDependents gexpr
         accMap = foldr addOne accMap0 deps
@@ -122,8 +115,8 @@ graphToAlg :: [(Node,GExpr a Node)] -> V.Vector (Sym,InputIdx) -> V.Vector (Node
               -> [AlgOp a]
 graphToAlg rgr0 inSyms outIdxs = f rgr0
   where
-    inSymMap = HM.fromList $ (F.toList inSyms :: [(Sym,InputIdx)])
-    outIdxMap = IM.fromList $ map (\(Node k, x) -> (k, x)) $ (F.toList outIdxs :: [(Node,OutputIdx)])
+    inSymMap = HM.fromList (F.toList inSyms :: [(Sym,InputIdx)])
+    outIdxMap = IM.fromList (map (\(Node k, x) -> (k, x)) (F.toList outIdxs :: [(Node,OutputIdx)]))
 
     f ((k@(Node k'),GSym s):xs) = case HM.lookup s inSymMap of
       Nothing -> error "toAlg: symbolic is not in inputs"
@@ -142,9 +135,9 @@ graphToAlg rgr0 inSyms outIdxs = f rgr0
 workVectorSize :: [AlgOp a] -> Int
 workVectorSize = workVectorSize' (-1)
   where
-    workVectorSize' n ((NormalOp (Node m) _):xs) = workVectorSize' (max n m) xs
-    workVectorSize' n ((InputOp  (Node m) _):xs) = workVectorSize' (max n m) xs
-    workVectorSize' n ((OutputOp (Node m) _):xs) = workVectorSize' (max n m) xs
+    workVectorSize' n (NormalOp (Node m) _:xs) = workVectorSize' (max n m) xs
+    workVectorSize' n (InputOp  (Node m) _:xs) = workVectorSize' (max n m) xs
+    workVectorSize' n (OutputOp (Node m) _:xs) = workVectorSize' (max n m) xs
     workVectorSize' n [] = n+1
 
 toAlg :: (Eq a, Show a, Hashable a) => V.Vector (Expr a) -> V.Vector (Expr a) -> IO (Algorithm a)
@@ -153,11 +146,11 @@ toAlg inputVecs outputVecs = do
   let inputIdxs  = V.map (\(k,x) -> (x,  InputIdx k)) (V.indexed ( fgInputs fg))
       outputIdxs = V.map (\(k,x) -> (x, OutputIdx k)) (V.indexed (fgOutputs fg))
       ops = graphToAlg (fgReified fg) inputIdxs outputIdxs
-  return $ Algorithm { algInDims  = V.length inputIdxs
-                        , algOutDims = V.length outputIdxs
-                        , algOps = ops
-                        , algWorkSize = workVectorSize ops
-                        }
+  return Algorithm { algInDims  = V.length inputIdxs
+                   , algOutDims = V.length outputIdxs
+                   , algOps = ops
+                   , algWorkSize = workVectorSize ops
+                   }
 
 runAlg :: Algorithm Double -> U.Vector Double -> U.Vector Double
 runAlg alg vIns
