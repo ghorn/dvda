@@ -9,6 +9,7 @@
 
 module Dvda.Reify ( MuRef(..)
                   , ReifyGraph(..)
+                  , Node(..)
                   , reifyGraphs
                   ) where
 
@@ -23,9 +24,11 @@ import Unsafe.Coerce ( unsafeCoerce )
 import qualified Data.HashTable.IO as H
 type HashTable k v = H.CuckooHashTable k v
 
-type Unique = Int
+newtype Node = Node Int deriving (Ord, Eq)
+instance Show Node where
+  show (Node k) = "@" ++ show k
 
-data ReifyGraph e = ReifyGraph [(Unique,e Unique)]
+data ReifyGraph e = ReifyGraph [(Node,e Node)]
 
 class MuRef a where
   type DeRef a :: * -> *
@@ -36,18 +39,18 @@ class MuRef a where
 
 -- | 'reifyGraph' takes a data structure that admits 'MuRef', and returns a 'ReifyGraph' that contains
 -- the dereferenced nodes, with their children as 'Int' rather than recursive values.
-reifyGraphs :: (MuRef s, Traversable t) => t s -> IO (ReifyGraph (DeRef s), t Unique)
+reifyGraphs :: (MuRef s, Traversable t) => t s -> IO (ReifyGraph (DeRef s), t Node)
 reifyGraphs m = do
-  stableNameMap <- H.new :: IO (HashTable DynStableName Unique)
-  uVar <- newMVar 0
+  stableNameMap <- H.new :: IO (HashTable DynStableName Node)
+  uVar <- newMVar (Node 0)
 
-  let newUnique :: IO Int
+  let newUnique :: IO Node
       newUnique = do
-        v <- takeMVar uVar
-        putMVar uVar (succ v)
+        v@(Node v') <- takeMVar uVar
+        putMVar uVar (Node (succ v'))
         return v
 
-      findNodes :: MuRef s => MVar [(Unique,DeRef s Unique)] -> s -> IO Unique
+      findNodes :: MuRef s => MVar [(Node,DeRef s Node)] -> s -> IO Node
       findNodes graph !j = do
         stableName <- makeDynStableName j
         amIHere <- H.lookup stableNameMap stableName

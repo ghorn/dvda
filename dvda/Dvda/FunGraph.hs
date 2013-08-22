@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Dvda.FunGraph ( FunGraph
+                     , Node(..)
                      , toFunGraph
                      , countNodes
                      , fgInputs
@@ -18,16 +19,17 @@ import Data.Traversable ( Traversable )
 import Data.Hashable ( Hashable(..) )
 
 import Dvda.Expr
-import Dvda.Reify ( ReifyGraph(..), reifyGraphs )
+import Dvda.Reify ( ReifyGraph(..), Node(..), reifyGraphs )
 
 data FunGraph f g a = FunGraph { fgInputs :: f Sym
-                               , fgOutputs :: g Int
-                               , fgReified :: [(Int, GExpr a Int)]
-                               , fgTopSort :: [(Int,GExpr a Int)]
+                               , fgOutputs :: g Node
+                               , fgReified :: [(Node, GExpr a Node)]
+                               , fgTopSort :: [(Node, GExpr a Node)]
                                }
 
 -- | find any symbols which are parents of outputs, but are not supplied by the user
-detectMissingInputs :: (Foldable f, Eq a, Hashable a, Show a) => f (Expr a) -> [(Int,GExpr a Int)] -> [GExpr a Int]
+detectMissingInputs :: (Foldable f, Eq a, Hashable a, Show a) =>
+                       f (Expr a) -> [(Node, GExpr a Node)] -> [GExpr a Int]
 detectMissingInputs exprs gr = HS.toList $ HS.difference allGraphInputs allUserInputs
   where
     allUserInputs =
@@ -77,13 +79,13 @@ toFunGraph inputExprs outputExprs = do
       -- make sure all the inputs are symbolic, and find their indices in the Expr graph
       (gr, lookupVertex, lookupKey) = Graph.graphFromEdges $ map (\(k,gexpr) -> (gexpr, k, getParents gexpr)) rgr
       lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
-    
+
       topSort = map lookup' $ reverse $ map ((\(_,k,_) -> k) . lookupVertex) $ Graph.topSort gr
         where
           lookup' k = case lookupG k of
             Nothing -> error "DVDA internal error"
             (Just g) -> (k,g)
-  
+
   return $ case (detectMissingInputs inputExprs rgr, findConflictingInputs userInputSyms) of
     ([],[]) -> fg
     (xs,[]) -> error $ "toFunGraph found inputs that were not provided by the user: " ++ show xs
