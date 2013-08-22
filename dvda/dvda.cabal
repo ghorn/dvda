@@ -52,6 +52,7 @@ Library
 
                      Dvda.AD
                      Dvda.Alg
+                     Dvda.RuntimeAlg
  --                    Dvda.Codegen.CPlugins
 --                     Dvda.Codegen.CGen
 --                     Dvda.Codegen.Gcc

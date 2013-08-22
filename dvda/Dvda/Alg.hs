@@ -2,6 +2,8 @@
 
 module Dvda.Alg ( Algorithm(..)
                 , AlgOp(..)
+                , InputIdx(..)
+                , OutputIdx(..)
                 , toAlg
                 , runAlg
                 , squashWorkVec
