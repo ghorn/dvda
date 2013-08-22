@@ -103,8 +103,7 @@ squashWorkVec alg = Algorithm { algOps = newAlgOps
     countAccesses accMap  (OutputOp k _:xs) = countAccesses (addOne k accMap) xs
     countAccesses accMap0 (NormalOp _ gexpr:xs) = countAccesses accMap xs
       where
-        deps = getDependents gexpr
-        accMap = foldr addOne accMap0 deps
+        accMap = F.foldr addOne accMap0 gexpr
     countAccesses accMap [] = accMap
     accesses = countAccesses nmEmpty (algOps alg)
 
