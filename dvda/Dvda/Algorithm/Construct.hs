@@ -16,7 +16,6 @@ import qualified Data.Traversable as T
 import qualified Data.IntMap as IM
 import qualified Data.Vector as V
 import qualified Data.HashMap.Lazy as HM
-import Data.Hashable ( Hashable(..) )
 
 import Dvda.Expr
 import Dvda.Algorithm.FunGraph ( FunGraph(..), Node(..), toFunGraph )
@@ -141,8 +140,7 @@ workVectorSize = workVectorSize' (-1)
     workVectorSize' n [] = n+1
 
 -- | create a SSA algorithm from a vector of symbolic inputs and outputs
-constructAlgorithm :: (Eq a, Show a, Hashable a)
-                      => V.Vector (Expr a) -> V.Vector (Expr a) -> IO (Algorithm a)
+constructAlgorithm :: V.Vector (Expr a) -> V.Vector (Expr a) -> IO (Algorithm a)
 constructAlgorithm inputVecs outputVecs = do
   fg <- toFunGraph inputVecs outputVecs
   let inputIdxs  = V.map (\(k,x) -> (x,  InputIdx k)) (V.indexed ( fgInputs fg))

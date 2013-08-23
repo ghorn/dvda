@@ -12,7 +12,6 @@ import qualified Data.Foldable as F
 import qualified Data.Graph as Graph
 import qualified Data.HashSet as HS
 import Data.Traversable ( Traversable )
-import Data.Hashable ( Hashable(..) )
 
 import Dvda.Expr
 import Dvda.Algorithm.Reify ( ReifyGraph(..), Node(..), reifyGraph )
@@ -24,17 +23,16 @@ data FunGraph f g a = FunGraph { fgInputs :: f Sym
                                }
 
 -- | find any symbols which are parents of outputs, but are not supplied by the user
-detectMissingInputs :: (Foldable f, Eq a, Hashable a, Show a) =>
-                       f (Expr a) -> [(Node, GExpr a Node)] -> [GExpr a Int]
+detectMissingInputs :: Foldable f => f (Expr a) -> [(Node, GExpr a Node)] -> [Sym]
 detectMissingInputs exprs gr = HS.toList $ HS.difference allGraphInputs allUserInputs
   where
     allUserInputs =
-      let f (ESym name) acc = GSym name : acc
-          f _ e = error $ "detectMissingInputs given non-ESym input \"" ++ show e ++ "\""
+      let f (ESym name) acc = name : acc
+          f _ _ = error $ "detectMissingInputs given non-ESym input" -- \"" ++ show e ++ "\""
       in HS.fromList $ F.foldr f [] exprs
 
     allGraphInputs =
-      let f (_, GSym name) acc = GSym name : acc
+      let f (_, GSym name) acc = name : acc
           f _ acc = acc
       in HS.fromList $ foldr f [] gr
 
@@ -56,7 +54,7 @@ findConflictingInputs syms = HS.toList redundant
 --   StableNames may be non-deterministic so this function may return graphs
 --   with greater or fewer CSE's eliminated.
 --   If CSE is then performed on the graph, the result is deterministic.
-toFunGraph :: (Functor f, Foldable f, Traversable g, Eq a, Hashable a, Show a) =>
+toFunGraph :: (Functor f, Foldable f, Traversable g) =>
               f (Expr a) -> g (Expr a) -> IO (FunGraph f g a)
 toFunGraph inputExprs outputExprs = do
   -- reify the outputs
@@ -64,7 +62,7 @@ toFunGraph inputExprs outputExprs = do
   let userInputSyms = fmap f inputExprs
         where
           f (ESym s) = s
-          f x = error $ "ERROR: toFunGraph given non-ESym input \"" ++ show x ++ "\""
+          f _ = error $ "ERROR: toFunGraph given non-ESym input" -- \"" ++ show x ++ "\""
 
       fg = FunGraph { fgInputs = userInputSyms
                     , fgOutputs = outputIndices
@@ -86,4 +84,4 @@ toFunGraph inputExprs outputExprs = do
   return $ case (detectMissingInputs inputExprs rgr, findConflictingInputs userInputSyms) of
     ([],[]) -> fg
     (xs,[]) -> error $ "toFunGraph found inputs that were not provided by the user: " ++ show xs
-    ( _,xs) -> error $ "toFunGraph found idential inputs set more than once: " ++ show xs
+    ( _,xs) -> error $ "toFunGraph found conflicting inputs: " ++ show xs
