@@ -1,11 +1,13 @@
 {-# OPTIONS_GHC -Wall #-}
+{-# Language RankNTypes #-}
 
 module Dvda.Algorithm
        ( Algorithm
        , constructAlgorithm
        , runAlgorithm
        , runAlgorithm'
-       , toSymbolic
+       , toSymbolicAlg
+       , toFloatingAlg
        , squashIsSame
        ) where
 
@@ -19,18 +21,31 @@ import Dvda.Expr ( Expr(..), GExpr(..) )
 squashIsSame :: (Eq (v a), G.Vector v a) => v a -> Algorithm a -> Bool
 squashIsSame x alg = runAlgorithm alg x == runAlgorithm (squashWorkVector alg) x
 
--- | convert an algorithm into a symbolic algorithm
-toSymbolic :: Ord a => Algorithm a -> Algorithm (Expr a)
-toSymbolic alg = alg { algOps = map opToExpr (algOps alg) }
+-- | Convert an algorithm into a symbolic algorithm.
+--   Is there any reason to keep this when we have toFloatingAlg?
+toSymbolicAlg :: Ord a => Algorithm a -> Algorithm (Expr a)
+toSymbolicAlg (Algorithm ind outd ops ws) = Algorithm ind outd (map opToExpr ops) ws
   where
-    opToExpr :: Ord a => AlgOp a -> AlgOp (Expr a)
     opToExpr (InputOp k idx) = InputOp k idx
     opToExpr (OutputOp k idx) = OutputOp k idx
     opToExpr (NormalOp k gexpr) = NormalOp k (g2e gexpr)
       where
-        g2e :: Ord a => GExpr a b -> GExpr (Expr a) b
-        g2e (GSym s) = GSym s
-        g2e (GConst a) = GConst (EConst a)
+        g2e (GSym x) = GSym x
+        g2e (GConst x) = GConst (EConst x)
+        g2e (GNum x) = GNum x
+        g2e (GFractional x) = GFractional x
+        g2e (GFloating x) = GFloating x
+
+-- | convert an algorithm into a floating algorithm
+toFloatingAlg :: Floating b => (forall a. Algorithm a) -> Algorithm b
+toFloatingAlg (Algorithm ind outd ops ws) = Algorithm ind outd (map opToExpr ops) ws
+  where
+    opToExpr (InputOp k idx) = InputOp k idx
+    opToExpr (OutputOp k idx) = OutputOp k idx
+    opToExpr (NormalOp k gexpr) = NormalOp k (g2e gexpr)
+      where
+        g2e (GSym x) = GSym x
+        g2e (GConst x) = GConst x
         g2e (GNum x) = GNum x
         g2e (GFractional x) = GFractional x
         g2e (GFloating x) = GFloating x
