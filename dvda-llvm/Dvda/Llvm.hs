@@ -34,7 +34,7 @@ import LLVM.General.AST.Float (  SomeFloat ( Double ) )
 import LLVM.General.AST.Visibility ( Visibility( Default ) )
 
 import Dvda.Expr ( GExpr(..), Floatings(..), Nums(..), Fractionals(..) )
-import Dvda.Alg
+import Dvda.Algorithm.Construct ( Algorithm(..), InputIdx(..), OutputIdx(..), AlgOp(..), Node(..) )
 
 doubleType :: Type
 doubleType = FloatingPointType 64 IEEE
