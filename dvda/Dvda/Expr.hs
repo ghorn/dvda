@@ -28,7 +28,6 @@ module Dvda.Expr ( Expr(..)
                  ) where
 
 import Control.Applicative ( (<$>), (<*>), pure )
-import Data.Data ( Data, Typeable )
 import Data.Hashable ( Hashable(..), hash )
 import Data.Ratio ( (%) )
 import GHC.Generics ( Generic )
@@ -48,7 +47,7 @@ commutativeAdd = True
 data Sym =
     Sym String -- doesn't depend on independent variable, or is an independent variable
   | SymDependent String Int Sym -- depends on independent variable, Int specifies the nth derivative
-  deriving (Eq, Ord, Generic, Data, Typeable)
+  deriving (Eq, Ord, Generic)
 
 instance Show Sym where
   showsPrec d (Sym name) = showParen (d >= 9) $ showString name
@@ -62,7 +61,6 @@ data Expr a where
   ENum :: Num a => Nums (Expr a) -> Expr a
   EFractional :: Fractional a => Fractionals (Expr a) -> Expr a
   EFloating :: Floating a => Floatings (Expr a) -> Expr a
-  deriving Typeable
 
 data Nums a = Mul a a
             | Add a a
@@ -71,11 +69,11 @@ data Nums a = Mul a a
             | Abs a
             | Signum a
             | FromInteger Integer
-            deriving (Ord, Data, Typeable, Generic, Functor, F.Foldable, T.Traversable)
+            deriving (Ord, Generic, Functor, F.Foldable, T.Traversable)
 
 data Fractionals a = Div a a
                    | FromRational Rational
-                   deriving (Eq, Ord, Generic, Typeable, Data, Functor, F.Foldable, T.Traversable)
+                   deriving (Eq, Ord, Generic, Functor, F.Foldable, T.Traversable)
 
 data Floatings a = Pow a a
                  | LogBase a a
@@ -92,10 +90,7 @@ data Floatings a = Pow a a
                  | ASinh a
                  | ATanh a
                  | ACosh a
-                 deriving (Eq, Ord, Generic, Data, Typeable, Functor, F.Foldable, T.Traversable)
-
-deriving instance (Data a, Floating a) => Data (Expr a)
-deriving instance (Data a, Data b, Floating a) => Data (GExpr a b)
+                 deriving (Eq, Ord, Generic, Functor, F.Foldable, T.Traversable)
 
 
 ----------------------- Show instances -------------------------
@@ -348,8 +343,7 @@ data GExpr a b where
   GNum :: Num a => Nums b -> GExpr a b
   GFractional :: Fractional a => Fractionals b -> GExpr a b
   GFloating :: Floating a => Floatings b -> GExpr a b
-  deriving Typeable
-deriving instance (Ord a, Ord b) => Ord (GExpr a b)
+
 deriving instance (Show a, Show b) => Show (GExpr a b)
 instance Functor (GExpr a) where
   fmap _ (GSym s) = GSym s
