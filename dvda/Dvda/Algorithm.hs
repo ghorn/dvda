@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language RankNTypes #-}
 
 module Dvda.Algorithm
        ( Algorithm
@@ -7,7 +6,6 @@ module Dvda.Algorithm
        , runAlgorithm
        , runAlgorithm'
        , toSymbolicAlg
-       , toFloatingAlg
        , squashIsSame
        ) where
 
@@ -23,29 +21,17 @@ squashIsSame x alg = runAlgorithm alg x == runAlgorithm (squashWorkVector alg) x
 
 -- | Convert an algorithm into a symbolic algorithm.
 --   Is there any reason to keep this when we have toFloatingAlg?
-toSymbolicAlg :: Ord a => Algorithm a -> Algorithm (Expr a)
+toSymbolicAlg :: Eq a => Algorithm a -> Algorithm (Expr a)
 toSymbolicAlg (Algorithm ind outd ops ws) = Algorithm ind outd (map opToExpr ops) ws
   where
+    opToExpr :: Eq a => AlgOp a -> AlgOp (Expr a)
     opToExpr (InputOp k idx) = InputOp k idx
     opToExpr (OutputOp k idx) = OutputOp k idx
     opToExpr (NormalOp k gexpr) = NormalOp k (g2e gexpr)
       where
+        g2e :: Eq a => GExpr a b -> GExpr (Expr a) b
         g2e (GSym x) = GSym x
         g2e (GConst x) = GConst (EConst x)
-        g2e (GNum x) = GNum x
-        g2e (GFractional x) = GFractional x
-        g2e (GFloating x) = GFloating x
-
--- | convert an algorithm into a floating algorithm
-toFloatingAlg :: Floating b => (forall a. Algorithm a) -> Algorithm b
-toFloatingAlg (Algorithm ind outd ops ws) = Algorithm ind outd (map opToExpr ops) ws
-  where
-    opToExpr (InputOp k idx) = InputOp k idx
-    opToExpr (OutputOp k idx) = OutputOp k idx
-    opToExpr (NormalOp k gexpr) = NormalOp k (g2e gexpr)
-      where
-        g2e (GSym x) = GSym x
-        g2e (GConst x) = GConst x
         g2e (GNum x) = GNum x
         g2e (GFractional x) = GFractional x
         g2e (GFloating x) = GFloating x

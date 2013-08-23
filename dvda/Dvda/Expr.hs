@@ -202,17 +202,17 @@ instance Hashable a => Hashable (Expr a) where
   hashWithSalt s (EFractional x) = s `hashWithSalt` "EFractional" `hashWithSalt` x
   hashWithSalt s (EFloating x)   = s `hashWithSalt` "EFloating"   `hashWithSalt` x
 
-fromNeg :: (Num a, Ord a) => Expr a -> Maybe (Expr a)
+fromNeg :: Expr a -> Maybe (Expr a)
 fromNeg (ENum (Negate x)) = Just x
 fromNeg (ENum (FromInteger k))
   | k < 0 = Just (ENum (FromInteger (abs k)))
 fromNeg (EFractional (FromRational r))
   | r < 0 = Just (EFractional (FromRational (abs r)))
-fromNeg (EConst c)
-  | c < 0 = Just (EConst (abs c))
+--fromNeg (EConst c)
+--  | c < 0 = Just (EConst (abs c))
 fromNeg _ = Nothing
 
-instance (Num a, Ord a) => Num (Expr a) where
+instance (Eq a, Num a) => Num (Expr a) where
   (*) (EConst x) (EConst y) = EConst (x*y)
   (*) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx * ky)
   (*) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx * ry)
@@ -290,7 +290,7 @@ instance (Num a, Ord a) => Num (Expr a) where
 
   fromInteger = ENum . FromInteger
 
-instance (Fractional a, Ord a) => Fractional (Expr a) where
+instance (Eq a, Fractional a) => Fractional (Expr a) where
   (/) (EConst x) (EConst y) = EConst (x/y)
   (/) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = EFractional $ FromRational (kx % ky)
   (/) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx / ry)
@@ -312,7 +312,7 @@ instance (Fractional a, Ord a) => Fractional (Expr a) where
 
   fromRational = EFractional . FromRational
 
-instance (Floating a, Ord a) => Floating (Expr a) where
+instance (Eq a, Floating a) => Floating (Expr a) where
   pi          = EConst pi
   x ** y      = EFloating $ Pow x y
   logBase x y = EFloating $ LogBase x y
@@ -561,7 +561,7 @@ getConst _ = Nothing
 
 -- | Separate nonlinear and linear parts of an expression
 --   @extractLinearPart (fNonLin(x)+a*x) x == (fNonLin(x), a)
-extractLinearPart :: (Num a, Ord a, Show a) => Expr a -> Expr a -> (Expr a, a)
+extractLinearPart :: (Num a, Eq a, Show a) => Expr a -> Expr a -> (Expr a, a)
 extractLinearPart e@(EConst _) _ = (e,0)
 extractLinearPart e@(ENum (FromInteger _)) _ = (e,0)
 extractLinearPart e@(EFractional (FromRational _)) _ = (e,0)
