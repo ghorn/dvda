@@ -51,8 +51,9 @@ Library
 --                     Dvda.Tests.Unary
 
                      Dvda.AD
-                     Dvda.Alg
-                     Dvda.RuntimeAlg
+                     Dvda.Algorithm
+                     Dvda.Algorithm.Construct
+                     Dvda.Algorithm.Eval
  --                    Dvda.Codegen.CPlugins
 --                     Dvda.Codegen.CGen
 --                     Dvda.Codegen.Gcc

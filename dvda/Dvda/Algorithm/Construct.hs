@@ -1,13 +1,14 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Dvda.Alg ( Algorithm(..)
-                , AlgOp(..)
-                , Node(..)
-                , InputIdx(..)
-                , OutputIdx(..)
-                , toAlg
-                , squashWorkVec
-                ) where
+module Dvda.Algorithm.Construct
+       ( Algorithm(..)
+       , AlgOp(..)
+       , Node(..)
+       , InputIdx(..)
+       , OutputIdx(..)
+       , constructAlgorithm
+       , squashWorkVector
+       ) where
 
 import qualified Data.Foldable as F
 import Data.Maybe ( fromMaybe )
@@ -86,13 +87,17 @@ squashWorkVec' accessMap0 liveMap0 pool0 (NormalOp k gexpr0:xs) =
 squashWorkVec' _ _ _ [] = []
 squashWorkVec' _ _ [] _ = error "squashWorkVec': empty pool"
 
-
-squashWorkVec :: Algorithm a -> Algorithm a
-squashWorkVec alg = Algorithm { algOps = newAlgOps
-                              , algInDims = algInDims alg
-                              , algOutDims = algOutDims alg
-                              , algWorkSize = workVectorSize newAlgOps
-                              }
+-- | Converts SSA to live variables.
+--   This reduces the size of the work vector by re-using dead registers.
+--   Does this break if it's called more than once?
+--   Maybe these should have different types
+squashWorkVector :: Algorithm a -> Algorithm a
+squashWorkVector alg =
+  Algorithm { algOps = newAlgOps
+            , algInDims = algInDims alg
+            , algOutDims = algOutDims alg
+            , algWorkSize = workVectorSize newAlgOps
+            }
   where
     addOne k = nmInsertWith (+) k (1::Int)
     countAccesses accMap  (InputOp _ _:xs) = countAccesses accMap xs
@@ -135,8 +140,10 @@ workVectorSize = workVectorSize' (-1)
     workVectorSize' n (OutputOp (Node m) _:xs) = workVectorSize' (max n m) xs
     workVectorSize' n [] = n+1
 
-toAlg :: (Eq a, Show a, Hashable a) => V.Vector (Expr a) -> V.Vector (Expr a) -> IO (Algorithm a)
-toAlg inputVecs outputVecs = do
+-- | create a SSA algorithm from a vector of symbolic inputs and outputs
+constructAlgorithm :: (Eq a, Show a, Hashable a)
+                      => V.Vector (Expr a) -> V.Vector (Expr a) -> IO (Algorithm a)
+constructAlgorithm inputVecs outputVecs = do
   fg <- toFunGraph inputVecs outputVecs
   let inputIdxs  = V.map (\(k,x) -> (x,  InputIdx k)) (V.indexed ( fgInputs fg))
       outputIdxs = V.map (\(k,x) -> (x, OutputIdx k)) (V.indexed (fgOutputs fg))
