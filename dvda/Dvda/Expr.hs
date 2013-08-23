@@ -314,6 +314,9 @@ instance (Eq a, Fractional a) => Fractional (Expr a) where
 
 instance (Eq a, Floating a) => Floating (Expr a) where
   pi          = EConst pi
+  x ** 1      = x
+  0 ** 0      = error "Expr: 0 ** 0 indeterminate"
+  _ ** 0      = 1
   x ** y      = EFloating $ Pow x y
   logBase x y = EFloating $ LogBase x y
   exp         = applyFloatingUn (  exp,   Exp)
