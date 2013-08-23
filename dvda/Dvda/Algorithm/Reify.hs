@@ -3,15 +3,16 @@
 {-# Language BangPatterns #-}
 {-# Language TypeFamilies #-}
 
--- This file is a modified version from Andy Gill's data-reify package
--- It is modified to use Data.HashTable.IO, which gives a speed improvement
--- at the expense of portability.
+-- | This file is a modified version from Andy Gill's data-reify package
+--   It is modified to use Data.HashTable.IO, which gives a speed improvement
+--   at the expense of portability.
 
-module Dvda.Reify ( MuRef(..)
-                  , ReifyGraph(..)
-                  , Node(..)
-                  , reifyGraphs
-                  ) where
+module Dvda.Algorithm.Reify
+       ( MuRef(..)
+       , ReifyGraph(..)
+       , Node(..)
+       , reifyGraph
+       ) where
 
 import Control.Concurrent.MVar ( newMVar, takeMVar, putMVar, MVar, readMVar, modifyMVar_ )
 import Control.Applicative ( Applicative )
@@ -39,8 +40,8 @@ class MuRef a where
 
 -- | 'reifyGraph' takes a data structure that admits 'MuRef', and returns a 'ReifyGraph' that contains
 -- the dereferenced nodes, with their children as 'Int' rather than recursive values.
-reifyGraphs :: (MuRef s, Traversable t) => t s -> IO (ReifyGraph (DeRef s), t Node)
-reifyGraphs m = do
+reifyGraph :: (MuRef s, Traversable t) => t s -> IO (ReifyGraph (DeRef s), t Node)
+reifyGraph m = do
   stableNameMap <- H.new :: IO (HashTable DynStableName Node)
   uVar <- newMVar (Node 0)
 

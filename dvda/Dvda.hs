@@ -16,7 +16,6 @@ module Dvda ( -- * primitives
               -- * symbolic expression type
             , Expr
               -- * construct FunGraphs
-            , toFunGraph
 --            , cse
               -- * show/summarize FunGraphs
 --            , previewGraph
@@ -25,11 +24,12 @@ module Dvda ( -- * primitives
 --            , buildHSFunction
 --            , buildHSFunctionPure
 --            , buildHSFunctionFromGraph
+            , module Dvda.Algorithm
             ) where
 
 import Dvda.AD ( rad )
 --import Dvda.CSE ( cse )
 import Dvda.Expr ( Expr, sym, symDependent, symDependentN )
-import Dvda.FunGraph ( toFunGraph )
+import Dvda.Algorithm
 --import Dvda.Vis ( previewGraph, previewGraph' )
 --import Dvda.HSBuilder

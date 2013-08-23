@@ -1,14 +1,10 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Dvda.FunGraph ( FunGraph
-                     , Node(..)
-                     , toFunGraph
-                     , countNodes
-                     , fgInputs
-                     , fgOutputs
-                     , fgReified
-                     , fgTopSort
-                     ) where
+module Dvda.Algorithm.FunGraph
+       ( FunGraph(..)
+       , Node(..)
+       , toFunGraph
+       ) where
 
 import Control.Applicative ( (<$>) )
 import Data.Foldable ( Foldable )
@@ -19,7 +15,7 @@ import Data.Traversable ( Traversable )
 import Data.Hashable ( Hashable(..) )
 
 import Dvda.Expr
-import Dvda.Reify ( ReifyGraph(..), Node(..), reifyGraphs )
+import Dvda.Algorithm.Reify ( ReifyGraph(..), Node(..), reifyGraph )
 
 data FunGraph f g a = FunGraph { fgInputs :: f Sym
                                , fgOutputs :: g Node
@@ -64,7 +60,7 @@ toFunGraph :: (Functor f, Foldable f, Traversable g, Eq a, Hashable a, Show a) =
               f (Expr a) -> g (Expr a) -> IO (FunGraph f g a)
 toFunGraph inputExprs outputExprs = do
   -- reify the outputs
-  (ReifyGraph rgr, outputIndices) <- reifyGraphs outputExprs
+  (ReifyGraph rgr, outputIndices) <- reifyGraph outputExprs
   let userInputSyms = fmap f inputExprs
         where
           f (ESym s) = s
@@ -91,8 +87,3 @@ toFunGraph inputExprs outputExprs = do
     ([],[]) -> fg
     (xs,[]) -> error $ "toFunGraph found inputs that were not provided by the user: " ++ show xs
     ( _,xs) -> error $ "toFunGraph found idential inputs set more than once: " ++ show xs
-
-
----------------------------------- utilities -----------------------------
-countNodes :: FunGraph a f g -> Int
-countNodes = length . fgTopSort

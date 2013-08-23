@@ -19,7 +19,7 @@ import qualified Data.HashMap.Lazy as HM
 import Data.Hashable ( Hashable(..) )
 
 import Dvda.Expr
-import Dvda.FunGraph ( FunGraph(..), Node(..), toFunGraph )
+import Dvda.Algorithm.FunGraph ( FunGraph(..), Node(..), toFunGraph )
 
 newtype InputIdx = InputIdx Int deriving Show
 newtype OutputIdx = OutputIdx Int deriving Show

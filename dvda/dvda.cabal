@@ -54,6 +54,8 @@ Library
                      Dvda.Algorithm
                      Dvda.Algorithm.Construct
                      Dvda.Algorithm.Eval
+                     Dvda.Algorithm.FunGraph
+                     Dvda.Algorithm.Reify
  --                    Dvda.Codegen.CPlugins
 --                     Dvda.Codegen.CGen
 --                     Dvda.Codegen.Gcc
@@ -62,9 +64,7 @@ Library
 --                     Dvda.CSE
                      Dvda.Expr
 --                     Dvda.Examples
-                     Dvda.FunGraph
                      Dvda.HashMap
-                     Dvda.Reify
 --                     Dvda.Vis
 
   Other-modules:     Dvda.ShowExprTests

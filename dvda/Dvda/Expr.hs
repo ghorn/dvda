@@ -37,7 +37,7 @@ import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 
 import qualified Dvda.HashMap as HM
-import Dvda.Reify ( MuRef(..) )
+import Dvda.Algorithm.Reify ( MuRef(..) )
 
 commutativeMul :: Bool
 commutativeMul = True

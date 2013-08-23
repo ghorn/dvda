@@ -14,7 +14,7 @@ import qualified Data.Vector.Generic.Mutable as GM
 
 import Dvda.Expr
 import Dvda.Algorithm.Construct ( Algorithm(..), AlgOp(..), InputIdx(..), OutputIdx(..) )
-import Dvda.FunGraph ( Node(..) )
+import Dvda.Algorithm.FunGraph ( Node(..) )
 
 newtype RtOp v a = RtOp (forall s. (G.Mutable v) s a -> v a -> (G.Mutable v) s a -> ST s ())
 
