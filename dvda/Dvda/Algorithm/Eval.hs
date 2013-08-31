@@ -79,6 +79,7 @@ toRtOp (NormalOp k (GFloating (Exp x)))       = un k x exp
 toRtOp (NormalOp k (GFloating (Log x)))       = un k x log
 toRtOp (NormalOp k (GFloating (Sin x)))       = un k x sin
 toRtOp (NormalOp k (GFloating (Cos x)))       = un k x cos
+toRtOp (NormalOp k (GFloating (Tan x)))       = un k x tan
 toRtOp (NormalOp k (GFloating (ASin x)))      = un k x asin
 toRtOp (NormalOp k (GFloating (ATan x)))      = un k x atan
 toRtOp (NormalOp k (GFloating (ACos x)))      = un k x acos

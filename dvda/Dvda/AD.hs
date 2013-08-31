@@ -55,6 +55,7 @@ backpropNode sens (EFloating (Exp x))   = bpUnary sens x exp
 backpropNode sens (EFloating (Log x))   = bpUnary sens x log
 backpropNode sens (EFloating (Sin x))   = bpUnary sens x sin
 backpropNode sens (EFloating (Cos x))   = bpUnary sens x cos
+backpropNode sens (EFloating (Tan x))   = bpUnary sens x tan
 backpropNode sens (EFloating (ASin x))  = bpUnary sens x asin
 backpropNode sens (EFloating (ATan x))  = bpUnary sens x atan
 backpropNode sens (EFloating (ACos x))  = bpUnary sens x acos

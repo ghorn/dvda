@@ -81,6 +81,7 @@ data Floatings a = Pow a a
                  | Log a
                  | Sin a
                  | Cos a
+                 | Tan a
                  | ASin a
                  | ATan a
                  | ACos a
@@ -125,6 +126,7 @@ instance Show a => Show (Floatings a) where
   showsPrec d (Log x)   = showsUnary d 10 "log" x
   showsPrec d (Sin x)   = showsUnary d 10 "sin" x
   showsPrec d (Cos x)   = showsUnary d 10 "cos" x
+  showsPrec d (Tan x)   = showsUnary d 10 "tan" x
   showsPrec d (ASin x)  = showsUnary d 10 "asin" x
   showsPrec d (ATan x)  = showsUnary d 10 "atan" x
   showsPrec d (ACos x)  = showsUnary d 10 "acos" x
@@ -323,6 +325,7 @@ instance (Eq a, Floating a) => Floating (Expr a) where
   log         = applyFloatingUn (  log,   Log)
   sin         = applyFloatingUn (  sin,   Sin)
   cos         = applyFloatingUn (  cos,   Cos)
+  tan         = applyFloatingUn (  tan,   Tan)
   asin        = applyFloatingUn ( asin,  ASin)
   atan        = applyFloatingUn ( atan,  ATan)
   acos        = applyFloatingUn ( acos,  ACos)
@@ -405,6 +408,7 @@ instance MuRef (Expr a) where
   mapDeRef f (EFloating (Log   x))     = GFloating <$> (Log   <$> f x)
   mapDeRef f (EFloating (Sin   x))     = GFloating <$> (Sin   <$> f x)
   mapDeRef f (EFloating (Cos   x))     = GFloating <$> (Cos   <$> f x)
+  mapDeRef f (EFloating (Tan   x))     = GFloating <$> (Tan   <$> f x)
   mapDeRef f (EFloating (ASin  x))     = GFloating <$> (ASin  <$> f x)
   mapDeRef f (EFloating (ATan  x))     = GFloating <$> (ATan  <$> f x)
   mapDeRef f (EFloating (ACos  x))     = GFloating <$> (ACos  <$> f x)
@@ -445,6 +449,7 @@ substitute expr subList
     subs (EFloating (Log   x))     = log   (subs x)
     subs (EFloating (Sin   x))     = sin   (subs x)
     subs (EFloating (Cos   x))     = cos   (subs x)
+    subs (EFloating (Tan   x))     = tan   (subs x)
     subs (EFloating (ASin  x))     = asin  (subs x)
     subs (EFloating (ATan  x))     = atan  (subs x)
     subs (EFloating (ACos  x))     = acos  (subs x)
@@ -487,6 +492,7 @@ sketchySubstitute expr subList
     subs (EFloating (Log   x))     = EFloating (Log   (subs x))
     subs (EFloating (Sin   x))     = EFloating (Sin   (subs x))
     subs (EFloating (Cos   x))     = EFloating (Cos   (subs x))
+    subs (EFloating (Tan   x))     = EFloating (Tan   (subs x))
     subs (EFloating (ASin  x))     = EFloating (ASin  (subs x))
     subs (EFloating (ATan  x))     = EFloating (ATan  (subs x))
     subs (EFloating (ACos  x))     = EFloating (ACos  (subs x))
@@ -518,6 +524,7 @@ foldExpr f acc (EFloating (Exp x))       = foldExpr f acc x
 foldExpr f acc (EFloating (Log x))       = foldExpr f acc x
 foldExpr f acc (EFloating (Sin x))       = foldExpr f acc x
 foldExpr f acc (EFloating (Cos x))       = foldExpr f acc x
+foldExpr f acc (EFloating (Tan x))       = foldExpr f acc x
 foldExpr f acc (EFloating (ASin x))      = foldExpr f acc x
 foldExpr f acc (EFloating (ATan x))      = foldExpr f acc x
 foldExpr f acc (EFloating (ACos x))      = foldExpr f acc x
@@ -599,6 +606,7 @@ extractLinearPart e@(EFloating (Exp _))   _ = (e,0)
 extractLinearPart e@(EFloating (Log _))   _ = (e,0)
 extractLinearPart e@(EFloating (Sin _))   _ = (e,0)
 extractLinearPart e@(EFloating (Cos _))   _ = (e,0)
+extractLinearPart e@(EFloating (Tan _))   _ = (e,0)
 extractLinearPart e@(EFloating (ASin _))  _ = (e,0)
 extractLinearPart e@(EFloating (ATan _))  _ = (e,0)
 extractLinearPart e@(EFloating (ACos _))  _ = (e,0)
