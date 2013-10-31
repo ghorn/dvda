@@ -215,6 +215,10 @@ fromNeg (EFractional (FromRational r))
 fromNeg _ = Nothing
 
 instance (Eq a, Num a) => Num (Expr a) where
+  (*) x y
+    | isVal 0 x || isVal 0 y = 0
+    | isVal 1 x = y
+    | isVal 1 y = x
   (*) (EConst x) (EConst y) = EConst (x*y)
   (*) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx * ky)
   (*) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx * ry)
@@ -224,16 +228,16 @@ instance (Eq a, Num a) => Num (Expr a) where
   (*) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx * y
   (*) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx * ry)
   (*) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx * fromInteger ky)
-  (*) x y
-    | isVal 0 x || isVal 0 y = 0
-    | isVal 1 x = y
-    | isVal 1 y = x
   (*) x y = case (fromNeg x, fromNeg y) of
               (Just x', Just y') -> x' * y'
               (Nothing, Just y') -> negate (x  * y')
               (Just x', Nothing) -> negate (x' * y )
               _ -> ENum $ Mul x y
 
+  (+) x y
+    | isVal 0 x = y
+    | isVal 0 y = x
+    | x == negate y = 0
   (+) (EConst x) (EConst y) = EConst (x+y)
   (+) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx + ky)
   (+) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx + ry)
@@ -243,16 +247,16 @@ instance (Eq a, Num a) => Num (Expr a) where
   (+) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx + y
   (+) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx + ry)
   (+) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx + fromInteger ky)
-  (+) x y
-    | isVal 0 x = y
-    | isVal 0 y = x
-    | x == negate y = 0
   (+) x y = case (fromNeg x, fromNeg y) of
               (Just x', Just y') -> negate (x' + y')
               (Nothing, Just y') -> x  - y'
               (Just x', Nothing) -> y  - x'
               _ -> ENum $ Add x y
 
+  (-) x y
+    | isVal 0 x = negate y
+    | isVal 0 y = x
+    | x == y = 0
   (-) (EConst x) (EConst y) = EConst (x-y)
   (-) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = ENum $ FromInteger (kx - ky)
   (-) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx - ry)
@@ -262,10 +266,6 @@ instance (Eq a, Num a) => Num (Expr a) where
   (-) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx - y
   (-) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx - ry)
   (-) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx - fromInteger ky)
-  (-) x y
-    | isVal 0 x = negate y
-    | isVal 0 y = x
-    | x == y = 0
   (-) x y = case (fromNeg x, fromNeg y) of
               (Just x', Just y') -> y' - x' -- (-x) - (-y) == y - x
               (Nothing, Just y') -> x + y' -- (x) - (-y) == x + y
@@ -293,6 +293,10 @@ instance (Eq a, Num a) => Num (Expr a) where
   fromInteger = ENum . FromInteger
 
 instance (Eq a, Fractional a) => Fractional (Expr a) where
+  (/) x y
+    | isVal 0 y = error "Fractional (Expr a) divide by zero"
+    | isVal 0 x = 0
+    | isVal 1 y = x
   (/) (EConst x) (EConst y) = EConst (x/y)
   (/) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = EFractional $ FromRational (kx % ky)
   (/) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx / ry)
@@ -302,10 +306,6 @@ instance (Eq a, Fractional a) => Fractional (Expr a) where
   (/) (EFractional (FromRational rx)) (EConst y) = EConst $ fromRational rx / y
   (/) (ENum (FromInteger kx)) (EFractional (FromRational ry)) = EFractional $ FromRational (fromInteger kx / ry)
   (/) (EFractional (FromRational rx)) (ENum (FromInteger ky)) = EFractional $ FromRational (rx / fromInteger ky)
-  (/) x y
-    | isVal 0 y = error "Fractional (Expr a) divide by zero"
-    | isVal 0 x = 0
-    | isVal 1 y = x
   (/) x y = case (fromNeg x, fromNeg y) of
               (Just x', Just y') -> x' / y'
               (Nothing, Just y') -> negate (x  / y')
