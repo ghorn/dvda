@@ -297,6 +297,7 @@ instance (Eq a, Fractional a) => Fractional (Expr a) where
     | isVal 0 y = error "Fractional (Expr a) divide by zero"
     | isVal 0 x = 0
     | isVal 1 y = x
+    | x == y = 1
   (/) (EConst x) (EConst y) = EConst (x/y)
   (/) (ENum (FromInteger kx)) (ENum (FromInteger ky)) = EFractional $ FromRational (kx % ky)
   (/) (EFractional (FromRational rx)) (EFractional (FromRational ry)) = EFractional $ FromRational (rx / ry)
