@@ -46,7 +46,6 @@ findConflictingInputs syms = HS.toList redundant
           | HS.member s knownExprs = (knownExprs, HS.insert s redundantExprs)
           | otherwise = (HS.insert s knownExprs, redundantExprs)
 
-
 -- | Take inputs and outputs and traverse the outputs reifying all expressions
 --   and creating a hashmap of StableNames. Once the hashmap is created,
 --   lookup the provided inputs and return a FunGraph which contains an
@@ -63,7 +62,6 @@ toFunGraph inputExprs outputExprs = do
         where
           f (ESym s) = s
           f _ = error $ "ERROR: toFunGraph given non-ESym input" -- \"" ++ show x ++ "\""
-
       fg = FunGraph { fgInputs = userInputSyms
                     , fgOutputs = outputIndices
                     , fgReified = reverse rgr
@@ -76,11 +74,10 @@ toFunGraph inputExprs outputExprs = do
       lookupG k = (\(g,_,_) -> g) <$> lookupVertex <$> lookupKey k
 
       topSort = map lookup' $ reverse $ map ((\(_,k,_) -> k) . lookupVertex) $ Graph.topSort gr
-        where
-          lookup' k = case lookupG k of
-            Nothing -> error "DVDA internal error"
-            (Just g) -> (k,g)
 
+      lookup' k = case lookupG k of
+        Nothing -> error "DVDA internal error"
+        Just g -> (k,g)
   return $ case (detectMissingInputs inputExprs rgr, findConflictingInputs userInputSyms) of
     ([],[]) -> fg
     (xs,[]) -> error $ "toFunGraph found inputs that were not provided by the user: " ++ show xs

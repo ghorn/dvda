@@ -14,7 +14,6 @@ module Dvda.Expr ( Expr(..)
                  , Fractionals(..)
                  , Floatings(..)
                  , Sym(..)
-                 , isVal
                  , sym
                  , symDependent
                  , symDependentN
@@ -27,7 +26,7 @@ module Dvda.Expr ( Expr(..)
                  , fromNeg
                  ) where
 
-import Control.Applicative ( (<$>), (<*>), pure )
+import Control.Applicative ( (<$>), pure )
 import Data.Hashable ( Hashable(..), hash )
 import Data.Ratio ( (%) )
 import GHC.Generics ( Generic )
@@ -36,7 +35,6 @@ import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 
 import qualified Dvda.HashMap as HM
-import Dvda.Algorithm.Reify ( MuRef(..) )
 
 commutativeMul :: Bool
 commutativeMul = True
@@ -92,7 +90,6 @@ data Floatings a = Pow a a
                  | ATanh a
                  | ACosh a
                  deriving (Eq, Ord, Generic, Functor, F.Foldable, T.Traversable)
-
 
 ----------------------- Show instances -------------------------
 showsInfixBinary :: (Show a, Show b) => Int -> Int -> String -> a -> b -> ShowS
@@ -388,38 +385,6 @@ instance (Hashable a, Hashable b) => Hashable (GExpr a b) where
   hashWithSalt s (GFractional x) = s `hashWithSalt` "GFractional" `hashWithSalt` x
   hashWithSalt s (GFloating x)   = s `hashWithSalt` "GFloating"   `hashWithSalt` x
 
-instance MuRef (Expr a) where
-  type DeRef (Expr a) = GExpr a
-  mapDeRef _ (ESym name) = pure (GSym name)
-  mapDeRef _ (EConst c)  = pure (GConst c)
-  mapDeRef f (ENum (Mul x y)) = GNum <$> (Mul <$> f x <*> f y)
-  mapDeRef f (ENum (Add x y)) = GNum <$> (Add <$> f x <*> f y)
-  mapDeRef f (ENum (Sub x y)) = GNum <$> (Sub <$> f x <*> f y)
-  mapDeRef f (ENum (Negate x)) = GNum <$> (Negate <$> f x)
-  mapDeRef f (ENum (Abs x)) = GNum <$> (Abs <$> f x)
-  mapDeRef f (ENum (Signum x)) = GNum <$> (Signum <$> f x)
-  mapDeRef _ (ENum (FromInteger k)) = pure $ GNum (FromInteger k)
-
-  mapDeRef f (EFractional (Div x y)) = GFractional <$> (Div <$> f x <*> f y)
-  mapDeRef _ (EFractional (FromRational x)) = pure $ GFractional (FromRational x)
-
-  mapDeRef f (EFloating (Pow x y))     = GFloating <$> (Pow <$> f x <*> f y)
-  mapDeRef f (EFloating (LogBase x y)) = GFloating <$> (LogBase <$> f x <*> f y)
-  mapDeRef f (EFloating (Exp   x))     = GFloating <$> (Exp   <$> f x)
-  mapDeRef f (EFloating (Log   x))     = GFloating <$> (Log   <$> f x)
-  mapDeRef f (EFloating (Sin   x))     = GFloating <$> (Sin   <$> f x)
-  mapDeRef f (EFloating (Cos   x))     = GFloating <$> (Cos   <$> f x)
-  mapDeRef f (EFloating (Tan   x))     = GFloating <$> (Tan   <$> f x)
-  mapDeRef f (EFloating (ASin  x))     = GFloating <$> (ASin  <$> f x)
-  mapDeRef f (EFloating (ATan  x))     = GFloating <$> (ATan  <$> f x)
-  mapDeRef f (EFloating (ACos  x))     = GFloating <$> (ACos  <$> f x)
-  mapDeRef f (EFloating (Sinh  x))     = GFloating <$> (Sinh  <$> f x)
-  mapDeRef f (EFloating (Cosh  x))     = GFloating <$> (Cosh  <$> f x)
-  mapDeRef f (EFloating (Tanh  x))     = GFloating <$> (Tanh  <$> f x)
-  mapDeRef f (EFloating (ASinh x))     = GFloating <$> (ASinh <$> f x)
-  mapDeRef f (EFloating (ATanh x))     = GFloating <$> (ATanh <$> f x)
-  mapDeRef f (EFloating (ACosh x))     = GFloating <$> (ACosh <$> f x)
-
 substitute :: (Ord a, Hashable a, Show a) => Expr a -> [(Expr a, Expr a)] -> Expr a
 substitute expr subList
   | nonSymInputs /= [] = error $ "substitute got non-ESym input: " ++ show nonSymInputs
@@ -561,6 +526,7 @@ isVal v (EConst c) = v == c
 isVal v (ENum (FromInteger k)) = v == fromInteger k
 isVal v (EFractional (FromRational r)) = v == fromRational r
 isVal _ _ = False
+{-# INLINE isVal #-}
 
 -- | if the expression is a constant, a fromInteger, or a fromRational, return the constant part
 --   otherwise return nothing
