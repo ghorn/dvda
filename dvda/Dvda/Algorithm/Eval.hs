@@ -19,31 +19,38 @@ import Dvda.Algorithm.FunGraph ( Node(..) )
 newtype RtOp v a = RtOp (forall s. (G.Mutable v) s a -> v a -> (G.Mutable v) s a -> ST s ())
 
 -- | purely run an algoritm
-runAlgorithm :: G.Vector v a => Algorithm a -> v a -> v a
+runAlgorithm :: G.Vector v a => Algorithm a -> v a -> Either String (v a)
 runAlgorithm alg =
   runAlg'' (algInDims alg) (algOutDims alg) (algWorkSize alg) (map toRtOp (algOps alg))
   where
-    runAlg'' :: G.Vector v a => Int -> Int -> Int -> [RtOp v a] -> v a -> v a
+    runAlg'' :: G.Vector v a => Int -> Int -> Int -> [RtOp v a] -> v a -> Either String (v a)
     runAlg'' inSize outSize workSize ops inputVec
-      | G.length inputVec /= inSize = error "runAlg: input dimension mismatch"
-      | otherwise = runST $ do
+      | G.length inputVec /= inSize =
+        Left $ "runAlg: input dimension mismatch, given: " ++ show (G.length inputVec) ++
+               ", expected: " ++ show inSize
+      | otherwise = Right $ runST $ do
         workVec <- GM.new workSize
         outputVec <- GM.new outSize
         mapM_ (\(RtOp op) -> op workVec inputVec outputVec) ops
         G.freeze outputVec
 
 -- | run an algoritm in the ST monad, mutating a user-provided output vector
-runAlgorithm' :: G.Vector v a => Algorithm a -> v a -> G.Mutable v s a -> ST s ()
+runAlgorithm' :: G.Vector v a => Algorithm a -> v a -> G.Mutable v s a -> ST s (Maybe String)
 runAlgorithm' alg =
   runAlg'' (algInDims alg) (algOutDims alg) (algWorkSize alg) (map toRtOp (algOps alg))
   where
-    runAlg'' :: G.Vector v a => Int -> Int -> Int -> [RtOp v a] -> v a -> G.Mutable v s a -> ST s ()
+    runAlg'' :: G.Vector v a => Int -> Int -> Int -> [RtOp v a] -> v a -> G.Mutable v s a -> ST s (Maybe String)
     runAlg'' inSize outSize workSize ops inputVec outputVec
-      | G.length inputVec /= inSize = error "runAlg': input dimension mismatch"
-      | GM.length outputVec /= outSize = error "runAlg': output dimension mismatch"
+      | G.length inputVec /= inSize =
+        return $ Just $ "runAlg': input dimension mismatch, given: " ++ show (G.length inputVec) ++
+                        ", expected: " ++ show inSize
+      | GM.length outputVec /= outSize =
+        return $ Just $ "runAlg': output dimension mismatch, given: " ++ show (GM.length outputVec) ++
+                        ", expected: " ++ show outSize
       | otherwise = do
         workVec <- GM.new workSize
         mapM_ (\(RtOp op) -> op workVec inputVec outputVec) ops
+        return Nothing
 
 bin :: GM.MVector (G.Mutable v) a => Node -> Node -> Node -> (a -> a -> a) -> RtOp v a
 bin (Node k) (Node kx) (Node ky) f = RtOp $ \work _ _ -> do
