@@ -100,6 +100,7 @@ Test-suite test
   type:              exitcode-stdio-1.0
   hs-source-dirs:    .
   main-is:           TestMain.hs
+  other-modules:     Dvda.Tests.Unary
   build-depends:     base,
                      dvda,
                      file-location,
